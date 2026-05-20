@@ -1,0 +1,289 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Ledge Design System - Social Prediction Market */
+/* Target: Gen Z | Aesthetic: Bloomberg terminal meets streetwear */
+
+:root {
+  /* Core Palette */
+  --background: #0A0A0B;
+  --foreground: #F0F0F0;
+  --surface: #111114;
+  --surface-foreground: #F0F0F0;
+  
+  /* Card System */
+  --card: #111114;
+  --card-foreground: #F0F0F0;
+  --popover: #111114;
+  --popover-foreground: #F0F0F0;
+  
+  /* Accent - Electric Amber */
+  --accent: #F5A623;
+  --accent-foreground: #0A0A0B;
+  --primary: #F5A623;
+  --primary-foreground: #0A0A0B;
+  
+  /* Secondary/Muted */
+  --secondary: #1E1E24;
+  --secondary-foreground: #F0F0F0;
+  --muted: #1E1E24;
+  --muted-foreground: #6B6B7B;
+  
+  /* Borders */
+  --border: #1E1E24;
+  --input: #1E1E24;
+  --ring: #F5A623;
+  
+  /* Semantic Colors */
+  --success: #22C55E;
+  --success-foreground: #0A0A0B;
+  --danger: #EF4444;
+  --danger-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  
+  /* Chart Colors - Data Visualization */
+  --chart-1: #F5A623;
+  --chart-2: #22C55E;
+  --chart-3: #EF4444;
+  --chart-4: #6B6B7B;
+  --chart-5: #3B82F6;
+  
+  /* Radius System */
+  --radius: 8px;
+  --radius-card: 8px;
+  --radius-button: 6px;
+  --radius-badge: 4px;
+  
+  /* Glow Effects */
+  --glow-amber: 0 0 20px rgba(245, 166, 35, 0.15);
+  --glow-amber-hover: 0 0 30px rgba(245, 166, 35, 0.25);
+  --glow-success: 0 0 20px rgba(34, 197, 94, 0.2);
+  --glow-danger: 0 0 20px rgba(239, 68, 68, 0.2);
+  
+  /* Sidebar */
+  --sidebar: #0A0A0B;
+  --sidebar-foreground: #F0F0F0;
+  --sidebar-primary: #F5A623;
+  --sidebar-primary-foreground: #0A0A0B;
+  --sidebar-accent: #1E1E24;
+  --sidebar-accent-foreground: #F0F0F0;
+  --sidebar-border: #1E1E24;
+  --sidebar-ring: #F5A623;
+}
+
+@theme inline {
+  /* Typography */
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
+  
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  
+  /* Radius */
+  --radius-sm: var(--radius-badge);
+  --radius-md: var(--radius-button);
+  --radius-lg: var(--radius-card);
+  --radius-xl: calc(var(--radius-card) + 4px);
+  
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  
+  html {
+    @apply bg-background;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  /* Card Glow Effect */
+  .card-glow {
+    @apply transition-shadow duration-300;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+  
+  .card-glow:hover {
+    box-shadow: var(--glow-amber-hover), 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  
+  /* Ticker Animation */
+  .ticker-up {
+    animation: ticker-up 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .ticker-down {
+    animation: ticker-down 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Badge with Gradient (rank badges only) */
+  .badge-rank-gold {
+    background: linear-gradient(135deg, #F5A623 0%, #FCD34D 50%, #F5A623 100%);
+    color: #0A0A0B;
+  }
+  
+  .badge-rank-silver {
+    background: linear-gradient(135deg, #6B6B7B 0%, #A1A1AA 50%, #6B6B7B 100%);
+    color: #0A0A0B;
+  }
+  
+  .badge-rank-bronze {
+    background: linear-gradient(135deg, #CD7F32 0%, #E9A96C 50%, #CD7F32 100%);
+    color: #0A0A0B;
+  }
+  
+  /* Monospace Numbers */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Dense Data Grid */
+  .data-dense {
+    @apply text-sm leading-tight tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* Glow utilities */
+  .glow-amber {
+    box-shadow: var(--glow-amber);
+  }
+  
+  .glow-success {
+    box-shadow: var(--glow-success);
+  }
+  
+  .glow-danger {
+    box-shadow: var(--glow-danger);
+  }
+  
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Animations */
+@keyframes ticker-up {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ticker-down {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: var(--glow-amber);
+  }
+  50% {
+    box-shadow: var(--glow-amber-hover);
+  }
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Selection */
+::selection {
+  background: rgba(245, 166, 35, 0.3);
+  color: var(--foreground);
+}

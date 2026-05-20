@@ -1,0 +1,287 @@
+"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
+import { MarketFeedCard } from "@/components/market-feed-card"
+import { BetModal } from "@/components/bet-modal"
+import { MarketDetail } from "@/components/market-detail"
+import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+
+type Category = "All" | "Sports" | "Politics" | "Culture" | "Circle"
+
+const TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Circle"]
+
+interface Market {
+  id: string
+  title: string
+  category: "Sports" | "Politics" | "Culture" | "Circle"
+  endTime: string
+  yesPercent: number
+  yesPool: number
+  noPool: number
+  totalCredits: number
+  hotScore?: number
+  momentumShift?: number
+  isFeatured?: boolean
+  isNearMiss?: boolean
+  userBet?: { side: "yes" | "no"; amount: number }
+  resolved?: { winner: "yes" | "no" }
+}
+
+interface TradeModal {
+  market: Market
+  side: "yes" | "no"
+}
+
+interface FeedScreenProps {
+  availableCredits: number
+  onBet: (
+    marketTitle: string,
+    marketCategory: string,
+    side: "yes" | "no",
+    amount: number,
+    yesPercent: number,
+    majorityWas: "yes" | "no",
+    serverCredits?: number,
+    serverXp?: number,
+  ) => void
+  onWin: (
+    marketTitle: string,
+    marketCategory: string,
+    bet: { side: "yes" | "no"; amount: number },
+    payout: number
+  ) => void
+}
+
+function formatCredits(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+  return value.toString()
+}
+
+export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) {
+  const [activeTab, setActiveTab] = useState<Category>("All")
+  const [markets, setMarkets] = useState<Market[]>([])
+  const [loading, setLoading] = useState(true)
+  const [detailMarket, setDetailMarket] = useState<Market | null>(null)
+  const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
+  const supabase = useRef(createClient())
+
+  const loadMarkets = useCallback(async () => {
+    await fetch('/api/markets/resolve-expired', { method: 'POST' })
+    const res = await fetch('/api/markets')
+    if (res.ok) {
+      const data = await res.json()
+      setMarkets(data)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadMarkets()
+  }, [loadMarkets])
+
+  // Supabase Realtime — live odds
+  useEffect(() => {
+    const channel = supabase.current
+      .channel('market-odds')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'markets' },
+        (payload) => {
+          const updated = payload.new as {
+            id: string
+            yes_percent: number
+            yes_pool: number
+            no_pool: number
+            total_credits: number
+            hot_score: number
+            momentum_shift: number
+            resolved: boolean
+            winner: string | null
+          }
+          const patch = {
+            yesPercent: updated.yes_percent,
+            yesPool: updated.yes_pool,
+            noPool: updated.no_pool,
+            totalCredits: updated.total_credits,
+            hotScore: updated.hot_score,
+            momentumShift: updated.momentum_shift,
+            resolved: updated.resolved && updated.winner
+              ? { winner: updated.winner as "yes" | "no" }
+              : undefined,
+          }
+          setMarkets((prev) => prev.map((m) => m.id === updated.id ? { ...m, ...patch } : m))
+          // Also patch the open detail view if it's for this market
+          setDetailMarket((prev) => prev?.id === updated.id ? { ...prev, ...patch } : prev)
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.current.removeChannel(channel) }
+  }, [])
+
+  const filtered = activeTab === "All"
+    ? markets
+    : markets.filter((m) => m.category === activeTab)
+
+  // Screener stats
+  const openMarkets = markets.filter((m) => !m.resolved)
+  const totalVolume = markets.reduce((sum, m) => sum + m.totalCredits, 0)
+  const hotCount = openMarkets.filter((m) => (m.hotScore ?? 0) >= 8).length
+
+  const openTrade = (market: Market, side: "yes" | "no") => {
+    if (market.userBet || market.resolved) return
+    setTradeModal({ market, side })
+  }
+
+  const handleBetSubmit = async (side: "yes" | "no", amount: number) => {
+    const market = tradeModal?.market
+    if (!market) return
+
+    const majorityWas: "yes" | "no" = market.yesPercent >= 50 ? "yes" : "no"
+    const creditsBeforeBet = availableCredits
+
+    setTradeModal(null) // close modal immediately
+
+    // Optimistic update — deduct credits and show toast right away, don't wait for API
+    onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas)
+
+    const res = await fetch('/api/bets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ market_id: market.id, side, amount }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const msg = err?.error ?? `Server error (${res.status})`
+      console.error('Bet failed:', msg, err)
+      // Reverse the optimistic deduction and show error
+      onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
+      return
+    }
+
+    const data = await res.json()
+
+    const patch = { userBet: { side, amount: data?.cappedAmount ?? amount } }
+    setMarkets((prev) => prev.map((m) => m.id === market.id ? { ...m, ...patch } : m))
+    setDetailMarket((prev) => prev?.id === market.id ? { ...prev, ...patch } : prev)
+
+    // Correct balance to exact server value (handles capped amounts etc.)
+    if (data?.profile) {
+      onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp)
+    }
+  }
+
+  // When trade modal opens from detail view, keep the detail open under it
+  const openTradeFromDetail = (side: "yes" | "no") => {
+    if (!detailMarket) return
+    setTradeModal({ market: detailMarket, side })
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto">
+
+        {/* Screener stats bar */}
+        <div className="bg-surface border-b border-border px-4 py-2 flex items-center gap-4 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+              <span className="font-mono font-bold text-foreground">{openMarkets.length}</span> open
+            </span>
+          </div>
+          <span className="text-border shrink-0">·</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              <span className="font-mono font-bold text-foreground">{formatCredits(totalVolume)}</span> CR vol
+            </span>
+          </div>
+          {hotCount > 0 && (
+            <>
+              <span className="text-border shrink-0">·</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[10px] text-orange-400 uppercase tracking-wider font-semibold">
+                  🔥 <span className="font-mono">{hotCount}</span> hot
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-4 py-2">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "shrink-0 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-150",
+                  activeTab === tab
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Markets */}
+        <div className="px-4 py-3 space-y-3">
+          {loading ? (
+            <div className="py-16 flex justify-center">
+              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground text-sm">No {activeTab.toLowerCase()} markets right now.</p>
+            </div>
+          ) : (
+            filtered.map((market) => (
+              <MarketFeedCard
+                key={market.id}
+                {...market}
+                endTime={new Date(market.endTime)}
+                yesPool={market.yesPool ?? 0}
+                noPool={market.noPool ?? 0}
+                hotScore={market.hotScore ?? 0}
+                momentumShift={market.momentumShift ?? 0}
+                isFeatured={market.isFeatured ?? false}
+                isNearMiss={market.isNearMiss ?? false}
+                onClick={() => setDetailMarket(market)}
+                onBuyYes={() => openTrade(market, "yes")}
+                onBuyNo={() => openTrade(market, "no")}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Market detail overlay */}
+      {detailMarket && (
+        <MarketDetail
+          market={detailMarket}
+          onClose={() => setDetailMarket(null)}
+          onBuyYes={() => openTradeFromDetail("yes")}
+          onBuyNo={() => openTradeFromDetail("no")}
+        />
+      )}
+
+      {/* Bet / trade modal */}
+      {tradeModal && (
+        <BetModal
+          market={tradeModal.market}
+          initialSide={tradeModal.side}
+          availableCredits={availableCredits}
+          onClose={() => setTradeModal(null)}
+          onSubmit={handleBetSubmit}
+        />
+      )}
+    </div>
+  )
+}
