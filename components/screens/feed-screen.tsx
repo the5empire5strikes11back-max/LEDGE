@@ -6,6 +6,7 @@ import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 
 type Category = "All" | "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -65,14 +66,26 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
   const [loading, setLoading] = useState(true)
   const [detailMarket, setDetailMarket] = useState<Market | null>(null)
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
+
+  // ── Odds history — stored in a ref (Map), never causes re-renders on push.
+  // A separate version counter forces cards to re-read the ref when new points
+  // arrive from Realtime. We increment per-market so only affected cards update.
+  const oddsHistoryRef = useRef<Map<string, OddsPoint[]>>(new Map())
+  const [oddsVersion, setOddsVersion] = useState<Map<string, number>>(new Map())
+
   const supabase = useRef(createClient())
 
   const loadMarkets = useCallback(async () => {
     await fetch('/api/markets/resolve-expired', { method: 'POST' })
     const res = await fetch('/api/markets')
     if (res.ok) {
-      const data = await res.json()
+      const data: Market[] = await res.json()
       setMarkets(data)
+      // Seed one baseline point per market from the initial load
+      seedOddsHistory(
+        oddsHistoryRef.current,
+        data.map((m) => ({ id: m.id, yesPercent: m.yesPercent }))
+      )
     }
     setLoading(false)
   }, [])
@@ -81,7 +94,7 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
     loadMarkets()
   }, [loadMarkets])
 
-  // Supabase Realtime — live odds
+  // ── Supabase Realtime — live odds + history accumulation
   useEffect(() => {
     const channel = supabase.current
       .channel('market-odds')
@@ -100,6 +113,17 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
             resolved: boolean
             winner: string | null
           }
+
+          // Push new odds point into the history ring
+          pushOddsPoint(oddsHistoryRef.current, updated.id, updated.yes_percent)
+
+          // Bump per-market version so the card reading from the ref re-renders
+          setOddsVersion((prev) => {
+            const next = new Map(prev)
+            next.set(updated.id, (prev.get(updated.id) ?? 0) + 1)
+            return next
+          })
+
           const patch = {
             yesPercent: updated.yes_percent,
             yesPool: updated.yes_pool,
@@ -112,7 +136,6 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
               : undefined,
           }
           setMarkets((prev) => prev.map((m) => m.id === updated.id ? { ...m, ...patch } : m))
-          // Also patch the open detail view if it's for this market
           setDetailMarket((prev) => prev?.id === updated.id ? { ...prev, ...patch } : prev)
         }
       )
@@ -142,9 +165,8 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
     const majorityWas: "yes" | "no" = market.yesPercent >= 50 ? "yes" : "no"
     const creditsBeforeBet = availableCredits
 
-    setTradeModal(null) // close modal immediately
+    setTradeModal(null)
 
-    // Optimistic update — deduct credits and show toast right away, don't wait for API
     onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas)
 
     const res = await fetch('/api/bets', {
@@ -155,9 +177,7 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      const msg = err?.error ?? `Server error (${res.status})`
-      console.error('Bet failed:', msg, err)
-      // Reverse the optimistic deduction and show error
+      console.error('Bet failed:', err?.error ?? `Server error (${res.status})`)
       onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
       return
     }
@@ -168,13 +188,11 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
     setMarkets((prev) => prev.map((m) => m.id === market.id ? { ...m, ...patch } : m))
     setDetailMarket((prev) => prev?.id === market.id ? { ...prev, ...patch } : prev)
 
-    // Correct balance to exact server value (handles capped amounts etc.)
     if (data?.profile) {
       onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp)
     }
   }
 
-  // When trade modal opens from detail view, keep the detail open under it
   const openTradeFromDetail = (side: "yes" | "no") => {
     if (!detailMarket) return
     setTradeModal({ market: detailMarket, side })
@@ -253,6 +271,8 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
                 momentumShift={market.momentumShift ?? 0}
                 isFeatured={market.isFeatured ?? false}
                 isNearMiss={market.isNearMiss ?? false}
+                oddsHistory={oddsHistoryRef.current.get(market.id) ?? []}
+                oddsVersion={oddsVersion.get(market.id) ?? 0}
                 onClick={() => setDetailMarket(market)}
                 onBuyYes={() => openTrade(market, "yes")}
                 onBuyNo={() => openTrade(market, "no")}

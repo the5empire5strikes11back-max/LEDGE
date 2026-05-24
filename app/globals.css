@@ -263,6 +263,49 @@
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* ── Market liveness animations ─────────────────────────────────────────── */
+
+/* Live indicator dot — slow breathe for "moving", faster for "volatile/surging" */
+@keyframes live-dot-breathe {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+.live-dot-moving {
+  animation: live-dot-breathe 2.4s ease-in-out infinite;
+}
+
+.live-dot-volatile {
+  animation: live-dot-breathe 1.4s ease-in-out infinite;
+}
+
+.live-dot-surging {
+  animation: live-dot-breathe 0.8s ease-in-out infinite;
+}
+
+/* Card border glow — extremely subtle, only for volatile/surging */
+@keyframes card-border-breathe-yes {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(34, 197, 94, 0.10); }
+}
+
+@keyframes card-border-breathe-no {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(239, 68, 68, 0.10); }
+}
+
+@keyframes card-border-breathe-neutral {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(245, 166, 35, 0.08); }
+}
+
+.market-volatile-yes     { animation: card-border-breathe-yes     3s ease-in-out infinite; }
+.market-volatile-no      { animation: card-border-breathe-no      3s ease-in-out infinite; }
+.market-volatile-neutral { animation: card-border-breathe-neutral 3s ease-in-out infinite; }
+.market-surging-yes      { animation: card-border-breathe-yes     1.6s ease-in-out infinite; }
+.market-surging-no       { animation: card-border-breathe-no      1.6s ease-in-out infinite; }
+.market-surging-neutral  { animation: card-border-breathe-neutral 1.6s ease-in-out infinite; }
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 8px;

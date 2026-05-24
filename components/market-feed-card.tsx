@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
+import { OddsSparkline } from "@/components/ui/odds-sparkline"
+import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -20,20 +22,17 @@ interface MarketFeedCardProps {
   momentumShift?: number
   isFeatured?: boolean
   isNearMiss?: boolean
-  userBet?: {
-    side: "yes" | "no"
-    amount: number
-  }
-  resolved?: {
-    winner: "yes" | "no"
-  }
+  oddsHistory?: OddsPoint[]
+  /** Increments each time history is updated — invalidates memoized signals */
+  oddsVersion?: number
+  userBet?: { side: "yes" | "no"; amount: number }
+  resolved?: { winner: "yes" | "no" }
   className?: string
   onClick?: () => void
   onBuyYes?: () => void
   onBuyNo?: () => void
 }
 
-// Muted category labels — information, not decoration
 const categoryLabel: Record<MarketCategory, string> = {
   Sports: "Sports",
   Politics: "Politics",
@@ -57,7 +56,6 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
     const end = value
     const duration = 500
     const startTime = performance.now()
-
     const animate = (time: number) => {
       const elapsed = time - startTime
       const progress = Math.min(elapsed / duration, 1)
@@ -65,18 +63,67 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
       setDisplayValue(start + (end - start) * eased)
       if (progress < 1) requestAnimationFrame(animate)
     }
-
     requestAnimationFrame(animate)
     prevValue.current = value
   }, [value])
 
-  const rounded = Math.round(displayValue)
   return (
     <span className={cn("font-mono tabular-nums", className)}>
-      {rounded}
+      {Math.round(displayValue)}
     </span>
   )
 }
+
+// ── Volatility glow class ─────────────────────────────────────────────────────
+
+function volatilityGlowClass(
+  volatility: "calm" | "moving" | "volatile" | "surging",
+  trend: "up" | "down" | "flat"
+): string {
+  if (volatility === "calm" || volatility === "moving") return ""
+  const dir = trend === "up" ? "yes" : trend === "down" ? "no" : "neutral"
+  return `market-${volatility}-${dir}`
+}
+
+// ── Live dot ─────────────────────────────────────────────────────────────────
+
+function LiveDot({ volatility }: { volatility: "calm" | "moving" | "volatile" | "surging" }) {
+  if (volatility === "calm") return null
+  const dotClass =
+    volatility === "surging" ? "live-dot-surging bg-accent" :
+    volatility === "volatile" ? "live-dot-volatile bg-accent" :
+    "live-dot-moving bg-accent/60"
+
+  return (
+    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotClass)} />
+  )
+}
+
+// ── Movement label ────────────────────────────────────────────────────────────
+
+function MovementLabel({
+  label,
+  trend,
+  volatility,
+}: {
+  label: string | null
+  trend: "up" | "down" | "flat"
+  volatility: "calm" | "moving" | "volatile" | "surging"
+}) {
+  if (!label || volatility === "calm") return null
+
+  const textColor =
+    trend === "up"   ? "text-success/80" :
+    trend === "down" ? "text-danger/80"  : "text-accent/80"
+
+  return (
+    <span className={cn("text-[10px] font-medium font-mono shrink-0 truncate", textColor)}>
+      {label}
+    </span>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function MarketFeedCard({
   title,
@@ -90,6 +137,8 @@ export function MarketFeedCard({
   momentumShift = 0,
   isFeatured = false,
   isNearMiss = false,
+  oddsHistory = [],
+  oddsVersion = 0,
   userBet,
   resolved,
   className,
@@ -98,54 +147,66 @@ export function MarketFeedCard({
   onBuyNo,
 }: MarketFeedCardProps) {
   const isHot = hotScore >= 8
-  const hasMomentum = momentumShift >= 3
   const noPercent = 100 - yesPercent
   const hasUserBet = !!userBet
   const isResolved = !!resolved
   const totalPool = yesPool + noPool
 
-  const isWin = isResolved && userBet && resolved.winner === userBet.side
+  const isWin  = isResolved && userBet && resolved.winner === userBet.side
   const isLoss = isResolved && userBet && resolved.winner !== userBet.side
+
+  // Compute movement signals — memoized, invalidated by oddsVersion counter
+  // (oddsHistory is a mutable ref array; its reference never changes)
+  const signals = useMemo(
+    () => computeMovementSignals(oddsHistory),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [oddsVersion, yesPercent] // oddsVersion bumps whenever new points are pushed
+  )
+
+  const { trend, volatility, label: movementLabel } = signals
+  const glowClass = !isResolved ? volatilityGlowClass(volatility, trend) : ""
+
+  // Show movement row only when we have real history to show
+  const hasMovement = oddsHistory.length >= 2 && (movementLabel !== null || volatility !== "calm")
 
   return (
     <div
       className={cn(
         "relative bg-card border overflow-hidden transition-colors duration-200",
-        // Featured: subtle left accent line, no glow
+        // Featured: subtle left accent
         isFeatured && !isResolved && "border-border border-l-2 border-l-accent",
-        // Hot: slightly brighter border only
-        isHot && !isFeatured && !isResolved && "border-border/70",
-        // Default
-        !isFeatured && !isHot && !isResolved && "border-border",
-        // Position results
-        isWin && "border-l-2 border-l-success",
+        // Default / hot
+        !isFeatured && !isResolved && "border-border",
+        // Resolved positions
+        isWin  && "border-l-2 border-l-success",
         isLoss && "border-l-2 border-l-danger opacity-75",
-        // Open position
+        // Open position (not resolved)
         hasUserBet && !isResolved && !isWin && !isLoss && "border-l-2 border-l-accent",
+        // Volatility glow (overrides default border-color on the shadow only)
+        glowClass,
         className
       )}
       style={{ borderRadius: "var(--radius-card)" }}
     >
       <div className="p-4 flex flex-col gap-3">
 
-        {/* Row 1: Category · signals · time */}
+        {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            {/* Category — plain text, no colored pill */}
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
               {categoryLabel[category]}
             </span>
 
-            {/* HOT: a small static dot — signal, not decoration */}
-            {isHot && !isResolved && (
-              <span className="flex items-center gap-1 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                <span className="text-[10px] text-orange-400 font-medium">Hot</span>
-              </span>
+            {/* Live dot — only shown when there's actual movement */}
+            {!isResolved && <LiveDot volatility={volatility} />}
+
+            {/* HOT label */}
+            {isHot && !isResolved && volatility === "calm" && (
+              <span className="text-[10px] text-orange-400 font-medium shrink-0">Hot</span>
             )}
 
-            {/* Momentum: plain data, no badge */}
-            {hasMomentum && !isHot && !isResolved && (
+            {/* Momentum number — only when no history-based label is available */}
+            {!isResolved && momentumShift >= 3 && !hasMovement && volatility === "calm" && (
               <span className="text-[10px] text-accent font-mono shrink-0">
                 ↑{momentumShift.toFixed(1)}%
               </span>
@@ -156,9 +217,7 @@ export function MarketFeedCard({
             <span
               className={cn(
                 "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 shrink-0",
-                resolved.winner === "yes"
-                  ? "bg-success/15 text-success"
-                  : "bg-danger/15 text-danger"
+                resolved.winner === "yes" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
               )}
               style={{ borderRadius: "var(--radius-badge)" }}
             >
@@ -169,30 +228,40 @@ export function MarketFeedCard({
           )}
         </div>
 
-        {/* Row 2: Question + probability — question is the product */}
-        <button
-          onClick={onClick}
-          className="flex items-start gap-4 text-left w-full group"
-        >
-          {/* Probability — the price */}
-          <div className="shrink-0 flex flex-col items-center w-[56px]">
+        {/* Row 2: [Price column] [Title] */}
+        <button onClick={onClick} className="flex items-start gap-4 text-left w-full group">
+
+          {/* Price column: big % + sparkline stacked */}
+          <div className="shrink-0 flex flex-col items-center w-[56px] gap-0.5">
             <AnimatedNumber
               value={yesPercent}
               className={cn(
                 "font-black leading-none",
                 yesPercent >= 100 || yesPercent <= 0 ? "text-3xl" : "text-4xl",
-                yesPercent > 50 ? "text-success" : yesPercent < 50 ? "text-danger" : "text-foreground"
+                yesPercent > 50 ? "text-success" :
+                yesPercent < 50 ? "text-danger"  : "text-foreground"
               )}
             />
             <span className={cn(
-              "text-[9px] font-semibold uppercase tracking-widest mt-0.5",
-              yesPercent > 50 ? "text-success/50" : yesPercent < 50 ? "text-danger/50" : "text-muted-foreground"
+              "text-[9px] font-semibold uppercase tracking-widest",
+              yesPercent > 50 ? "text-success/50" :
+              yesPercent < 50 ? "text-danger/50"  : "text-muted-foreground"
             )}>
               % YES
             </span>
+
+            {/* Sparkline — lives directly below the percentage */}
+            {!isResolved && (
+              <OddsSparkline
+                points={oddsHistory}
+                trend={trend}
+                width={56}
+                height={14}
+              />
+            )}
           </div>
 
-          {/* The question — more visual weight */}
+          {/* Question */}
           <div className="flex-1 min-w-0 pt-0.5">
             <h3 className="text-[14px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
@@ -200,7 +269,7 @@ export function MarketFeedCard({
           </div>
         </button>
 
-        {/* Row 3: YES/NO split bar */}
+        {/* Row 3: YES/NO odds bar */}
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-success/70 font-mono w-8 text-right shrink-0">
             {yesPercent.toFixed(0)}%
@@ -215,6 +284,13 @@ export function MarketFeedCard({
             {noPercent.toFixed(0)}%
           </span>
         </div>
+
+        {/* Row 3b: Movement label — only when there's real activity to show */}
+        {!isResolved && hasMovement && (
+          <div className="flex items-center gap-2 -mt-1">
+            <MovementLabel label={movementLabel} trend={trend} volatility={volatility} />
+          </div>
+        )}
 
         {/* Row 4: Trade buttons */}
         {!isResolved && !hasUserBet && (
@@ -297,7 +373,7 @@ export function MarketFeedCard({
           </div>
         )}
 
-        {/* Near-miss: factual, not manipulative */}
+        {/* Near-miss */}
         {isNearMiss && isResolved && (
           <p className="text-[10px] text-muted-foreground">
             Settled at {yesPercent.toFixed(1)}% — resolved within 10% margin
@@ -326,6 +402,7 @@ export function MarketFeedCard({
             </button>
           )}
         </div>
+
       </div>
     </div>
   )
