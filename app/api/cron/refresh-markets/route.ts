@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMarkets } from '@/lib/market-generator'
+import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -49,19 +50,44 @@ export async function POST(request: Request) {
     )
   }
 
-  // 2. Insert new markets (skip duplicates by title)
+  // 2. Quality scoring — filter out weak markets before inserting
+  let scoringResult: Awaited<ReturnType<typeof scoreMarkets>>
+  try {
+    scoringResult = await scoreMarkets(newMarkets, anthropicKey)
+    console.log(formatScoringLog(scoringResult))
+  } catch (err) {
+    // Scoring failure is non-fatal — fall back to inserting all generated markets
+    console.error('[cron/refresh-markets] Scoring pipeline failed, skipping filter:', err)
+    scoringResult = {
+      accepted: newMarkets.map((m) => ({ ...m, quality_score: 50 })),
+      rejected: [],
+      scoring_stats: {
+        total_input: newMarkets.length,
+        instant_rejected: 0,
+        ai_scored: 0,
+        ai_accepted: newMarkets.length,
+        ai_rejected: 0,
+        avg_accepted_score: 50,
+      },
+    }
+  }
+
+  const { accepted: qualityMarkets, rejected: rejectedMarkets, scoring_stats } = scoringResult
+
+  // 3. Insert only quality markets (skip duplicates by title)
   const { data: existing } = await supabase
     .from('markets')
     .select('title')
     .eq('resolved', false)
 
   const existingTitles = new Set((existing ?? []).map((m) => m.title.toLowerCase()))
-  const toInsert = newMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
+  const toInsert = qualityMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
 
   let inserted = 0
   let insertError: string | null = null
   if (toInsert.length > 0) {
-    const { error } = await supabase.from('markets').insert(toInsert)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('markets').insert(toInsert as any[])
     if (error) {
       insertError = error.message
     } else {
@@ -69,7 +95,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // 3. Clean up resolved markets older than 7 days
+  // 4. Clean up resolved markets older than 7 days
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - 7)
 
@@ -82,8 +108,16 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     generated: newMarkets.length,
+    quality_filter: {
+      ...scoring_stats,
+      rejected_titles: rejectedMarkets.map((r) => ({
+        title: r.market.title,
+        score: r.scores.weighted_score.toFixed(1),
+        reason: r.reason,
+      })),
+    },
     inserted,
-    skippedDuplicates: newMarkets.length - inserted,
+    skippedDuplicates: qualityMarkets.length - toInsert.length,
     cleaned: cleaned ?? 0,
     ...(insertError && { insertError }),
   })
