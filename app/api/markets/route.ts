@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { rankFeed } from '@/lib/feed-ranker'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -11,38 +12,55 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Fetch markets without any ordering — the ranker will sort them
   let query = supabase
     .from('markets')
     .select('*')
-    .order('created_at', { ascending: false })
 
   if (category && category !== 'All') {
     query = query.eq('category', category as import('@/types/database').MarketCategory)
   }
 
-  const { data: markets, error } = await query
+  // Fetch markets, user bets, and user's circle memberships in parallel
+  const [marketsResult, userBetsResult, circleMembershipsResult] = await Promise.all([
+    query,
+    supabase
+      .from('bets')
+      .select('market_id, side, amount, payout, won')
+      .eq('user_id', user.id),
+    supabase
+      .from('circle_members')
+      .select('circle_id')
+      .eq('user_id', user.id),
+  ])
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (marketsResult.error) {
+    return NextResponse.json({ error: marketsResult.error.message }, { status: 500 })
   }
 
-  // Attach the current user's bet for each market
-  const marketIds = markets.map((m) => m.id)
-  const { data: userBets } = await supabase
-    .from('bets')
-    .select('market_id, side, amount, payout, won')
-    .eq('user_id', user.id)
-    .in('market_id', marketIds)
+  const markets = marketsResult.data ?? []
 
-  const betMap = new Map(userBets?.map((b) => [b.market_id, b]) ?? [])
+  // Build lookup structures
+  const betMap = new Map(
+    (userBetsResult.data ?? []).map((b) => [b.market_id, b])
+  )
+  const userCircleIds = new Set(
+    (circleMembershipsResult.data ?? []).map((cm) => cm.circle_id)
+  )
 
+  // Rank raw DB rows first (they have resolved: boolean, which the ranker needs)
+  const rankedRaw = rankFeed(markets, userCircleIds)
+
+  // Build a stable rank-order map so we can reorder the enriched output
+  const rankOrder = new Map(rankedRaw.map((m, i) => [m.id, i]))
+
+  // Enrich markets with client-facing aliases and derived fields
   const enriched = markets.map((market) => {
     const userBet = betMap.get(market.id)
-    // Near-miss: resolved market whose final odds were within 10pp of flipping
     const isNearMiss =
       !!market.resolved &&
-      market.yes_percent >= 40 &&
-      market.yes_percent <= 60
+      (market.yes_percent ?? 50) >= 40 &&
+      (market.yes_percent ?? 50) <= 60
 
     return {
       ...market,
@@ -61,15 +79,8 @@ export async function GET(request: Request) {
     }
   })
 
-  // Sort: featured pinned first → hottest unresolved → DB order (recency)
-  enriched.sort((a, b) => {
-    if (a.isFeatured && !b.isFeatured) return -1
-    if (!a.isFeatured && b.isFeatured) return 1
-    if (!a.resolved && !b.resolved && a.hotScore !== b.hotScore) {
-      return b.hotScore - a.hotScore
-    }
-    return 0
-  })
+  // Apply the computed rank order to the enriched output
+  enriched.sort((a, b) => (rankOrder.get(a.id) ?? 9999) - (rankOrder.get(b.id) ?? 9999))
 
   return NextResponse.json(enriched)
 }
