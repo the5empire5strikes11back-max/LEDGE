@@ -5,7 +5,9 @@ import { TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
 import { OddsSparkline } from "@/components/ui/odds-sparkline"
+import { MarketSocialBar } from "@/components/market-social-bar"
 import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
+import type { MarketSocialData } from "@/lib/social-signals"
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -25,6 +27,7 @@ interface MarketFeedCardProps {
   oddsHistory?: OddsPoint[]
   /** Increments each time history is updated — invalidates memoized signals */
   oddsVersion?: number
+  social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
   className?: string
@@ -139,6 +142,7 @@ export function MarketFeedCard({
   isNearMiss = false,
   oddsHistory = [],
   oddsVersion = 0,
+  social = null,
   userBet,
   resolved,
   className,
@@ -290,6 +294,16 @@ export function MarketFeedCard({
           <div className="flex items-center gap-2 -mt-1">
             <MovementLabel label={movementLabel} trend={trend} volatility={volatility} />
           </div>
+        )}
+
+        {/* Row 3c: Social activity signals */}
+        {!isResolved && (
+          <MarketSocialBar
+            social={social}
+            yesPercent={yesPercent}
+            momentumShift={momentumShift}
+            className="-mt-1"
+          />
         )}
 
         {/* Row 4: Trade buttons */}

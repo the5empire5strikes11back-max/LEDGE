@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rankFeed } from '@/lib/feed-ranker'
+import { aggregateRecentBets } from '@/lib/social-signals'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -21,8 +22,11 @@ export async function GET(request: Request) {
     query = query.eq('category', category as import('@/types/database').MarketCategory)
   }
 
-  // Fetch markets, user bets, and user's circle memberships in parallel
-  const [marketsResult, userBetsResult, circleMembershipsResult] = await Promise.all([
+  // Single timestamp for all time-windowed queries
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString()
+
+  // Fetch markets, user bets, circle memberships, and recent bets — all in parallel
+  const [marketsResult, userBetsResult, circleMembershipsResult, recentBetsResult] = await Promise.all([
     query,
     supabase
       .from('bets')
@@ -32,6 +36,11 @@ export async function GET(request: Request) {
       .from('circle_members')
       .select('circle_id')
       .eq('user_id', user.id),
+    // All bets across all markets in last 24h — grouped in memory, not per-market
+    supabase
+      .from('bets')
+      .select('market_id, side, amount, created_at')
+      .gte('created_at', dayAgo),
   ])
 
   if (marketsResult.error) {
@@ -47,6 +56,9 @@ export async function GET(request: Request) {
   const userCircleIds = new Set(
     (circleMembershipsResult.data ?? []).map((cm) => cm.circle_id)
   )
+
+  // Aggregate recent bets into per-market social data (in-memory grouping, O(n) on bets)
+  const socialMap = aggregateRecentBets(recentBetsResult.data ?? [])
 
   // Rank raw DB rows first (they have resolved: boolean, which the ranker needs)
   const rankedRaw = rankFeed(markets, userCircleIds)
@@ -76,6 +88,7 @@ export async function GET(request: Request) {
       isNearMiss,
       resolved: market.resolved ? { winner: market.winner } : undefined,
       userBet: userBet ? { side: userBet.side, amount: userBet.amount } : undefined,
+      social: socialMap.get(market.id) ?? null,
     }
   })
 

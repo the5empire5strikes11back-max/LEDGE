@@ -12,6 +12,8 @@ type Category = "All" | "Sports" | "Politics" | "Culture" | "Circle"
 
 const TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Circle"]
 
+import type { MarketSocialData } from "@/lib/social-signals"
+
 interface Market {
   id: string
   title: string
@@ -25,6 +27,7 @@ interface Market {
   momentumShift?: number
   isFeatured?: boolean
   isNearMiss?: boolean
+  social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
 }
@@ -273,6 +276,7 @@ export function FeedScreen({ availableCredits, onBet, onWin }: FeedScreenProps) 
                 isNearMiss={market.isNearMiss ?? false}
                 oddsHistory={oddsHistoryRef.current.get(market.id) ?? []}
                 oddsVersion={oddsVersion.get(market.id) ?? 0}
+                social={market.social}
                 onClick={() => setDetailMarket(market)}
                 onBuyYes={() => openTrade(market, "yes")}
                 onBuyNo={() => openTrade(market, "no")}
