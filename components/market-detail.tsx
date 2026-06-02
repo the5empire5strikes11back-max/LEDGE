@@ -168,6 +168,15 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
 
   useEffect(() => { load() }, [load])
 
+  // Lock background scroll while overlay is open so the feed doesn't
+  // scroll underneath and leave a black gap behind the detail panel.
+  useEffect(() => {
+    if (isPanel) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [isPanel])
+
   // Social signals — computed from the full bets list (available after load)
   const signals = computeDetailSignals(
     bets.map((b) => ({ side: b.side, amount: b.amount, created_at: b.created_at })),
