@@ -7,11 +7,16 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profiles, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rawProfiles, error } = await (supabase as any)
     .from('profiles')
-    .select('id, username, credits, rank, streak')
+    .select('id, username, credits, rank, streak, avatar_url')
     .order('credits', { ascending: false })
     .limit(10)
+
+  const profiles = (rawProfiles ?? []) as Array<{
+    id: string; username: string; credits: number; rank: string; streak: number; avatar_url?: string | null
+  }>
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -68,6 +73,7 @@ export async function GET() {
       rank: i + 1,
       id: p.id,
       username: p.username,
+      avatarUrl: p.avatar_url ?? null,
       credits: p.credits,
       rankLabel: p.rank,
       streak: p.streak,

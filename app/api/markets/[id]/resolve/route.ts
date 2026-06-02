@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { pushToUser } from '@/lib/push'
 
 export async function POST(
   request: Request,
@@ -62,7 +63,15 @@ export async function POST(
       .update({ won, payout })
       .eq('id', bet.id)
 
-    // Credit the winner
+    // Credit the winner; notify all bettors
+    if (!won) {
+      void pushToUser(bet.user_id, {
+        title: '📉 Market Settled',
+        body: `"${market.title.length > 50 ? market.title.slice(0, 47) + '…' : market.title}" didn't go your way. Jump back in.`,
+        url: '/',
+      })
+    }
+
     if (won && payout > 0) {
       const { data: profile } = await supabase
         .from('profiles')
@@ -71,6 +80,9 @@ export async function POST(
         .single()
 
       if (profile) {
+        const profit = payout - bet.amount
+        const profitStr = profit >= 0 ? `+${profit.toLocaleString()}` : profit.toLocaleString()
+
         await supabase
           .from('profiles')
           .update({
@@ -78,6 +90,12 @@ export async function POST(
             xp: profile.xp + 60, // XP_PER_BET + XP_PER_WIN
           })
           .eq('id', bet.user_id)
+
+        void pushToUser(bet.user_id, {
+          title: '💰 Market Settled — You Won!',
+          body: `${profitStr} CR profit on "${market.title.length > 40 ? market.title.slice(0, 37) + '…' : market.title}"`,
+          url: '/',
+        })
       }
     }
 

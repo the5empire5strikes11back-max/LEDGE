@@ -1,11 +1,19 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
-  const supabase = await createClient()
+// Readable uppercase invite code — excludes easily-confused chars (0/O, 1/I/L)
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
-  const { data: { user } } = await supabase.auth.getUser()
+export async function GET() {
+  // Authenticate via user client, then query via admin to bypass RLS
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createAdminClient()
 
   const { data: memberships } = await supabase
     .from('circle_members')
@@ -15,10 +23,12 @@ export async function GET() {
   const circleIds = memberships?.map((m) => m.circle_id) ?? []
   if (circleIds.length === 0) return NextResponse.json([])
 
-  const { data: rawCircles, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rawCircles, error } = await (supabase as any)
     .from('circles')
-    .select(`*, circle_members(user_id, profiles(id, username, rank, credits))`)
+    .select('*, circle_members(user_id, profiles(id, username, rank, credits, avatar_url))')
     .in('id', circleIds)
+    .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -28,17 +38,16 @@ export async function GET() {
     created_by: string
     invite_code: string
     created_at: string
+    circle_avatar_url?: string | null
     circle_members: Array<{
       user_id: string
-      profiles: { id: string; username: string; rank: string; credits: number } | null
+      profiles: { id: string; username: string; rank: string; credits: number; avatar_url?: string | null } | null
     }>
   }
   const circles = (rawCircles ?? []) as CircleRow[]
 
-  // Compute weekly credit change per member using pnl_snapshots
+  // Weekly credit change via pnl_snapshots
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
-  // Collect all member IDs across all circles
   const allMemberIds = new Set<string>()
   for (const circle of circles) {
     for (const m of circle.circle_members ?? []) {
@@ -46,42 +55,74 @@ export async function GET() {
     }
   }
 
-  // Fetch the oldest snapshot from the last 7 days per member
-  const memberIdList = [...allMemberIds]
   const weeklyChangeMap = new Map<string, number>()
-
-  if (memberIdList.length > 0) {
+  if (allMemberIds.size > 0) {
     const { data: snapshots } = await supabase
       .from('pnl_snapshots')
-      .select('user_id, credits, created_at')
-      .in('user_id', memberIdList)
+      .select('user_id, credits')
+      .in('user_id', [...allMemberIds])
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: true })
 
-    // For each member, use the earliest snapshot this week as baseline
     const baselineMap = new Map<string, number>()
     for (const snap of snapshots ?? []) {
-      if (!baselineMap.has(snap.user_id)) {
-        baselineMap.set(snap.user_id, snap.credits)
-      }
+      if (!baselineMap.has(snap.user_id)) baselineMap.set(snap.user_id, snap.credits)
     }
 
-    // weeklyChange = current credits - baseline
     for (const circle of circles) {
       for (const m of circle.circle_members ?? []) {
         if (!m.profiles) continue
         const baseline = baselineMap.get(m.profiles.id)
-        weeklyChangeMap.set(
-          m.profiles.id,
-          baseline !== undefined ? m.profiles.credits - baseline : 0
-        )
+        weeklyChangeMap.set(m.profiles.id, baseline !== undefined ? m.profiles.credits - baseline : 0)
       }
     }
   }
 
-  // Attach weeklyChange to each member
+  // Recent activity: count bets placed in circle markets in the last 24 hours.
+  // This drives the "X bets placed today" pulse on each circle card.
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const recentActivityMap = new Map<string, number>()
+
+  if (circleIds.length > 0) {
+    // Get all market IDs per circle
+    const { data: circleMarkets } = await supabase
+      .from('markets')
+      .select('id, circle_id')
+      .in('circle_id', circleIds)
+
+    // Group market IDs by circle
+    const marketsByCircle = new Map<string, string[]>()
+    for (const m of circleMarkets ?? []) {
+      if (!m.circle_id) continue
+      const list = marketsByCircle.get(m.circle_id) ?? []
+      list.push(m.id)
+      marketsByCircle.set(m.circle_id, list)
+    }
+
+    // Count recent bets across all circle markets in one query
+    const allCircleMarketIds = (circleMarkets ?? []).map((m) => m.id)
+    if (allCircleMarketIds.length > 0) {
+      const { data: recentBets } = await supabase
+        .from('bets')
+        .select('market_id')
+        .in('market_id', allCircleMarketIds)
+        .gte('created_at', oneDayAgo)
+
+      // Tally per circle
+      for (const bet of recentBets ?? []) {
+        for (const [circleId, mIds] of marketsByCircle) {
+          if (mIds.includes(bet.market_id)) {
+            recentActivityMap.set(circleId, (recentActivityMap.get(circleId) ?? 0) + 1)
+            break
+          }
+        }
+      }
+    }
+  }
+
   const enriched = circles.map((circle) => ({
     ...circle,
+    recent_bets_24h: recentActivityMap.get(circle.id) ?? 0,
     circle_members: (circle.circle_members ?? []).map((m) => ({
       ...m,
       weeklyChange: m.profiles ? (weeklyChangeMap.get(m.profiles.id) ?? 0) : 0,
@@ -92,9 +133,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
@@ -104,15 +144,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Circle name is required' }, { status: 400 })
   }
 
+  const supabase = createAdminClient()
+
+  // Generate a readable, uppercase invite code — retry on collision (extremely rare)
+  let invite_code = generateInviteCode()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: existing } = await supabase
+      .from('circles')
+      .select('id')
+      .eq('invite_code', invite_code)
+      .maybeSingle()
+    if (!existing) break
+    invite_code = generateInviteCode()
+  }
+
   const { data: circle, error } = await supabase
     .from('circles')
-    .insert({ name: name.trim(), created_by: user.id })
+    .insert({ name: name.trim(), created_by: user.id, invite_code })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await supabase.from('circle_members').insert({ circle_id: circle.id, user_id: user.id })
+  const { error: memberError } = await supabase
+    .from('circle_members')
+    .insert({ circle_id: circle.id, user_id: user.id })
+
+  if (memberError) return NextResponse.json({ error: memberError.message }, { status: 500 })
 
   return NextResponse.json(circle, { status: 201 })
 }

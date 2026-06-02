@@ -21,6 +21,14 @@ export interface GeneratedMarket {
   target_data_key: string
 }
 
+export interface GenerationOptions {
+  /**
+   * When true, bias generation toward ~48% Sports / 27% Culture / 25% Politics.
+   * Triggered automatically when Sports inventory (live + queued) falls below threshold.
+   */
+  sportsHeavy?: boolean
+}
+
 function extractTitlesFromRSS(xml: string): string[] {
   const titles: string[] = []
   // Match <title> tags, skip the first one (feed title)
@@ -60,15 +68,31 @@ async function fetchHeadlines(): Promise<{ headline: string; category: string }[
   return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
 }
 
-export async function generateMarkets(apiKey?: string): Promise<GeneratedMarket[]> {
+export async function generateMarkets(
+  apiKey?: string,
+  options: GenerationOptions = {}
+): Promise<GeneratedMarket[]> {
   const key = apiKey ?? process.env.ANTHROPIC_API_KEY
   if (!key) throw new Error('ANTHROPIC_API_KEY not set')
 
   const headlines = await fetchHeadlines()
   if (headlines.length === 0) throw new Error('No headlines fetched')
 
-  const client = new Anthropic({ apiKey })
+  const client = new Anthropic({ apiKey: key })
   const now = new Date()
+
+  // Category distribution instruction — changes when Sports inventory is low
+  const distributionInstruction = options.sportsHeavy
+    ? `CATEGORY DISTRIBUTION (Sports inventory is critically low — boost Sports now):
+- Sports: ~12 markets (48%) — prioritize game outcomes, match results, player performance, tournament results
+- Culture: ~7 markets (28%) — entertainment, awards, viral moments
+- Politics: ~6 markets (24%) — legislation, elections, policy
+All Sports markets MUST use hours_until_close of 12-48 to match real game timelines.`
+    : `CATEGORY DISTRIBUTION (balanced):
+- Sports: ~9 markets (36%) — game outcomes, match results, player performance
+- Culture: ~8 markets (32%) — entertainment, awards, pop culture moments
+- Politics: ~8 markets (32%) — legislation, elections, geopolitics
+Sports markets should strongly prefer hours_until_close of 12-48 (games don't take weeks).`
 
   const prompt = `You are generating prediction markets for a Gen Z social betting app called Ledge (fake credits, no real money).
 
@@ -77,12 +101,14 @@ Today is ${now.toDateString()}.
 Here are today's news headlines:
 ${headlines.map((h, i) => `${i + 1}. [${h.category}] ${h.headline}`).join('\n')}
 
-Generate exactly 30 yes/no prediction market questions based on these headlines. Requirements:
+Generate exactly 25 yes/no prediction market questions based on these headlines. Requirements:
 - Must be decidable within 1-7 days from today
 - Exciting and relevant to Gen Z (sports, politics, pop culture)
 - Natural language, like something people would actually bet on
 - Do NOT ask about things that already happened
 - Be PRECISE about timing — a game tonight closes in hours, not days
+
+${distributionInstruction}
 
 Return ONLY a JSON array, no other text:
 [
@@ -148,7 +174,7 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 4096,
+    max_tokens: 8192,
     messages: [{ role: 'user', content: prompt }],
   })
 

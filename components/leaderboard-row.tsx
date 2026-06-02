@@ -3,11 +3,12 @@
 import { cn } from "@/lib/utils"
 import { RankBadge, StreakBadge } from "@/components/ui/rank-badge"
 import { Ticker, TickerPercent } from "@/components/ui/ticker"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 interface LeaderboardRowProps {
   rank: number
   username: string
-  avatar?: string
+  avatarUrl?: string | null
   credits: number
   winRate: number
   pnl: number
@@ -19,6 +20,7 @@ interface LeaderboardRowProps {
 export function LeaderboardRow({
   rank,
   username,
+  avatarUrl,
   credits,
   winRate,
   pnl,
@@ -39,14 +41,9 @@ export function LeaderboardRow({
 
       {/* User */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-          {username.slice(0, 2).toUpperCase()}
-        </div>
+        <UserAvatar username={username} avatarUrl={avatarUrl} size={32} />
         <div className="flex flex-col min-w-0">
-          <span className={cn(
-            "text-sm font-medium truncate",
-            isCurrentUser && "text-accent"
-          )}>
+          <span className={cn("text-sm font-medium truncate", isCurrentUser && "text-accent")}>
             @{username}
           </span>
           {streak && streak >= 3 && <StreakBadge streak={streak} className="mt-0.5 w-fit" />}

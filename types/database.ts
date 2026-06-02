@@ -72,6 +72,10 @@ export interface Database {
           hot_score: number
           momentum_shift: number
           is_featured: boolean
+          // Queue architecture fields
+          status: 'queued' | 'live' | 'archived'
+          published_at: string | null
+          generated_at: string | null
         }
         Insert: {
           title: string
@@ -92,6 +96,9 @@ export interface Database {
           hot_score?: number
           momentum_shift?: number
           is_featured?: boolean
+          status?: 'queued' | 'live' | 'archived'
+          published_at?: string | null
+          generated_at?: string | null
         }
         Update: {
           yes_percent?: number
@@ -103,6 +110,9 @@ export interface Database {
           hot_score?: number
           momentum_shift?: number
           is_featured?: boolean
+          status?: 'queued' | 'live' | 'archived'
+          published_at?: string | null
+          generated_at?: string | null
         }
         Relationships: []
       }

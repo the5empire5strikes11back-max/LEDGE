@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rankFeed } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
+import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Fetch markets without any ordering — the ranker will sort them
+  // Fetch markets without any ordering — the ranker will sort them.
   let query = supabase
     .from('markets')
     .select('*')
@@ -47,7 +48,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: marketsResult.error.message }, { status: 500 })
   }
 
-  const markets = marketsResult.data ?? []
+  // Post-filter: hide queued/archived markets.
+  // Pre-migration rows have no status field (undefined) and pass through as live.
+  const markets = (marketsResult.data ?? []).filter((m) => {
+    const s = (m as { status?: string }).status
+    return !s || s === 'live'
+  })
 
   // Build lookup structures
   const betMap = new Map(
@@ -113,9 +119,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  // Seed virtual liquidity for the new market
+  const liquiditySeed = seedLiquidity(category as MarketCategory, false)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('markets')
-    .insert({ title, category, end_time, jackpot_pool: jackpot_pool ?? 0, created_by: user.id })
+    .insert({
+      title,
+      category,
+      end_time,
+      jackpot_pool: jackpot_pool ?? 0,
+      created_by: user.id,
+      ...liquiditySeed,
+    })
     .select()
     .single()
 

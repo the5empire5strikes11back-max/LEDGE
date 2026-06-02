@@ -31,6 +31,10 @@ interface MarketFeedCardProps {
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
   className?: string
+  /** Pulse the YES/NO buttons for first-time onboarding hint */
+  pulseCTA?: boolean
+  /** First-session spotlight: pulsing ring + "Popular right now" badge */
+  isSpotlight?: boolean
   onClick?: () => void
   onBuyYes?: () => void
   onBuyNo?: () => void
@@ -146,6 +150,8 @@ export function MarketFeedCard({
   userBet,
   resolved,
   className,
+  pulseCTA = false,
+  isSpotlight = false,
   onClick,
   onBuyYes,
   onBuyNo,
@@ -177,6 +183,8 @@ export function MarketFeedCard({
     <div
       className={cn(
         "relative bg-card border overflow-hidden transition-colors duration-200",
+        // Spotlight: slow-pulse ring for first-session
+        isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
         // Featured: subtle left accent
         isFeatured && !isResolved && "border-border border-l-2 border-l-accent",
         // Default / hot
@@ -192,6 +200,19 @@ export function MarketFeedCard({
       )}
       style={{ borderRadius: "var(--radius-card)" }}
     >
+      {/* Spotlight banner */}
+      {isSpotlight && !isResolved && (
+        <div className="px-4 pt-3 pb-0">
+          <span
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-accent/10 border border-accent/25 text-[10px] font-bold text-accent uppercase tracking-wider"
+            style={{ borderRadius: "var(--radius-badge)" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            Popular right now
+          </span>
+        </div>
+      )}
+
       <div className="p-4 flex flex-col gap-3">
 
         {/* Row 1: Category · live signals · time */}
@@ -313,7 +334,8 @@ export function MarketFeedCard({
               onClick={onBuyYes}
               className={cn(
                 "flex items-center justify-between py-2.5 px-3 border transition-all duration-150",
-                "bg-success/8 border-success/20 hover:bg-success/15 hover:border-success/35 active:scale-[0.98]"
+                "bg-success/8 border-success/20 hover:bg-success/15 hover:border-success/35 active:scale-[0.98]",
+                pulseCTA && "ring-2 ring-success/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
@@ -330,7 +352,8 @@ export function MarketFeedCard({
               onClick={onBuyNo}
               className={cn(
                 "flex items-center justify-between py-2.5 px-3 border transition-all duration-150",
-                "bg-danger/8 border-danger/20 hover:bg-danger/15 hover:border-danger/35 active:scale-[0.98]"
+                "bg-danger/8 border-danger/20 hover:bg-danger/15 hover:border-danger/35 active:scale-[0.98]",
+                pulseCTA && "ring-2 ring-danger/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >

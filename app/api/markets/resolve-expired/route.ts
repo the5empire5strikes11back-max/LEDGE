@@ -105,7 +105,7 @@ async function settleBets(
 
     await supabase.from('bets').update({ won, payout }).eq('id', bet.id)
 
-    // Track loss streak for comeback mechanics
+    // Track loss streak for comeback mechanics + send loss notification
     if (!won) {
       const { data: losingProfile } = await supabase
         .from('profiles')
@@ -127,6 +127,13 @@ async function settleBets(
           void pushToUser(bet.user_id, {
             title: '🔥 Comeback Mode Activated',
             body: 'Win your next bet for BONUS XP. You\'ve got this.',
+            url: '/',
+          })
+        } else {
+          // Regular loss notification — gives users a reason to come back and bet again
+          void pushToUser(bet.user_id, {
+            title: '📉 Market Settled',
+            body: `"${market.title.length > 50 ? market.title.slice(0, 47) + '…' : market.title}" didn't go your way. Jump back in.`,
             url: '/',
           })
         }

@@ -5,10 +5,12 @@ import { Plus, LogIn, TrendingUp, TrendingDown, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CircleDetail } from "@/components/circle-detail"
 import type { RankKey } from "@/components/user-profile-card"
+import { UserAvatar, CircleAvatar } from "@/components/ui/user-avatar"
 
 interface CircleMember {
   id: string
   username: string
+  avatarUrl?: string | null
   rank: RankKey
   credits: number
   weeklyChange: number
@@ -36,8 +38,11 @@ interface Circle {
   id: string
   name: string
   inviteCode: string
+  circleAvatarUrl?: string | null
+  createdBy: string
   members: CircleMember[]
   markets: CircleMarket[]
+  recentBets24h: number
 }
 
 interface CirclesScreenProps {
@@ -64,19 +69,13 @@ function MemberAvatarStack({ members }: { members: CircleMember[] }) {
   const top3 = members.slice(0, 3)
   return (
     <div className="flex -space-x-2">
-      {top3.map((m) => {
-        const initials = m.username.split(/[._-]/).map((p) => p[0]).join("").slice(0, 2).toUpperCase()
-        return (
-          <div
-            key={m.id}
-            className="w-6 h-6 rounded-full bg-surface border-2 border-background flex items-center justify-center text-[9px] font-mono font-bold text-muted-foreground"
-          >
-            {initials}
-          </div>
-        )
-      })}
+      {top3.map((m) => (
+        <div key={m.id} className="ring-2 ring-background rounded-full">
+          <UserAvatar username={m.username} avatarUrl={m.avatarUrl} size={24} />
+        </div>
+      ))}
       {members.length > 3 && (
-        <div className="w-6 h-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-mono font-bold text-muted-foreground">
+        <div className="w-6 h-6 rounded-full bg-muted ring-2 ring-background flex items-center justify-center text-[9px] font-mono font-bold text-muted-foreground">
           +{members.length - 3}
         </div>
       )}
@@ -100,9 +99,7 @@ function CircleCard({ circle, onClick }: { circle: Circle; onClick: () => void }
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center shrink-0">
-              <span className="text-accent text-sm font-bold">{circle.name.charAt(0).toUpperCase()}</span>
-            </div>
+            <CircleAvatar name={circle.name} avatarUrl={circle.circleAvatarUrl} size={36} />
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-accent transition-colors">
                 {circle.name}
@@ -153,14 +150,22 @@ function CircleCard({ circle, onClick }: { circle: Circle; onClick: () => void }
           </div>
         </div>
 
-        {/* Invite code row */}
+        {/* Invite code row + activity pulse */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <span className="text-[10px] text-muted-foreground">
             Code: <span className="font-mono font-bold text-accent tracking-wider">{circle.inviteCode}</span>
           </span>
-          <span className="text-[10px] text-muted-foreground/50 group-hover:text-accent transition-colors">
-            View →
-          </span>
+          <div className="flex items-center gap-2">
+            {circle.recentBets24h > 0 && (
+              <span className="flex items-center gap-1 text-[10px] text-success font-medium">
+                <span className="w-1 h-1 rounded-full bg-success animate-pulse" />
+                {circle.recentBets24h} bet{circle.recentBets24h !== 1 ? "s" : ""} today
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground/50 group-hover:text-accent transition-colors">
+              View →
+            </span>
+          </div>
         </div>
       </div>
     </button>
@@ -171,11 +176,13 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
   const [circles, setCircles] = useState<Circle[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCircle, setSelectedCircle] = useState<Circle | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   // Create modal state
   const [creating, setCreating] = useState(false)
   const [newCircleName, setNewCircleName] = useState("")
   const [createLoading, setCreateLoading] = useState(false)
+  const [createError, setCreateError] = useState("")
 
   // Join modal state
   const [joining, setJoining] = useState(false)
@@ -192,21 +199,28 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
         id: string
         name: string
         invite_code: string
+        created_by: string
+        circle_avatar_url?: string | null
+        recent_bets_24h?: number
         circle_members: Array<{
           user_id: string
           weeklyChange: number
-          profiles: { id: string; username: string; rank: string; credits: number; is_current_user?: boolean } | null
+          profiles: { id: string; username: string; rank: string; credits: number; avatar_url?: string | null; is_current_user?: boolean } | null
         }>
       }) => ({
         id: c.id,
         name: c.name,
         inviteCode: c.invite_code,
+        createdBy: c.created_by,
+        circleAvatarUrl: c.circle_avatar_url ?? null,
+        recentBets24h: c.recent_bets_24h ?? 0,
         markets: [],
         members: (c.circle_members ?? [])
           .filter((m) => m.profiles != null)
           .map((m) => ({
             id: m.profiles!.id,
             username: m.profiles!.username,
+            avatarUrl: m.profiles!.avatar_url ?? null,
             rank: (m.profiles!.rank ?? 'rookie') as RankKey,
             credits: m.profiles!.credits,
             weeklyChange: m.weeklyChange ?? 0,
@@ -226,6 +240,7 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
       const profileRes = await fetch('/api/user')
       if (!profileRes.ok) return
       const profile = await profileRes.json()
+      setCurrentUserId(profile.id)
       setCircles((prev) => prev.map((c) => ({
         ...c,
         members: c.members.map((m) => ({ ...m, isCurrentUser: m.id === profile.id })),
@@ -236,6 +251,7 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
   const handleCreateCircle = async () => {
     if (!newCircleName.trim()) return
     setCreateLoading(true)
+    setCreateError("")
     const res = await fetch('/api/circles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -246,6 +262,9 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
       setNewCircleName("")
       setCreating(false)
       loadCircles()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setCreateError(data.error ?? 'Failed to create circle')
     }
   }
 
@@ -298,7 +317,7 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
           </div>
         </div>
 
-        <div className="px-4 py-3 space-y-3">
+        <div className="px-4 py-3 space-y-3 lg:max-w-2xl lg:mx-auto">
 
           {/* Create circle form */}
           {creating && (
@@ -311,12 +330,13 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
                 autoFocus
                 type="text"
                 value={newCircleName}
-                onChange={(e) => setNewCircleName(e.target.value)}
+                onChange={(e) => { setNewCircleName(e.target.value); setCreateError("") }}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateCircle()}
                 placeholder="e.g. Degen Squad"
                 className="w-full bg-background border border-border px-3 py-2 text-sm font-mono outline-none focus:border-accent transition-colors"
                 style={{ borderRadius: "var(--radius-button)" }}
               />
+              {createError && <p className="text-[11px] text-danger font-medium">{createError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={handleCreateCircle}
@@ -327,7 +347,7 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
                   {createLoading ? "Creating…" : "Create"}
                 </button>
                 <button
-                  onClick={() => { setCreating(false); setNewCircleName("") }}
+                  onClick={() => { setCreating(false); setNewCircleName(""); setCreateError("") }}
                   className="flex-1 py-2 bg-secondary text-muted-foreground text-xs font-semibold uppercase tracking-wider hover:text-foreground transition-all"
                   style={{ borderRadius: "var(--radius-button)" }}
                 >
@@ -455,7 +475,12 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
         <CircleDetail
           circle={selectedCircle}
           availableCredits={availableCredits}
+          isCreator={currentUserId !== null && selectedCircle.createdBy === currentUserId}
           onClose={() => setSelectedCircle(null)}
+          onDelete={(circleId) => {
+            setCircles((prev) => prev.filter((c) => c.id !== circleId))
+            setSelectedCircle(null)
+          }}
           onBet={onBet}
         />
       )}

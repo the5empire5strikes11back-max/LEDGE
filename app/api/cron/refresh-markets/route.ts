@@ -2,11 +2,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMarkets } from '@/lib/market-generator'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
+import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
+import { CATEGORY_FLOORS } from '@/app/api/cron/release-markets/route'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-// Allow up to 60 s on Vercel Pro (default hobby limit is 10 s).
-// RSS fetches (8 × 8 s timeout) + Claude Haiku can easily exceed 10 s.
+// Allow up to 60s on Vercel Pro — RSS fetches + Claude Haiku can exceed 10s.
 export const maxDuration = 60
 
 // Read ANTHROPIC_API_KEY directly from .env.local if process.env is empty
@@ -14,7 +15,6 @@ export const maxDuration = 60
 function getAnthropicKey(): string | undefined {
   const fromEnv = process.env.ANTHROPIC_API_KEY
   if (fromEnv) return fromEnv
-
   try {
     const envPath = join(process.cwd(), '.env.local')
     const content = readFileSync(envPath, 'utf-8')
@@ -25,24 +25,47 @@ function getAnthropicKey(): string | undefined {
   }
 }
 
-// Vercel Cron calls this daily — also callable manually from the admin
+// Target live market count — if below this we seed from queue immediately
+const TARGET_LIVE_COUNT = 16
+// How many markets to immediately publish from the queue to prime the feed
+const PRIME_BATCH_SIZE = 5
+// If Sports (live + queued) is below this threshold, bias generation toward Sports
+const SPORTS_LOW_THRESHOLD = CATEGORY_FLOORS['Sports'] + 3  // floor(5) + buffer(3) = 8
+
+// Vercel Cron calls this twice daily (06:00 + 18:00 UTC).
+// Also callable manually from admin for ad-hoc generation.
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // Also allow if called from the app itself (no secret in dev)
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
 
   const supabase = createAdminClient()
+  const now = new Date().toISOString()
 
-  // 1. Generate new markets from today's news
+  // ── 1. Check Sports inventory — bias generation if running low ──────────────
+  const { data: sportsInventory } = await supabase
+    .from('markets')
+    .select('id')
+    .eq('category', 'Sports')
+    .in('status', ['live', 'queued'])
+    .eq('resolved', false)
+
+  const sportsTotal = sportsInventory?.length ?? 0
+  const sportsHeavy = sportsTotal < SPORTS_LOW_THRESHOLD
+
+  if (sportsHeavy) {
+    console.warn(`[refresh-markets] Sports inventory low (${sportsTotal} < ${SPORTS_LOW_THRESHOLD}) — using sports-heavy generation`)
+  }
+
+  // ── 2. Generate markets from today's news ────────────────────────────────────
   const anthropicKey = getAnthropicKey()
-
   let newMarkets: Awaited<ReturnType<typeof generateMarkets>> = []
+
   try {
-    newMarkets = await generateMarkets(anthropicKey)
+    newMarkets = await generateMarkets(anthropicKey, { sportsHeavy })
   } catch (err) {
     return NextResponse.json(
       { error: `Market generation failed: ${err instanceof Error ? err.message : String(err)}` },
@@ -50,13 +73,12 @@ export async function POST(request: Request) {
     )
   }
 
-  // 2. Quality scoring — filter out weak markets before inserting
+  // ── 3. Quality scoring — filter weak markets before inserting ────────────────
   let scoringResult: Awaited<ReturnType<typeof scoreMarkets>>
   try {
     scoringResult = await scoreMarkets(newMarkets, anthropicKey)
     console.log(formatScoringLog(scoringResult))
   } catch (err) {
-    // Scoring failure is non-fatal — fall back to inserting all generated markets
     console.error('[cron/refresh-markets] Scoring pipeline failed, skipping filter:', err)
     scoringResult = {
       accepted: newMarkets.map((m) => ({ ...m, quality_score: 50 })),
@@ -74,39 +96,89 @@ export async function POST(request: Request) {
 
   const { accepted: qualityMarkets, rejected: rejectedMarkets, scoring_stats } = scoringResult
 
-  // 3. Insert only quality markets (skip duplicates by title)
+  // ── 4. Deduplicate against all existing markets (live + queued) ──────────────
   const { data: existing } = await supabase
     .from('markets')
     .select('title')
-    .eq('resolved', false)
+    .or('status.eq.live,status.eq.queued,status.is.null')
 
   const existingTitles = new Set((existing ?? []).map((m) => m.title.toLowerCase()))
-  const toInsert = qualityMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
+  const toQueue = qualityMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
 
-  let inserted = 0
-  let insertError: string | null = null
-  if (toInsert.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from('markets').insert(toInsert as any[])
-    if (error) {
-      insertError = error.message
-    } else {
-      inserted = toInsert.length
+  if (toQueue.length === 0) {
+    return NextResponse.json({
+      success: true,
+      message: 'No new markets to queue — all generated markets are duplicates.',
+      generated: newMarkets.length,
+      quality_filter: scoring_stats,
+      queued: 0,
+      primed: 0,
+    })
+  }
+
+  // ── 5. Insert markets as QUEUED ──────────────────────────────────────────────
+  const toInsert = toQueue.map((m) => {
+    const seed = seedLiquidity(m.category as MarketCategory, false)
+    return {
+      ...m,
+      ...seed,
+      status: 'queued' as const,
+      generated_at: now,
+      published_at: null,
+    }
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertError, data: inserted } = await (supabase as any)
+    .from('markets')
+    .insert(toInsert)
+    .select('id, title, category, status')
+
+  if (insertError) {
+    return NextResponse.json({ error: insertError.message }, { status: 500 })
+  }
+
+  const queuedCount = (inserted ?? []).length
+
+  // ── 6. Prime the feed if below target live count ─────────────────────────────
+  // After inserting, check how many live markets exist. If the feed is thin
+  // (e.g. first run after migration, or low-traffic period), immediately publish
+  // up to PRIME_BATCH_SIZE markets so users don't see an empty feed.
+  const { count: liveCount } = await supabase
+    .from('markets')
+    .select('id', { count: 'exact', head: true })
+    .or('status.eq.live,status.is.null')
+    .eq('resolved', false)
+
+  let primedCount = 0
+  if ((liveCount ?? 0) < TARGET_LIVE_COUNT && queuedCount > 0) {
+    const needed = Math.min(
+      TARGET_LIVE_COUNT - (liveCount ?? 0),
+      PRIME_BATCH_SIZE,
+      queuedCount
+    )
+
+    // Pick the first N queued markets just inserted (spread across categories)
+    const toPublish = (inserted ?? []).slice(0, needed)
+    const ids = toPublish.map((m: { id: string }) => m.id)
+
+    if (ids.length > 0) {
+      await supabase
+        .from('markets')
+        .update({ status: 'live', published_at: now })
+        .in('id', ids)
+
+      primedCount = ids.length
     }
   }
 
-  // 4. Clean up resolved markets older than 7 days
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 7)
-
-  const { count: cleaned } = await supabase
-    .from('markets')
-    .delete({ count: 'exact' })
-    .eq('resolved', true)
-    .lt('created_at', cutoff.toISOString())
-
   return NextResponse.json({
     success: true,
+    generation: {
+      sports_heavy: sportsHeavy,
+      sports_total_before: sportsTotal,
+      sports_low_threshold: SPORTS_LOW_THRESHOLD,
+    },
     generated: newMarkets.length,
     quality_filter: {
       ...scoring_stats,
@@ -116,9 +188,8 @@ export async function POST(request: Request) {
         reason: r.reason,
       })),
     },
-    inserted,
-    skippedDuplicates: qualityMarkets.length - toInsert.length,
-    cleaned: cleaned ?? 0,
-    ...(insertError && { insertError }),
+    queued: queuedCount - primedCount,
+    primed: primedCount,
+    live_count_before: liveCount ?? 0,
   })
 }

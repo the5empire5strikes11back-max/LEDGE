@@ -1,16 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { SettingsSheet } from "@/components/settings-sheet"
 import { LeaderboardRow } from "@/components/leaderboard-row"
 import { Sparkline } from "@/components/ui/sparkline"
 import { AchievementsGrid } from "@/components/achievements-grid"
 import { xpProgress } from "@/lib/game-engine"
-import { Settings, TrendingUp, AlertTriangle } from "lucide-react"
+import { Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2 } from "lucide-react"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { Persona } from "@/lib/game-engine"
 import type { Achievement } from "@/lib/achievements"
 import { cn } from "@/lib/utils"
+import { ShareCardModal } from "@/components/share-card"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { compressToSquare } from "@/lib/compress-image"
 
 interface ProfileScreenProps {
   xp: number
@@ -21,6 +24,7 @@ interface ProfileScreenProps {
   persona: Persona
   decay: "none" | "warning" | "critical"
   username: string
+  avatarUrl?: string | null
   isPlus?: boolean
 }
 
@@ -56,23 +60,9 @@ function formatCredits(value: number): string {
   return value.toLocaleString()
 }
 
-// Compact avatar with initials
-function Avatar({ username }: { username: string }) {
-  const initials = username
-    .split(/[._-]/)
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
-  return (
-    <div className="w-10 h-10 rounded-full bg-surface border-2 border-border flex items-center justify-center shrink-0">
-      <span className="text-sm font-semibold text-muted-foreground">{initials}</span>
-    </div>
-  )
-}
 
 export function ProfileScreen({
-  xp, rank, credits, streak, persona, decay, username, isPlus = false
+  xp, rank, credits, streak, persona, decay, username, avatarUrl: initialAvatarUrl, isPlus = false
 }: ProfileScreenProps) {
   const progress = xpProgress(xp)
   const rankConfig = RANKS[rank]
@@ -80,6 +70,11 @@ export function ProfileScreen({
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [pnlHistory, setPnlHistory] = useState<PnlPoint[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl ?? null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/stats').then((r) => r.ok ? r.json() : null).then((d) => d && setStats(d))
@@ -91,6 +86,32 @@ export function ProfileScreen({
     ? pnlHistory[pnlHistory.length - 1].credits - pnlHistory[0].credits
     : null
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      const blob = await compressToSquare(file, 400)
+      const compressed = new File([blob], "avatar.jpg", { type: "image/jpeg" })
+      const form = new FormData()
+      form.append("file", compressed)
+      const res = await fetch("/api/user/avatar", { method: "POST", body: form })
+      if (res.ok) {
+        const data = await res.json()
+        setAvatarUrl(data.avatar_url)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setAvatarError(err.error ?? "Upload failed")
+      }
+    } catch {
+      setAvatarError("Failed to process image")
+    } finally {
+      setAvatarUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
@@ -98,15 +119,24 @@ export function ProfileScreen({
         {/* Sticky header */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
           <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Profile</span>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShareOpen(true)}
+              className="p-1.5 text-muted-foreground hover:text-accent transition-colors"
+              title="Share identity card"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4 lg:max-w-3xl lg:mx-auto">
 
           {/* Identity — compact, information-dense */}
           <div
@@ -117,7 +147,31 @@ export function ProfileScreen({
             style={{ borderRadius: "var(--radius-card)" }}
           >
             <div className="flex items-center gap-3">
-              <Avatar username={username} />
+              {/* Tappable avatar with camera overlay */}
+              <div className="relative shrink-0 group">
+                <UserAvatar username={username} avatarUrl={avatarUrl} size={44} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  aria-label="Change profile picture"
+                  className={cn(
+                    "absolute inset-0 rounded-full flex items-center justify-center transition-opacity",
+                    "bg-black/55 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  )}
+                >
+                  {avatarUploading
+                    ? <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    : <Camera className="w-4 h-4 text-white" />
+                  }
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleAvatarChange}
+                />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground truncate">@{username}</span>
@@ -164,6 +218,11 @@ export function ProfileScreen({
             )}
           </div>
 
+          {/* Avatar upload error */}
+          {avatarError && (
+            <p className="text-xs text-danger px-1">{avatarError}</p>
+          )}
+
           {/* Decay warning — factual, not dramatic */}
           {decay !== "none" && (
             <div
@@ -182,56 +241,59 @@ export function ProfileScreen({
             </div>
           )}
 
-          {/* Performance stats — lead with the numbers */}
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              {
-                label: "Win Rate",
-                value: stats ? `${stats.winRate}%` : "—",
-                color: stats
-                  ? stats.winRate >= 60 ? "text-success"
-                  : stats.winRate >= 50 ? "text-accent"
-                  : "text-danger"
-                  : "text-foreground",
-              },
-              { label: "Markets", value: stats?.marketsPlayed ?? "—", color: "text-foreground" },
-              { label: "Correct", value: stats?.correct ?? "—", color: "text-foreground" },
-              { label: "Best Run", value: stats?.bestStreak ?? "—", color: "text-foreground" },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="bg-card border border-border px-2 py-3 text-center"
-                style={{ borderRadius: "var(--radius-card)" }}
-              >
-                <span className={cn("text-base font-bold font-mono tabular-nums", stat.color)}>
-                  {stat.value}
-                </span>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Wealth history sparkline */}
-          <div
-            className="bg-card border border-border px-4 py-4"
-            style={{ borderRadius: "var(--radius-card)" }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-                  Wealth History
-                </span>
-              </div>
-              {pnlDelta !== null && (
-                <span className={cn("text-xs font-mono font-semibold", pnlDelta >= 0 ? "text-success" : "text-danger")}>
-                  {pnlDelta >= 0 ? "+" : ""}{pnlDelta.toLocaleString()} CR
-                </span>
-              )}
+          {/* Performance stats + sparkline — side by side on desktop */}
+          <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
+            {/* Performance stats */}
+            <div className="grid grid-cols-4 lg:grid-cols-2 gap-2">
+              {[
+                {
+                  label: "Win Rate",
+                  value: stats ? `${stats.winRate}%` : "—",
+                  color: stats
+                    ? stats.winRate >= 60 ? "text-success"
+                    : stats.winRate >= 50 ? "text-accent"
+                    : "text-danger"
+                    : "text-foreground",
+                },
+                { label: "Markets", value: stats?.marketsPlayed ?? "—", color: "text-foreground" },
+                { label: "Correct", value: stats?.correct ?? "—", color: "text-foreground" },
+                { label: "Best Run", value: stats?.bestStreak ?? "—", color: "text-foreground" },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="bg-card border border-border px-2 py-3 text-center"
+                  style={{ borderRadius: "var(--radius-card)" }}
+                >
+                  <span className={cn("text-base font-bold font-mono tabular-nums", stat.color)}>
+                    {stat.value}
+                  </span>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
             </div>
-            <Sparkline data={pnlHistory} />
+
+            {/* Wealth history sparkline */}
+            <div
+              className="bg-card border border-border px-4 py-4"
+              style={{ borderRadius: "var(--radius-card)" }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                    Wealth History
+                  </span>
+                </div>
+                {pnlDelta !== null && (
+                  <span className={cn("text-xs font-mono font-semibold", pnlDelta >= 0 ? "text-success" : "text-danger")}>
+                    {pnlDelta >= 0 ? "+" : ""}{pnlDelta.toLocaleString()} CR
+                  </span>
+                )}
+              </div>
+              <Sparkline data={pnlHistory} />
+            </div>
           </div>
 
           {/* Global leaderboard — prominent */}
@@ -260,6 +322,7 @@ export function ProfileScreen({
                     key={row.rank}
                     rank={row.rank}
                     username={row.username}
+                    avatarUrl={(row as { avatarUrl?: string }).avatarUrl ?? null}
                     credits={row.credits}
                     streak={row.streak}
                     winRate={row.winRate}
@@ -343,6 +406,22 @@ export function ProfileScreen({
         onClose={() => setSettingsOpen(false)}
         username={username}
       />
+
+      {shareOpen && (
+        <ShareCardModal
+          username={username}
+          xp={xp}
+          rank={rank}
+          credits={credits}
+          streak={streak}
+          persona={persona}
+          winRate={stats?.winRate ?? 0}
+          marketsPlayed={stats?.marketsPlayed ?? 0}
+          leaderboardRank={stats?.leaderboardRank ?? null}
+          bestStreak={stats?.bestStreak ?? streak}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }

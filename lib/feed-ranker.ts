@@ -35,6 +35,8 @@ export interface RankableMarket {
   momentum_shift: number | null
   total_credits: number | null
   circle_id: string | null
+  /** Set when the market goes from queued → live. Used for freshness boost. */
+  published_at?: string | null
 }
 
 // ── Weights — must sum to 1.0 ─────────────────────────────────────────────────
@@ -90,6 +92,16 @@ const URGENCY_CURVE: Array<{ hoursRemaining: number; score: number }> = [
  * regardless of organic rank score.
  */
 const FEATURED_PIN_BONUS = 1_000_000
+
+/**
+ * Freshness bonus: newly published markets get a temporary additive boost
+ * that decays linearly to zero over FRESHNESS_DECAY_HOURS.
+ * Max bonus is additive (not weighted) so it can't overpower a truly hot market.
+ *
+ * e.g. at t=0 of publish → +0.20; at t=1h → +0.10; at t=2h → 0
+ */
+const FRESHNESS_MAX_BONUS = 0.20
+const FRESHNESS_DECAY_HOURS = 2
 
 // ── Signal calculators ────────────────────────────────────────────────────────
 
@@ -178,6 +190,21 @@ function socialSignal(
   return userCircleIds.has(market.circle_id) ? 1 : 0
 }
 
+/**
+ * Freshness bonus: temporary additive boost for recently published markets.
+ * Decays linearly from FRESHNESS_MAX_BONUS → 0 over FRESHNESS_DECAY_HOURS.
+ * Returns 0 if market has no published_at (pre-queue-system markets).
+ *
+ * This is ADDITIVE, not weighted — avoids a brand-new low-activity market
+ * outranking a genuinely hot one, while still giving new markets initial air.
+ */
+function freshnessBonus(market: RankableMarket, nowMs: number): number {
+  if (!market.published_at) return 0
+  const ageHours = (nowMs - new Date(market.published_at).getTime()) / 3_600_000
+  if (ageHours >= FRESHNESS_DECAY_HOURS) return 0
+  return FRESHNESS_MAX_BONUS * (1 - ageHours / FRESHNESS_DECAY_HOURS)
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface RankBreakdown {
@@ -187,6 +214,7 @@ export interface RankBreakdown {
   hot_score: number
   tension: number
   social: number
+  freshness: number
   total: number
   pinned: boolean
 }
@@ -224,8 +252,59 @@ export function computeRankScore(
     signals.tension   * WEIGHTS.tension +
     signals.social    * WEIGHTS.social
 
+  // Freshness boost fades over 2 hours after publish — gives new markets initial air
+  const freshness = freshnessBonus(market, nowMs)
+
   // Featured markets always appear above organic results
-  return (market.is_featured ? FEATURED_PIN_BONUS : 0) + organic
+  return (market.is_featured ? FEATURED_PIN_BONUS : 0) + organic + freshness
+}
+
+// ── First-session weights ─────────────────────────────────────────────────────
+// New users need markets that feel: contested (close odds), alive (activity),
+// and fast (resolve soon). We suppress slow/niche markets entirely.
+
+const FIRST_SESSION_WEIGHTS = {
+  tension:   0.35,  // Close to 50/50 = high drama and accessibility
+  hot_score: 0.30,  // Real people betting = the world feels alive
+  urgency:   0.25,  // Resolves soon = immediate anticipation
+  velocity:  0.10,  // Recent momentum signal
+} as const
+
+/**
+ * First-session feed ranking.
+ *
+ * Surfaces markets that feel: contested, active, and fast-resolving.
+ * Applies a speed multiplier that penalises multi-day markets so new users
+ * see something they can check back on within hours, not days.
+ *
+ * Circle markets are excluded (they feel confusing to a new user).
+ */
+export function rankFeedFirstSession<T extends RankableMarket>(markets: T[]): T[] {
+  const nowMs = Date.now()
+  const candidates = markets.filter((m) => !m.resolved && !m.circle_id)
+
+  const scored = candidates.map((m) => {
+    const t = tensionSignal(m)
+    const h = hotScoreSignal(m)
+    const u = urgencySignal(m, nowMs)
+    const v = velocitySignal(m, nowMs)
+
+    const hoursLeft = (new Date(m.end_time).getTime() - nowMs) / 3_600_000
+    // Boost same-day markets; penalise anything > 2 days out
+    const speedMultiplier = hoursLeft < 12 ? 1.4 : hoursLeft < 24 ? 1.15 : hoursLeft < 48 ? 0.9 : 0.55
+
+    const score = (
+      t * FIRST_SESSION_WEIGHTS.tension +
+      h * FIRST_SESSION_WEIGHTS.hot_score +
+      u * FIRST_SESSION_WEIGHTS.urgency +
+      v * FIRST_SESSION_WEIGHTS.velocity
+    ) * speedMultiplier + (m.is_featured ? 0.4 : 0)
+
+    return { market: m, score }
+  })
+
+  scored.sort((a, b) => b.score - a.score)
+  return scored.map(({ market }) => market)
 }
 
 /**
@@ -263,7 +342,7 @@ export function debugRankScore(
   nowMs = Date.now()
 ): RankBreakdown {
   if (market.resolved) {
-    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, social: 0, total: -1, pinned: false }
+    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, social: 0, freshness: 0, total: -1, pinned: false }
   }
 
   const v = velocitySignal(market, nowMs)
@@ -275,6 +354,7 @@ export function debugRankScore(
 
   const organic = v * WEIGHTS.velocity + u * WEIGHTS.urgency + m * WEIGHTS.momentum + h * WEIGHTS.hot_score + t * WEIGHTS.tension + s * WEIGHTS.social
   const pinned = market.is_featured === true
+  const fresh = freshnessBonus(market, nowMs)
 
   return {
     velocity: +v.toFixed(3),
@@ -283,7 +363,8 @@ export function debugRankScore(
     hot_score: +h.toFixed(3),
     tension: +t.toFixed(3),
     social: +s.toFixed(3),
-    total: +(organic + (pinned ? FEATURED_PIN_BONUS : 0)).toFixed(3),
+    freshness: +fresh.toFixed(3),
+    total: +(organic + fresh + (pinned ? FEATURED_PIN_BONUS : 0)).toFixed(3),
     pinned,
   }
 }

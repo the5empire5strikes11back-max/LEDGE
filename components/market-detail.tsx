@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { X, TrendingUp, TrendingDown, Activity, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { useOnboarding } from "@/lib/onboarding"
+import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { Countdown } from "@/components/ui/countdown"
 import { computeDetailSignals } from "@/lib/social-signals"
 import {
@@ -34,11 +37,15 @@ interface MarketDetailProps {
   onClose: () => void
   onBuyYes: () => void
   onBuyNo: () => void
+  /** "overlay" = full-screen fixed modal (mobile default).
+   *  "panel"   = fills its container, no fixed positioning (desktop side panel). */
+  mode?: "overlay" | "panel"
 }
 
 interface BetActivity {
   id: string
   username: string
+  avatarUrl?: string | null
   side: string
   amount: number
   created_at: string
@@ -135,10 +142,12 @@ function TraderDistribution({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetailProps) {
+export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overlay" }: MarketDetailProps) {
+  const isPanel = mode === "panel"
   const [bets, setBets]       = useState<BetActivity[]>([])
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const { state: ob, complete: completeOb } = useOnboarding()
 
   const isResolved  = !!market.resolved
   const isHot       = (market.hotScore ?? 0) >= 8
@@ -165,6 +174,14 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
     yesPercent
   )
 
+  // Progressive tip: first time user sees whale activity
+  useEffect(() => {
+    if (!loading && signals.hasWhale && !ob.whaleTipDone) {
+      const t = setTimeout(() => completeOb("whaleTipDone"), 6000)
+      return () => clearTimeout(t)
+    }
+  }, [loading, signals.hasWhale, ob.whaleTipDone, completeOb])
+
   const chartData = history.length > 0
     ? [...history.map((h, i) => ({ t: i, y: h.yesPercent })), { t: history.length, y: yesPercent }]
     : [{ t: 0, y: yesPercent }]
@@ -173,7 +190,12 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
   const chartMax = Math.min(100, Math.max(...chartData.map((d) => d.y)) + 5)
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-background animate-in slide-in-from-bottom-full duration-300">
+    <div className={cn(
+      "flex flex-col bg-background",
+      isPanel
+        ? "h-full"
+        : "fixed inset-0 z-40 animate-in slide-in-from-bottom-full duration-300"
+    )}>
 
       {/* Header */}
       <div className="shrink-0 border-b border-border px-4 h-[57px] flex items-center justify-between gap-3">
@@ -207,8 +229,8 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 pt-4 pb-32 flex flex-col gap-5">
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-32")}>
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
 
@@ -401,9 +423,10 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
                 {bets.slice(0, 8).map((bet) => (
                   <div key={bet.id} className="flex items-center justify-between px-3 py-2.5 bg-surface">
                     <div className="flex items-center gap-2 min-w-0">
+                      <UserAvatar username={bet.username} avatarUrl={bet.avatarUrl} size={22} className="shrink-0" />
                       {bet.side === "yes"
-                        ? <TrendingUp className="w-3.5 h-3.5 text-success shrink-0" />
-                        : <TrendingDown className="w-3.5 h-3.5 text-danger shrink-0" />
+                        ? <TrendingUp className="w-3 h-3 text-success shrink-0" />
+                        : <TrendingDown className="w-3 h-3 text-danger shrink-0" />
                       }
                       <span className="text-xs text-foreground font-medium truncate">@{bet.username}</span>
                       <span
@@ -428,7 +451,10 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
 
       {/* Bottom action bar */}
       {!isResolved && !market.userBet && (
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 bg-background border-t border-border px-4 py-3 flex gap-3">
+        <div className={cn(
+          "shrink-0 bg-background border-t border-border px-4 py-3 flex gap-3",
+          !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
+        )}>
           <button onClick={onBuyYes} className="flex-1 flex items-center justify-center gap-2 py-3 bg-success text-success-foreground font-bold text-sm uppercase tracking-wide transition-all hover:bg-success/90" style={{ borderRadius: "var(--radius-button)" }}>
             <TrendingUp className="w-4 h-4" />
             Buy YES · {yesPercent.toFixed(0)}¢
@@ -443,11 +469,23 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo }: MarketDetai
       {/* Resolved banner */}
       {isResolved && (
         <div className={cn(
-          "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 border-t px-4 py-3 text-center font-bold text-sm uppercase tracking-widest",
-          market.resolved?.winner === "yes" ? "bg-success/20 border-success/30 text-success" : "bg-danger/20 border-danger/30 text-danger"
+          "shrink-0 border-t px-4 py-3 text-center font-bold text-sm uppercase tracking-widest",
+          market.resolved?.winner === "yes" ? "bg-success/20 border-success/30 text-success" : "bg-danger/20 border-danger/30 text-danger",
+          !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
         )}>
           {market.resolved?.winner === "yes" ? "YES Won" : "NO Won"} — Market Resolved
         </div>
+      )}
+
+      {/* Whale progressive tip */}
+      {!isPanel && (
+        <ProgressiveTip
+          show={!loading && signals.hasWhale && !ob.whaleTipDone}
+          icon="🐳"
+          title="Whale Alert"
+          body="A large position was placed on this market. Whales often have strong conviction — but can also be wrong. Use this as a signal, not a guarantee."
+          onDismiss={() => completeOb("whaleTipDone")}
+        />
       )}
     </div>
   )

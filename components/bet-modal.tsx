@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { X, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { calculateFixedOddsPayout } from "@/lib/game-engine"
+import { useOnboarding } from "@/lib/onboarding"
 
 interface BetModalProps {
   market: {
@@ -29,6 +30,8 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const [rawAmount, setRawAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { state: ob } = useOnboarding()
+  const showHint = !ob.firstBetAchievementDone  // show until first bet is done
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 80)
@@ -171,6 +174,19 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
               </button>
             </div>
           </div>
+
+          {/* First-bet hint — shown until user places their first bet */}
+          {showHint && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 bg-accent/8 border border-accent/25 animate-in fade-in duration-300"
+              style={{ borderRadius: "var(--radius-button)" }}
+            >
+              <span className="shrink-0 text-sm" aria-hidden>💡</span>
+              <p className="text-[11px] text-accent/80 font-medium">
+                Free credits only — no real money. Pick an amount and lock in your call.
+              </p>
+            </div>
+          )}
 
           {/* Trade stats */}
           {amount > 0 && (

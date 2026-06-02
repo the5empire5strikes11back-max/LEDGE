@@ -11,9 +11,10 @@ export async function GET(
 
   const { id } = await params
 
-  const { data: rawBets, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rawBets, error } = await (supabase as any)
     .from('bets')
-    .select('id, side, amount, created_at, profiles(username)')
+    .select('id, side, amount, created_at, profiles(username, avatar_url)')
     .eq('market_id', id)
     .order('created_at', { ascending: true })
     .limit(100)
@@ -25,7 +26,7 @@ export async function GET(
     side: string
     amount: number
     created_at: string
-    profiles: { username: string } | null
+    profiles: { username: string; avatar_url?: string | null } | null
   }>
 
   // Reconstruct probability history from sequential bets
@@ -45,6 +46,7 @@ export async function GET(
     bets: bets.map((b) => ({
       id: b.id,
       username: b.profiles?.username ?? 'anon',
+      avatarUrl: b.profiles?.avatar_url ?? null,
       side: b.side,
       amount: b.amount,
       created_at: b.created_at,
