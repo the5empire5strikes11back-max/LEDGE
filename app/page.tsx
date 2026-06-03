@@ -36,6 +36,11 @@ const NAV_ITEMS: { id: Screen; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
 ]
 
+// LocalStorage keys for activity tracking
+const LS_LAST_CIRCLES_VISIT = "ledge_last_circles_visit"
+const LS_HAS_CIRCLES        = "ledge_has_circles"
+const LS_LAST_APP_OPEN      = "ledge_last_app_open"
+
 interface WinReceiptData {
   market: { title: string; category: string }
   bet: { side: "yes" | "no"; amount: number }
@@ -45,6 +50,17 @@ interface WinReceiptData {
 }
 
 type Profile = Database['public']['Tables']['profiles']['Row']
+
+function formatResolveTime(endTime: string): string {
+  const ms = new Date(endTime).getTime() - Date.now()
+  if (ms <= 0) return "closing soon"
+  const mins  = Math.floor(ms / 60_000)
+  const hours = Math.floor(mins / 60)
+  const days  = Math.floor(hours / 24)
+  if (days >= 1)  return `closes in ${days}d`
+  if (hours >= 1) return `closes in ${hours}h`
+  return `closes in ${mins}m`
+}
 
 // ── Logo mark ─────────────────────────────────────────────────────────────────
 function LedgeLogo({ size = 28 }: { size?: number }) {
@@ -60,6 +76,8 @@ function LedgeLogo({ size = 28 }: { size?: number }) {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("feed")
+  const [returnHookCount, setReturnHookCount] = useState(0)
+  const [circlesBadge, setCirclesBadge] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [betHistory, setBetHistory] = useState<BetRecord[]>([])
   const [dailyDropOpen, setDailyDropOpen] = useState(false)
@@ -159,6 +177,46 @@ export default function App() {
     }
   }, [])
 
+  // Fetch return hooks count for nav badge + welcome-back toast
+  useEffect(() => {
+    if (!ob.firstBetAchievementDone) return
+    fetch('/api/return-hooks')
+      .then((r) => r.ok ? r.json() : [])
+      .then((hooks: unknown[]) => {
+        setReturnHookCount(hooks.length)
+        // Welcome-back toast when returning after >4h with bets in play
+        if (hooks.length > 0) {
+          const last = Number(localStorage.getItem(LS_LAST_APP_OPEN) ?? 0)
+          const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000
+          if (last < fourHoursAgo) {
+            toast(`${hooks.length} bet${hooks.length > 1 ? 's' : ''} still in play`, {
+              description: 'Welcome back — check your predictions',
+              duration: 4000,
+            })
+          }
+        }
+        localStorage.setItem(LS_LAST_APP_OPEN, String(Date.now()))
+      })
+      .catch(() => {})
+  }, [ob.firstBetAchievementDone])
+
+  // Circles activity badge — show dot if user has circles and hasn't visited in 8h
+  useEffect(() => {
+    const hasCircles = localStorage.getItem(LS_HAS_CIRCLES) === 'true'
+    if (!hasCircles) return
+    const last = Number(localStorage.getItem(LS_LAST_CIRCLES_VISIT) ?? 0)
+    const eightHoursAgo = Date.now() - 8 * 60 * 60 * 1000
+    if (last < eightHoursAgo) setCirclesBadge(true)
+  }, [])
+
+  const handleScreenChange = (s: Screen) => {
+    setScreen(s)
+    if (s === 'circles') {
+      setCirclesBadge(false)
+      localStorage.setItem(LS_LAST_CIRCLES_VISIT, String(Date.now()))
+    }
+  }
+
   useEffect(() => {
     loadProfile()
     loadBetHistory()
@@ -189,6 +247,7 @@ export default function App() {
     majorityWas: "yes" | "no",
     serverCredits?: number,
     serverXp?: number,
+    marketEndTime?: string,
   ) => {
     setProfile((prev) => {
       if (!prev) return prev
@@ -207,9 +266,10 @@ export default function App() {
           setTimeout(() => setDailyDropOpen(true), 3000)
         }
       } else {
-        toast("+10 XP", {
-          description: `Bet placed on ${side.toUpperCase()}`,
-          duration: 2000,
+        const resolveHint = marketEndTime ? formatResolveTime(marketEndTime) : null
+        toast(`+10 XP · ${side.toUpperCase()}`, {
+          description: resolveHint ?? "Bet placed — check back when it resolves",
+          duration: 3000,
           style: {
             background: "var(--accent)", color: "var(--accent-foreground)",
             border: "none", fontSize: "13px", fontWeight: "700",
@@ -318,10 +378,13 @@ export default function App() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+            const feedBadge = id === 'feed' && returnHookCount > 0
+            const circlesBadgeShow = id === 'circles' && circlesBadge
+            return (
             <button
               key={id}
-              onClick={() => setScreen(id)}
+              onClick={() => handleScreenChange(id)}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-all duration-150 text-left w-full",
                 screen === id
@@ -335,11 +398,22 @@ export default function App() {
                 screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.7)]"
               )} />
               {label}
-              {id === "feed" && screen === id && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              )}
+              <span className="ml-auto flex items-center gap-1">
+                {id === "feed" && screen === id && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                )}
+                {feedBadge && screen !== id && (
+                  <span className="min-w-[16px] h-4 px-1 bg-accent text-accent-foreground text-[9px] font-bold rounded-full flex items-center justify-center tabular-nums">
+                    {returnHookCount}
+                  </span>
+                )}
+                {circlesBadgeShow && (
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                )}
+              </span>
             </button>
-          ))}
+            )
+          })}
 
           {/* Live indicator strip */}
           <div className="mt-4 pt-4 border-t border-border">
@@ -366,7 +440,7 @@ export default function App() {
 
           {/* User card */}
           <button
-            onClick={() => setScreen("profile")}
+            onClick={() => handleScreenChange("profile")}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 transition-all duration-150 text-left w-full border",
               screen === "profile"
@@ -445,19 +519,33 @@ export default function App() {
       {/* ── MOBILE: Bottom Navigation ─────────────────────────────────────── */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-background border-t border-border">
         <div className="flex">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+            const feedBadge  = id === 'feed'    && returnHookCount > 0 && screen !== id
+            const circBadge  = id === 'circles' && circlesBadge
+            return (
             <button
               key={id}
-              onClick={() => setScreen(id)}
+              onClick={() => handleScreenChange(id)}
               className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors duration-200",
+                "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors duration-200 relative",
                 screen === id ? "text-accent" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className={cn("w-5 h-5 transition-all duration-200", screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.6)]")} />
+              <div className="relative">
+                <Icon className={cn("w-5 h-5 transition-all duration-200", screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.6)]")} />
+                {feedBadge && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 px-0.5 bg-accent text-accent-foreground text-[8px] font-bold rounded-full flex items-center justify-center tabular-nums leading-none">
+                    {returnHookCount}
+                  </span>
+                )}
+                {circBadge && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-background" />
+                )}
+              </div>
               <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
             </button>
-          ))}
+            )
+          })}
         </div>
       </nav>
 

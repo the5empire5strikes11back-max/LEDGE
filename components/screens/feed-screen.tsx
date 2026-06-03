@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
@@ -8,6 +8,7 @@ import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
 import { ReturnHooksBar } from "@/components/onboarding/return-hooks-bar"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
@@ -66,6 +67,7 @@ interface FeedScreenProps {
     majorityWas: "yes" | "no",
     serverCredits?: number,
     serverXp?: number,
+    marketEndTime?: string,
   ) => void
   onWin: (
     marketTitle: string,
@@ -79,6 +81,18 @@ function formatCredits(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
   return value.toString()
+}
+
+/** Human-readable "closes in X" string for bet toasts */
+function formatResolveTime(endTime: string): string {
+  const ms = new Date(endTime).getTime() - Date.now()
+  if (ms <= 0) return "closing soon"
+  const mins  = Math.floor(ms / 60_000)
+  const hours = Math.floor(mins / 60)
+  const days  = Math.floor(hours / 24)
+  if (days >= 1)  return `closes in ${days}d`
+  if (hours >= 1) return `closes in ${hours}h`
+  return `closes in ${mins}m`
 }
 
 export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: FeedScreenProps) {
@@ -244,7 +258,7 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
 
     setTradeModal(null)
 
-    onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas)
+    onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, undefined, undefined, market.endTime)
 
     const res = await fetch('/api/bets', {
       method: 'POST',
@@ -267,7 +281,7 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
     setDetailMarket((prev) => prev?.id === market.id ? { ...prev, ...patch } : prev)
 
     if (data?.profile) {
-      onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp)
+      onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp, market.endTime)
     }
 
     // Show anticipation panel on first bet
@@ -380,13 +394,23 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
 
         {/* Return hooks — shown to returning users with open bets */}
         {returnHooks.length > 0 && (
-          <ReturnHooksBar
-            hooks={returnHooks}
-            onHookClick={(hook) => {
-              const market = markets.find((m) => m.id === hook.marketId)
-              if (market) setDetailMarket(market)
-            }}
-          />
+          <>
+            {/* "While you were away" summary — gives context before the chips */}
+            <div className="px-4 pt-2.5 pb-0.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
+                {returnHooks.some((h) => h.urgent)
+                  ? `⚡ ${returnHooks.length} bet${returnHooks.length > 1 ? 's' : ''} need attention`
+                  : `${returnHooks.length} active bet${returnHooks.length > 1 ? 's' : ''} in play`}
+              </p>
+            </div>
+            <ReturnHooksBar
+              hooks={returnHooks}
+              onHookClick={(hook) => {
+                const market = markets.find((m) => m.id === hook.marketId)
+                if (market) setDetailMarket(market)
+              }}
+            />
+          </>
         )}
 
         {/* Onboarding: feed tooltip — explains the core action to new users */}

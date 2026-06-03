@@ -56,6 +56,7 @@ interface CirclesScreenProps {
     majorityWas: "yes" | "no",
     serverCredits?: number,
     serverXp?: number,
+    marketEndTime?: string,
   ) => void
 }
 
@@ -228,6 +229,10 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
           })),
       }))
       setCircles(mapped)
+      // Let page.tsx know user has circles so it can show the nav badge
+      if (mapped.length > 0) {
+        localStorage.setItem('ledge_has_circles', 'true')
+      }
     }
     setLoading(false)
   }, [])
