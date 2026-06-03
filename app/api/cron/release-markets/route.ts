@@ -177,6 +177,19 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient()
 
+  // ── Schema capability detection ───────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: schemaCheck } = await (supabase as any).from('markets').select('id, status').limit(1)
+  const hasStatusColumn = !schemaCheck
+
+  if (!hasStatusColumn) {
+    // Legacy schema — no queue system. Return early with a no-op response.
+    return NextResponse.json({
+      skipped: true,
+      reason: 'Legacy schema detected — status column not present. Run the schema migration to enable the queue system.',
+    })
+  }
+
   // Allow authenticated users for soft-trigger (same pattern as resolve-expired)
   if (!isCron) {
     const userClient = await import('@/lib/supabase/server').then((m) => m.createClient())
@@ -184,7 +197,8 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Rate-limit client calls — skip if last publish < CLIENT_RATE_LIMIT_HOURS ago
-    const { data: latestPublish } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: latestPublish } = await (supabase as any)
       .from('markets')
       .select('published_at')
       .eq('status', 'live')
@@ -211,13 +225,16 @@ export async function POST(request: Request) {
   // anything closer is expired before it even goes live.
   const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60_000).toISOString()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [liveResult, queuedResult] = await Promise.all([
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('markets')
       .select('id, category')
       .or('status.eq.live,status.is.null')
       .eq('resolved', false),
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('markets')
       .select('id, category, end_time, generated_at')
       .eq('status', 'queued')
