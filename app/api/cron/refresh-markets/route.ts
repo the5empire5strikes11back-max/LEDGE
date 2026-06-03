@@ -24,21 +24,6 @@ const PRIME_BATCH_SIZE = 5
 // If Sports (live + queued) is below this threshold, bias generation toward Sports
 const SPORTS_LOW_THRESHOLD = CATEGORY_FLOORS['Sports'] + 3  // floor(5) + buffer(3) = 8
 
-// ── Schema capability detection ───────────────────────────────────────────────
-// The production DB may be on a pre-migration schema that lacks the status,
-// generated_at, and published_at columns. We detect this once per invocation
-// and fall back to a simpler insert that works with the legacy schema.
-async function detectSchemaCapabilities(supabase: ReturnType<typeof createAdminClient>): Promise<{
-  hasStatusColumn: boolean
-}> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
-    .from('markets')
-    .select('id, status')
-    .limit(1)
-  return { hasStatusColumn: !error }
-}
-
 // Vercel Cron calls this twice daily (06:00 + 18:00 UTC).
 // Also callable manually from admin for ad-hoc generation.
 export async function POST(request: Request) {
@@ -58,21 +43,13 @@ export async function POST(request: Request) {
   const supabase = createAdminClient()
   const now = new Date().toISOString()
 
-  // Detect whether the production DB has the full schema (status column etc.)
-  const { hasStatusColumn } = await detectSchemaCapabilities(supabase)
-  if (!hasStatusColumn) {
-    logMessage('Running in legacy schema mode — status column not found. Markets will be inserted as live immediately.', { context: 'cron:refresh-markets' })
-  }
-
   // ── 1. Check Sports inventory — bias generation if running low ──────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sportsQuery = hasStatusColumn
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (supabase as any).from('markets').select('id').eq('category', 'Sports').in('status', ['live', 'queued']).eq('resolved', false)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (supabase as any).from('markets').select('id').eq('category', 'Sports').eq('resolved', false).gt('end_time', now)
-
-  const { data: sportsInventory } = await sportsQuery
+  const { data: sportsInventory } = await supabase
+    .from('markets')
+    .select('id')
+    .eq('category', 'Sports')
+    .in('status', ['live', 'queued'])
+    .eq('resolved', false)
 
   const sportsTotal = sportsInventory?.length ?? 0
   const sportsHeavy = sportsTotal < SPORTS_LOW_THRESHOLD
@@ -137,16 +114,12 @@ export async function POST(request: Request) {
   })
 
   // ── 4. Deduplicate against all existing markets (live + queued) ──────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dedupQuery = hasStatusColumn
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (supabase as any).from('markets').select('title').or('status.eq.live,status.eq.queued,status.is.null')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (supabase as any).from('markets').select('title').eq('resolved', false)
+  const { data: existing } = await supabase
+    .from('markets')
+    .select('title')
+    .or('status.eq.live,status.eq.queued,status.is.null')
 
-  const { data: existing } = await dedupQuery
-
-  const existingTitles = new Set((existing ?? []).map((m: { title: string }) => m.title.toLowerCase()))
+  const existingTitles = new Set((existing ?? []).map((m) => m.title.toLowerCase()))
   const toQueue = freshMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
 
   if (toQueue.length === 0) {
@@ -160,76 +133,65 @@ export async function POST(request: Request) {
     })
   }
 
-  // ── 5. Insert markets ────────────────────────────────────────────────────────
-  // With full schema: insert as 'queued' for controlled release via release-markets.
-  // Legacy schema (no status column): insert bare — markets show as live immediately
-  // since the feed filter treats status=null as live.
+  // ── 5. Insert markets as QUEUED ──────────────────────────────────────────────
   const toInsert = toQueue.map((m) => {
     const seed = seedLiquidity(m.category as MarketCategory, false)
-    if (hasStatusColumn) {
-      return {
-        ...m,
-        ...seed,
-        status: 'queued' as const,
-        generated_at: now,
-        published_at: null,
-      }
+    return {
+      ...m,
+      ...seed,
+      status: 'queued' as const,
+      generated_at: now,
+      published_at: null,
     }
-    // Legacy schema — omit status/generated_at/published_at
-    return { ...m, ...seed }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const selectCols = hasStatusColumn ? 'id, title, category, status' : 'id, title, category'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertError, data: inserted } = await (supabase as any)
     .from('markets')
     .insert(toInsert)
-    .select(selectCols)
+    .select('id, title, category, status')
 
   if (insertError) {
     logError(new Error(insertError.message), { context: 'cron:refresh-markets:insert' })
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
-  const insertedCount = (inserted ?? []).length
+  const queuedCount = (inserted ?? []).length
 
-  // ── 6. Prime the feed (full schema only) ─────────────────────────────────────
-  // In legacy mode markets are already live on insert, so no priming needed.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const liveCountQuery = hasStatusColumn
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (supabase as any).from('markets').select('id', { count: 'exact', head: true }).or('status.eq.live,status.is.null').eq('resolved', false)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (supabase as any).from('markets').select('id', { count: 'exact', head: true }).eq('resolved', false).gt('end_time', now)
-
-  const { count: liveCount } = await liveCountQuery
+  // ── 6. Prime the feed if below target live count ─────────────────────────────
+  // After inserting, check how many live markets exist. If the feed is thin
+  // (e.g. first run after migration, or low-traffic period), immediately publish
+  // up to PRIME_BATCH_SIZE markets so users don't see an empty feed.
+  const { count: liveCount } = await supabase
+    .from('markets')
+    .select('id', { count: 'exact', head: true })
+    .or('status.eq.live,status.is.null')
+    .eq('resolved', false)
 
   let primedCount = 0
-  if (hasStatusColumn && (liveCount ?? 0) < TARGET_LIVE_COUNT && insertedCount > 0) {
+  if ((liveCount ?? 0) < TARGET_LIVE_COUNT && queuedCount > 0) {
     const needed = Math.min(
       TARGET_LIVE_COUNT - (liveCount ?? 0),
       PRIME_BATCH_SIZE,
-      insertedCount
+      queuedCount
     )
+
+    // Pick the first N queued markets just inserted (spread across categories)
     const toPublish = (inserted ?? []).slice(0, needed)
     const ids = toPublish.map((m: { id: string }) => m.id)
 
     if (ids.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      await supabase
         .from('markets')
         .update({ status: 'live', published_at: now })
         .in('id', ids)
+
       primedCount = ids.length
     }
   }
 
-  const queuedCount = hasStatusColumn ? insertedCount - primedCount : 0
-
   return NextResponse.json({
     success: true,
-    schema_mode: hasStatusColumn ? 'full' : 'legacy',
     generation: {
       sports_heavy: sportsHeavy,
       sports_total_before: sportsTotal,
@@ -244,8 +206,7 @@ export async function POST(request: Request) {
         reason: r.reason,
       })),
     },
-    inserted: insertedCount,
-    queued: queuedCount,
+    queued: queuedCount - primedCount,
     primed: primedCount,
     live_count_before: liveCount ?? 0,
   })
