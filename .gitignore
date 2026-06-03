@@ -17,3 +17,4 @@ node_modules
 
 # Sentry Config File
 .env.sentry-build-plugin
+HANDOFF.md
