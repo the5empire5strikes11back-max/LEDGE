@@ -7,6 +7,7 @@
  */
 import webpush from 'web-push'
 import { createAdminClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/logger'
 
 const VAPID_SUBJECT = 'mailto:admin@ledge.app'
 
@@ -40,8 +41,17 @@ async function deliverOne(sub: StoredSubscription, payload: PushPayload) {
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(payload)
     )
-  } catch {
-    // Stale or revoked subscription — silently discard
+  } catch (err) {
+    // 410 Gone = subscription expired/revoked — expected, discard silently
+    // Any other status = configuration or network problem — log to Sentry
+    const status = (err as { statusCode?: number }).statusCode
+    if (status !== 410) {
+      logError(err, {
+        context: 'push:deliverOne',
+        statusCode: status,
+        endpoint: sub.endpoint.slice(0, 60),
+      })
+    }
   }
 }
 

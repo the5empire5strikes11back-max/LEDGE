@@ -17,24 +17,20 @@ import {
 } from '@/lib/game-engine'
 import { resolveFromSource } from '@/lib/market-resolver'
 import { pushToUser } from '@/lib/push'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
 
 // Allow up to 60 s — resolving many markets with Claude fallbacks can be slow.
 export const maxDuration = 60
 
-// ── Anthropic key helper (same pattern as cron route) ────────────────────────
+// Kill switch: set DISABLE_RESOLUTION=true in Vercel env to halt automated resolution.
+// Use this if resolution is producing wrong outcomes and manual review is needed.
+const RESOLUTION_DISABLED = process.env.DISABLE_RESOLUTION === 'true'
+
+// ── Anthropic key helper ─────────────────────────────────────────────────────
 
 function getAnthropicKey(): string | undefined {
-  const fromEnv = process.env.ANTHROPIC_API_KEY
-  if (fromEnv) return fromEnv
-  try {
-    const content = readFileSync(join(process.cwd(), '.env.local'), 'utf-8')
-    return content.match(/^ANTHROPIC_API_KEY=(.+)$/m)?.[1]?.trim()
-  } catch {
-    return undefined
-  }
+  return process.env.ANTHROPIC_API_KEY
 }
 
 // ── Claude fallback ──────────────────────────────────────────────────────────
@@ -197,6 +193,12 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Kill switch — halt resolution without a deploy
+  if (RESOLUTION_DISABLED) {
+    logMessage('Resolution skipped: DISABLE_RESOLUTION=true', { context: 'resolve-expired' })
+    return NextResponse.json({ skipped: true, reason: 'DISABLE_RESOLUTION is set' })
+  }
+
   // 1. Fetch only expired, unresolved markets (hits partial index)
   const { data: expiredMarkets, error } = await supabase
     .from('markets')
@@ -204,7 +206,10 @@ export async function POST(request: Request) {
     .eq('resolved', false)
     .lte('end_time', new Date().toISOString())
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError(new Error(error.message), { context: 'resolve-expired:fetch' })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   if (!expiredMarkets?.length) {
     return NextResponse.json({ resolved: 0, message: 'No expired markets' })
   }
@@ -212,48 +217,60 @@ export async function POST(request: Request) {
   const apiKey = getAnthropicKey()
   const results = []
 
+  const errors: { marketId: string; error: string }[] = []
+
   for (const market of expiredMarkets) {
-    let winner: 'yes' | 'no' = market.yes_percent >= 50 ? 'yes' : 'no'
-    let resolvedBy = 'majority_vote'
+    try {
+      let winner: 'yes' | 'no' = market.yes_percent >= 50 ? 'yes' : 'no'
+      let resolvedBy = 'majority_vote'
 
-    // 2. Try direct HTTP resolution first (no AI tokens)
-    const directOutcome = await resolveFromSource(
-      market.resolution_source_url,
-      market.target_data_key
-    )
-
-    if (directOutcome !== 'unknown') {
-      winner = directOutcome
-      resolvedBy = 'direct_http'
-    } else if (apiKey) {
-      // 3. Claude fallback — only invoked when direct resolution fails
-      const aiOutcome = await resolveWithClaude(
-        market.title,
-        market.resolution_criteria,
-        apiKey
+      // 2. Try direct HTTP resolution first (no AI tokens)
+      const directOutcome = await resolveFromSource(
+        market.resolution_source_url,
+        market.target_data_key
       )
-      if (aiOutcome !== 'unknown') {
-        winner = aiOutcome
-        resolvedBy = 'ai_fallback'
+
+      if (directOutcome !== 'unknown') {
+        winner = directOutcome
+        resolvedBy = 'direct_http'
+      } else if (apiKey) {
+        // 3. Claude fallback — only invoked when direct resolution fails
+        const aiOutcome = await resolveWithClaude(
+          market.title,
+          market.resolution_criteria,
+          apiKey
+        )
+        if (aiOutcome !== 'unknown') {
+          winner = aiOutcome
+          resolvedBy = 'ai_fallback'
+        }
       }
+
+      // 4. Persist resolution — clear engagement signals on close
+      await supabase
+        .from('markets')
+        .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0 })
+        .eq('id', market.id)
+
+      const payoutCount = await settleBets(supabase, market, winner)
+
+      results.push({
+        marketId: market.id,
+        title: market.title,
+        winner,
+        resolvedBy,
+        payoutCount,
+      })
+    } catch (err) {
+      // Log per-market failure to Sentry but continue resolving other markets
+      logError(err, { context: 'resolve-expired:market', marketId: market.id, title: market.title })
+      errors.push({ marketId: market.id, error: err instanceof Error ? err.message : String(err) })
     }
-
-    // 4. Persist resolution — clear engagement signals on close
-    await supabase
-      .from('markets')
-      .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0 })
-      .eq('id', market.id)
-
-    const payoutCount = await settleBets(supabase, market, winner)
-
-    results.push({
-      marketId: market.id,
-      title: market.title,
-      winner,
-      resolvedBy,
-      payoutCount,
-    })
   }
 
-  return NextResponse.json({ resolved: results.length, results })
+  if (errors.length > 0) {
+    console.error(`[resolve-expired] ${errors.length} market(s) failed to resolve:`, errors)
+  }
+
+  return NextResponse.json({ resolved: results.length, results, errors })
 }

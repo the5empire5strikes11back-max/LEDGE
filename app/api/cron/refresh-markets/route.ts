@@ -4,25 +4,17 @@ import { generateMarkets } from '@/lib/market-generator'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { CATEGORY_FLOORS } from '@/app/api/cron/release-markets/route'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { logError, logMessage } from '@/lib/logger'
 
 // Allow up to 60s on Vercel Pro — RSS fetches + Claude Haiku can exceed 10s.
 export const maxDuration = 60
 
-// Read ANTHROPIC_API_KEY directly from .env.local if process.env is empty
-// (happens when shell exports an empty ANTHROPIC_API_KEY that overrides .env.local)
+// Kill switch: set DISABLE_MARKET_GENERATION=true in Vercel env to stop generation
+// without a code deploy. Useful if AI is producing bad markets.
+const GENERATION_DISABLED = process.env.DISABLE_MARKET_GENERATION === 'true'
+
 function getAnthropicKey(): string | undefined {
-  const fromEnv = process.env.ANTHROPIC_API_KEY
-  if (fromEnv) return fromEnv
-  try {
-    const envPath = join(process.cwd(), '.env.local')
-    const content = readFileSync(envPath, 'utf-8')
-    const match = content.match(/^ANTHROPIC_API_KEY=(.+)$/m)
-    return match?.[1]?.trim() ?? undefined
-  } catch {
-    return undefined
-  }
+  return process.env.ANTHROPIC_API_KEY
 }
 
 // Target live market count — if below this we seed from queue immediately
@@ -40,6 +32,12 @@ export async function POST(request: Request) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+  }
+
+  // Kill switch — disable without a deploy via Vercel env var
+  if (GENERATION_DISABLED) {
+    logMessage('Market generation skipped: DISABLE_MARKET_GENERATION=true', { context: 'cron:refresh-markets' })
+    return NextResponse.json({ skipped: true, reason: 'DISABLE_MARKET_GENERATION is set' })
   }
 
   const supabase = createAdminClient()
@@ -67,6 +65,7 @@ export async function POST(request: Request) {
   try {
     newMarkets = await generateMarkets(anthropicKey, { sportsHeavy })
   } catch (err) {
+    logError(err, { context: 'cron:refresh-markets:generate' })
     return NextResponse.json(
       { error: `Market generation failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }
@@ -135,6 +134,7 @@ export async function POST(request: Request) {
     .select('id, title, category, status')
 
   if (insertError) {
+    logError(new Error(insertError.message), { context: 'cron:refresh-markets:insert' })
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 

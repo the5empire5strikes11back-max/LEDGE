@@ -1,18 +1,29 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { pushToUser } from '@/lib/push'
+import { logError, logMessage } from '@/lib/logger'
 
+/**
+ * POST /api/markets/[id]/resolve
+ *
+ * Admin-only manual resolution endpoint.
+ * Requires Authorization: Bearer <CRON_SECRET> header.
+ * For automated resolution (cron + AI fallback) use /api/markets/resolve-expired.
+ *
+ * Body: { winner: "yes" | "no" }
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
-  const { id } = await params
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Admin-only: require CRON_SECRET — any authenticated user must NOT be able to resolve
+  const authHeader = request.headers.get('authorization')
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  const supabase = createAdminClient()
+  const { id } = await params
 
   const body = await request.json()
   const { winner } = body as { winner: 'yes' | 'no' }
@@ -36,10 +47,12 @@ export async function POST(
     return NextResponse.json({ error: 'Market already resolved' }, { status: 400 })
   }
 
+  logMessage(`Manual resolution: market ${id} → ${winner}`, { context: 'admin:resolve', marketId: id, winner })
+
   // Mark market resolved
   await supabase
     .from('markets')
-    .update({ resolved: true, winner })
+    .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0 })
     .eq('id', id)
 
   // Get all bets on this market
@@ -103,5 +116,8 @@ export async function POST(
   })
 
   const results = await Promise.all(payoutPromises)
-  return NextResponse.json({ resolved: true, results })
+  logMessage(`Manual resolution complete: market ${id} settled ${results.length} bets`, {
+    context: 'admin:resolve', marketId: id, winner, betCount: results.length,
+  })
+  return NextResponse.json({ resolved: true, payouts: results.length, results })
 }
