@@ -1,9 +1,43 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { unstable_cache } from 'next/cache'
 import { rankFeed } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
+
+// Cache the full markets list for 30 seconds — same for all users
+const getCachedMarkets = unstable_cache(
+  async (category: string | null) => {
+    const admin = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (admin as any).from('markets').select('*')
+    if (category && category !== 'All') {
+      query = query.eq('category', category)
+    }
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data ?? []) as any[]
+  },
+  ['markets'],
+  { revalidate: 30, tags: ['markets'] }
+)
+
+// Cache the last-24h bets for social signals for 60 seconds — same for all users
+const getCachedRecentBets = unstable_cache(
+  async () => {
+    const admin = createAdminClient()
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString()
+    const { data } = await admin
+      .from('bets')
+      .select('market_id, side, amount, created_at')
+      .gte('created_at', dayAgo)
+    return data ?? []
+  },
+  ['recent-bets'],
+  { revalidate: 60, tags: ['recent-bets'] }
+)
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -15,21 +49,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Fetch markets without any ordering — the ranker will sort them.
-  let query = supabase
-    .from('markets')
-    .select('*')
-
-  if (category && category !== 'All') {
-    query = query.eq('category', category as import('@/types/database').MarketCategory)
-  }
-
-  // Single timestamp for all time-windowed queries
-  const dayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString()
-
-  // Fetch markets, user bets, circle memberships, and recent bets — all in parallel
-  const [marketsResult, userBetsResult, circleMembershipsResult, recentBetsResult] = await Promise.all([
-    query,
+  // Cached queries (shared across all users) + user-specific queries run in parallel
+  const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult] = await Promise.all([
+    getCachedMarkets(category),
+    getCachedRecentBets(),
     supabase
       .from('bets')
       .select('market_id, side, amount, payout, won')
@@ -38,20 +61,13 @@ export async function GET(request: Request) {
       .from('circle_members')
       .select('circle_id')
       .eq('user_id', user.id),
-    // All bets across all markets in last 24h — grouped in memory, not per-market
-    supabase
-      .from('bets')
-      .select('market_id, side, amount, created_at')
-      .gte('created_at', dayAgo),
   ])
 
-  if (marketsResult.error) {
-    return NextResponse.json({ error: marketsResult.error.message }, { status: 500 })
-  }
+  const recentBetsResult = { data: recentBetsData }
 
   // Post-filter: hide queued/archived markets.
   // Pre-migration rows have no status field (undefined) and pass through as live.
-  const markets = (marketsResult.data ?? []).filter((m) => {
+  const markets = (allMarkets ?? []).filter((m) => {
     const s = (m as { status?: string }).status
     return !s || s === 'live'
   })
