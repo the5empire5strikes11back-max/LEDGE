@@ -1,8 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rankFeed } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
+import { rateLimit, LIMITS } from '@/lib/rate-limit'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -98,8 +99,20 @@ export async function GET(request: Request) {
     }
   })
 
-  // Apply the computed rank order to the enriched output
-  enriched.sort((a, b) => (rankOrder.get(a.id) ?? 9999) - (rankOrder.get(b.id) ?? 9999))
+  // Apply rank order with per-request random jitter so refreshing shows a new order.
+  // Hot/featured markets are pinned to the top (no jitter). Everything else gets
+  // ±3 position noise, keeping the feed feeling fresh without losing relevance.
+  const jitterMap = new Map(
+    enriched.map((m) => [m.id, (Math.random() - 0.5) * 6])
+  )
+  enriched.sort((a, b) => {
+    const aIsHot = (a.hotScore ?? 0) >= 8 || a.isFeatured
+    const bIsHot = (b.hotScore ?? 0) >= 8 || b.isFeatured
+    if (aIsHot !== bIsHot) return aIsHot ? -1 : 1
+    const aRank = (rankOrder.get(a.id) ?? 9999) + (aIsHot ? 0 : jitterMap.get(a.id)!)
+    const bRank = (rankOrder.get(b.id) ?? 9999) + (bIsHot ? 0 : jitterMap.get(b.id)!)
+    return aRank - bRank
+  })
 
   return NextResponse.json(enriched)
 }
@@ -110,6 +123,16 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit — max 5 user-created markets per hour
+  const adminForRl = createAdminClient()
+  const rl = await rateLimit(adminForRl, { key: `${user.id}:marketsCreate`, ...LIMITS.marketsCreate })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many markets created. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    )
   }
 
   const body = await request.json()

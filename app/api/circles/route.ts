@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { rateLimit, LIMITS } from '@/lib/rate-limit'
 
 // Readable uppercase invite code — excludes easily-confused chars (0/O, 1/I/L)
 function generateInviteCode(): string {
@@ -145,6 +146,15 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient()
+
+  // Rate limit — max 3 circles per hour
+  const rl = await rateLimit(supabase, { key: `${user.id}:circlesCreate`, ...LIMITS.circlesCreate })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many circles created. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    )
+  }
 
   // Generate a readable, uppercase invite code — retry on collision (extremely rare)
   let invite_code = generateInviteCode()

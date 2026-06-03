@@ -187,9 +187,12 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
     return () => { supabase.current.removeChannel(channel) }
   }, [])
 
+  // Hide markets the user has already bet on — they move to Profile > Bets Made
+  const unbetMarkets = markets.filter((m) => !m.userBet)
+
   const rawFiltered = activeTab === "All"
-    ? markets
-    : markets.filter((m) => m.category === activeTab)
+    ? unbetMarkets
+    : unbetMarkets.filter((m) => m.category === activeTab)
 
   // Apply first-session ranking to All tab when user hasn't bet yet
   const filtered = (isFirstSession && activeTab === "All")
@@ -293,7 +296,7 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
   // ── Feed column (shared by mobile full-width + desktop left column) ──────────
   const feedColumn = (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Screener stats bar */}
         <div className="bg-surface border-b border-border px-4 py-2 flex items-center gap-4 overflow-x-auto scrollbar-none">
           {isFirstSession ? (

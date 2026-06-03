@@ -299,7 +299,7 @@ export default function App() {
   )
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen overflow-hidden bg-background flex">
 
       {/* ── DESKTOP: Left Sidebar ─────────────────────────────────────────── */}
       <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 z-30 w-[220px] border-r border-border bg-background">

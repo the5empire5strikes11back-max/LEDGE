@@ -6,7 +6,7 @@ import { LeaderboardRow } from "@/components/leaderboard-row"
 import { Sparkline } from "@/components/ui/sparkline"
 import { AchievementsGrid } from "@/components/achievements-grid"
 import { xpProgress } from "@/lib/game-engine"
-import { Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2 } from "lucide-react"
+import { Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { Persona } from "@/lib/game-engine"
 import type { Achievement } from "@/lib/achievements"
@@ -54,6 +54,16 @@ interface PnlPoint {
   created_at: string
 }
 
+interface BetRecord {
+  id: string
+  side: 'yes' | 'no'
+  amount: number
+  payout: number | null
+  won: boolean | null
+  created_at: string
+  markets: { title: string; category: string } | null
+}
+
 function formatCredits(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`
@@ -69,6 +79,7 @@ export function ProfileScreen({
   const [stats, setStats] = useState<UserStats | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [pnlHistory, setPnlHistory] = useState<PnlPoint[]>([])
+  const [bets, setBets] = useState<BetRecord[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl ?? null)
@@ -80,6 +91,7 @@ export function ProfileScreen({
     fetch('/api/stats').then((r) => r.ok ? r.json() : null).then((d) => d && setStats(d))
     fetch('/api/leaderboard').then((r) => r.ok ? r.json() : null).then((d) => d && setLeaderboard(d))
     fetch('/api/pnl-history').then((r) => r.ok ? r.json() : null).then((d) => d && setPnlHistory(d))
+    fetch('/api/bets').then((r) => r.ok ? r.json() : null).then((d) => Array.isArray(d) && setBets(d))
   }, [])
 
   const pnlDelta = pnlHistory.length >= 2
@@ -375,6 +387,85 @@ export function ProfileScreen({
                 </span>
               </div>
               <AchievementsGrid earned={stats?.achievements ?? []} />
+            </div>
+          )}
+
+          {/* Bets Made */}
+          {bets.length > 0 && (
+            <div
+              className="bg-card border border-border overflow-hidden"
+              style={{ borderRadius: "var(--radius-card)" }}
+            >
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                  Bets Made
+                </span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {bets.length}
+                </span>
+              </div>
+              <div className="divide-y divide-border">
+                {bets.map((bet) => {
+                  const isPending = bet.won === null
+                  const profit = bet.won && bet.payout ? bet.payout - bet.amount : null
+                  return (
+                    <div key={bet.id} className="px-4 py-3 flex items-start gap-3">
+                      {/* Outcome icon */}
+                      <div className="mt-0.5 shrink-0">
+                        {isPending
+                          ? <Clock className="w-3.5 h-3.5 text-muted-foreground/50" />
+                          : bet.won
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                            : <XCircle className="w-3.5 h-3.5 text-danger" />
+                        }
+                      </div>
+
+                      {/* Market + meta */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground leading-snug line-clamp-2">
+                          {bet.markets?.title ?? 'Unknown market'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {bet.markets?.category && (
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                              {bet.markets.category}
+                            </span>
+                          )}
+                          <span
+                            className={cn(
+                              "text-[10px] font-bold uppercase tracking-wider px-1 py-0.5",
+                              bet.side === 'yes'
+                                ? "text-success bg-success/10"
+                                : "text-danger bg-danger/10"
+                            )}
+                            style={{ borderRadius: "var(--radius-badge)" }}
+                          >
+                            {bet.side}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Amount + profit */}
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-mono font-semibold text-foreground tabular-nums">
+                          {bet.amount.toLocaleString()} CR
+                        </span>
+                        {profit !== null && (
+                          <p className={cn(
+                            "text-[10px] font-mono font-semibold tabular-nums",
+                            profit >= 0 ? "text-success" : "text-danger"
+                          )}>
+                            {profit >= 0 ? "+" : ""}{profit.toLocaleString()}
+                          </p>
+                        )}
+                        {isPending && (
+                          <p className="text-[10px] text-muted-foreground/50">pending</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD, calculateFixedOddsPayout } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
 import { computeYesPercent, type PoolState } from '@/lib/liquidity'
+import { rateLimit, LIMITS } from '@/lib/rate-limit'
+import { logError } from '@/lib/logger'
 
 export async function GET() {
   const supabase = await createClient()
@@ -26,6 +28,16 @@ export async function POST(request: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rate limit — max 8 bets per 30 seconds
+  const admin = createAdminClient()
+  const rl = await rateLimit(admin, { key: `${user.id}:bets`, ...LIMITS.bets })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many bets. Slow down.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    )
+  }
 
   const body = await request.json()
   const { market_id, side, amount } = body as {
@@ -98,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   // Deduct credits + add XP — use admin client to bypass RLS on profiles
-  const admin = createAdminClient()
+  // (admin client already created above for rate limiting)
 
   // Update pools (for live odds display), yes_percent, and engagement signals
   // Uses virtual liquidity for odds calculation — virtual pools absorb volatility
@@ -158,7 +170,7 @@ export async function POST(request: Request) {
     { status: 201 }
   )
   } catch (err) {
-    console.error('[/api/bets] Unhandled error:', err)
+    logError(err, { context: 'bets:POST' })
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 }
