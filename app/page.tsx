@@ -503,12 +503,12 @@ export default function App() {
       </header>
 
       {/* ── Main content area ─────────────────────────────────────────────── */}
-      <div className="flex-1 lg:ml-[220px] flex flex-col">
+      <div className="flex-1 min-w-0 lg:ml-[220px] flex flex-col overflow-hidden">
         {/* Mobile top padding */}
         <div className="lg:hidden h-[57px] shrink-0" />
 
         {/* Screen */}
-        <main className="flex-1 flex flex-col overflow-hidden pb-[65px] lg:pb-0">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden pb-[65px] lg:pb-0">
           {screenContent}
         </main>
 
