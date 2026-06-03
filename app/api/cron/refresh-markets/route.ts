@@ -95,6 +95,24 @@ export async function POST(request: Request) {
 
   const { accepted: qualityMarkets, rejected: rejectedMarkets, scoring_stats } = scoringResult
 
+  // ── 4a. End-time guard — defense in depth after scoring ─────────────────────
+  // Discard any market whose end_time is already past or within 2 hours.
+  // The scorer catches this too, but this is a hard server-side gate before DB write.
+  const NOW_MS = Date.now()
+  const MIN_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours
+  const freshMarkets = qualityMarkets.filter((m) => {
+    const end = new Date(m.end_time).getTime()
+    const hoursLeft = (end - NOW_MS) / 3_600_000
+    if (hoursLeft < 2) {
+      logMessage(
+        `Discarded market with stale end_time: "${m.title}" (${hoursLeft.toFixed(1)}h remaining)`,
+        { context: 'cron:refresh-markets:end_time_guard' }
+      )
+      return false
+    }
+    return true
+  })
+
   // ── 4. Deduplicate against all existing markets (live + queued) ──────────────
   const { data: existing } = await supabase
     .from('markets')
@@ -102,7 +120,7 @@ export async function POST(request: Request) {
     .or('status.eq.live,status.eq.queued,status.is.null')
 
   const existingTitles = new Set((existing ?? []).map((m) => m.title.toLowerCase()))
-  const toQueue = qualityMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
+  const toQueue = freshMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
 
   if (toQueue.length === 0) {
     return NextResponse.json({

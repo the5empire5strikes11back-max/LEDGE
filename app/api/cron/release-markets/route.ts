@@ -207,6 +207,10 @@ export async function POST(request: Request) {
   const now = new Date().toISOString()
 
   // ── 1. Snapshot live + queued state ──────────────────────────────────────────
+  // Only fetch queued markets whose end_time is still at least 2h away —
+  // anything closer is expired before it even goes live.
+  const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60_000).toISOString()
+
   const [liveResult, queuedResult] = await Promise.all([
     supabase
       .from('markets')
@@ -217,6 +221,7 @@ export async function POST(request: Request) {
       .from('markets')
       .select('id, category, end_time, generated_at')
       .eq('status', 'queued')
+      .gt('end_time', twoHoursFromNow)
       .order('generated_at', { ascending: true })
       .limit(80),
   ])
@@ -278,6 +283,39 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── 5a. Archive expired unresolved live markets ──────────────────────────────
+  // Markets past their end_time that resolve-expired hasn't caught yet.
+  // These should never show in the feed as live bettable cards.
+  const { data: expiredLive } = await supabase
+    .from('markets')
+    .select('id')
+    .or('status.eq.live,status.is.null')
+    .eq('resolved', false)
+    .lt('end_time', now)
+
+  const expiredLiveIds = (expiredLive ?? []).map((m) => m.id)
+  let archivedExpiredLive = 0
+  if (expiredLiveIds.length > 0) {
+    await supabase.from('markets').update({ status: 'archived' }).in('id', expiredLiveIds)
+    archivedExpiredLive = expiredLiveIds.length
+    console.warn(`[release-markets] Archived ${archivedExpiredLive} expired unresolved market(s) — resolve-expired should have caught these`)
+  }
+
+  // ── 5b. Archive expired queued markets (end_time already passed) ─────────────
+  // These were never published and can never be bet on.
+  const { data: expiredQueued } = await supabase
+    .from('markets')
+    .select('id')
+    .eq('status', 'queued')
+    .lt('end_time', now)
+
+  const expiredQueuedIds = (expiredQueued ?? []).map((m) => m.id)
+  let archivedExpiredQueued = 0
+  if (expiredQueuedIds.length > 0) {
+    await supabase.from('markets').update({ status: 'archived' }).in('id', expiredQueuedIds)
+    archivedExpiredQueued = expiredQueuedIds.length
+  }
+
   // ── 5. Archive resolved markets beyond retention window ──────────────────────
   const { data: resolvedToArchive } = await supabase
     .from('markets')
@@ -333,6 +371,8 @@ export async function POST(request: Request) {
     archived: {
       resolved: archivedResolved,
       stale_queued: archivedStale,
+      expired_live: archivedExpiredLive,
+      expired_queued: archivedExpiredQueued,
     },
   })
 }

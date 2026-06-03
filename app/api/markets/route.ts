@@ -65,11 +65,17 @@ export async function GET(request: Request) {
 
   const recentBetsResult = { data: recentBetsData }
 
-  // Post-filter: hide queued/archived markets.
+  // Post-filter: hide queued/archived markets, and hide expired unresolved markets.
   // Pre-migration rows have no status field (undefined) and pass through as live.
+  // Expired unresolved markets are excluded here so they never render as live
+  // bettable cards between cron runs — resolve-expired archives them asynchronously.
+  const nowIso = new Date().toISOString()
   const markets = (allMarkets ?? []).filter((m) => {
     const s = (m as { status?: string }).status
-    return !s || s === 'live'
+    if (s && s !== 'live') return false
+    // Hide expired unresolved markets — stale events should never show as live
+    if (!m.resolved && m.end_time && m.end_time < nowIso) return false
+    return true
   })
 
   // Build lookup structures

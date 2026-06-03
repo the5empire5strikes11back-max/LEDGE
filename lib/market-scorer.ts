@@ -68,10 +68,35 @@ const SCORE_WEIGHTS = {
  */
 const REJECTION_THRESHOLD = 6.0
 
+// Minimum hours a market must have remaining to be accepted.
+// A market with less than 2h until close has no meaningful betting window.
+const MIN_HOURS_REMAINING = 2
+// Maximum hours until close. Anything beyond 7 days loses urgency entirely.
+const MAX_HOURS_REMAINING = 168
+
+/**
+ * Validate that a market's end_time is within the acceptable window.
+ * Returns a rejection reason string, or null if valid.
+ */
+function checkEndTimeFreshness(market: GeneratedMarket): string | null {
+  const endTime = new Date(market.end_time)
+  if (isNaN(endTime.getTime())) {
+    return `Invalid end_time value: "${market.end_time}"`
+  }
+  const hoursRemaining = (endTime.getTime() - Date.now()) / 3_600_000
+  if (hoursRemaining < MIN_HOURS_REMAINING) {
+    return `End time too soon — ${hoursRemaining.toFixed(1)}h remaining (minimum ${MIN_HOURS_REMAINING}h required)`
+  }
+  if (hoursRemaining > MAX_HOURS_REMAINING) {
+    return `End time too far — ${(hoursRemaining / 24).toFixed(1)} days away (maximum ${MAX_HOURS_REMAINING / 24} days)`
+  }
+  return null
+}
+
 /**
  * Regex patterns that instantly disqualify markets regardless of score.
- * These signal corporate finance, complex legislation, or expert-only topics
- * that Gen Z fundamentally does not care about.
+ * These signal corporate finance, complex legislation, expert-only topics,
+ * or events that have clearly already occurred.
  */
 const INSTANT_REJECT_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   {
@@ -94,6 +119,18 @@ const INSTANT_REJECT_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
     pattern: /\b(central bank|interest rate hike|monetary policy|rate cut decision|fed meeting)\b/i,
     label: 'central banking / monetary policy',
   },
+  {
+    // Catches titles referencing a specific past year's championship/award/season
+    // e.g. "2024 NBA Champion", "2025 Super Bowl winner", "last season's MVP"
+    pattern: /\b(20(1[0-9]|2[0-5])\s+(champion|championship|winner|award|season|cup|title|mvp|playoff)|(last|previous)\s+(season|year|month|week)'?s?\b)/i,
+    label: 'past-year or previous-season event',
+  },
+  {
+    // Catches titles that describe something that already resolved
+    // e.g. "Did X win", "Has X already", "Who won the"
+    pattern: /^(did |has |who won |who is the (new|current|next) )/i,
+    label: 'past-resolved or rhetorical question',
+  },
 ]
 
 // ── Core Logic ────────────────────────────────────────────────────────────────
@@ -115,6 +152,10 @@ function clamp(value: number, min = 1, max = 10): number {
 }
 
 function checkInstantReject(market: GeneratedMarket): string | null {
+  // End-time freshness check — catches expired or window-less markets
+  const freshnessReason = checkEndTimeFreshness(market)
+  if (freshnessReason) return `Instant reject — ${freshnessReason}`
+
   const text = `${market.title} ${market.resolution_criteria}`
   for (const { pattern, label } of INSTANT_REJECT_PATTERNS) {
     if (pattern.test(text)) {
