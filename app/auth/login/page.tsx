@@ -112,6 +112,11 @@ export default function LoginPage() {
             Sign up
           </Link>
         </p>
+
+        <div className="flex justify-center gap-4 text-[11px] text-muted-foreground/50">
+          <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-muted-foreground transition-colors">Terms</Link>
+        </div>
       </div>
     </div>
   )

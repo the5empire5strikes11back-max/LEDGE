@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { X, LogOut, Palette, User, Info, ChevronRight, Check } from "lucide-react"
+import { X, LogOut, Palette, User, Info, ChevronRight, Check, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
 
 const ACCENT_COLORS = [
   { name: "Amber",      value: "#F5A623", fg: "#0A0A0B" },
@@ -226,6 +227,46 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
                   <span className="text-xs font-medium text-foreground">{row.value}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ── LEGAL ── */}
+          <div className="px-5 pt-4 pb-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Legal</span>
+            </div>
+
+            <div
+              className="bg-card border border-border overflow-hidden"
+              style={{ borderRadius: "var(--radius-card)" }}
+            >
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-secondary transition-colors"
+              >
+                <span className="text-sm font-medium text-foreground">Privacy Policy</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+              <Link
+                href="/terms"
+                target="_blank"
+                className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-secondary transition-colors"
+              >
+                <span className="text-sm font-medium text-foreground">Terms of Service</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+              <a
+                href="mailto:support@ledge.app"
+                className="flex items-center justify-between px-4 py-3 hover:bg-secondary transition-colors"
+              >
+                <div>
+                  <span className="text-sm font-medium text-foreground">Delete My Account</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Email us to request deletion</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </a>
             </div>
           </div>
 

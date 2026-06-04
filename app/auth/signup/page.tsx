@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -24,6 +25,12 @@ export default function SignupPage() {
 
     if (username.length < 3) {
       setError("Username must be at least 3 characters")
+      setLoading(false)
+      return
+    }
+
+    if (!agreedToTerms) {
+      setError("Please agree to the Terms of Service and Privacy Policy to continue.")
       setLoading(false)
       return
     }
@@ -126,11 +133,49 @@ export default function SignupPage() {
             </div>
           </div>
 
+          {/* Terms & privacy consent */}
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="relative flex-shrink-0 mt-0.5">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="sr-only"
+              />
+              <div
+                className={cn(
+                  "w-4 h-4 border flex items-center justify-center transition-colors",
+                  agreedToTerms
+                    ? "bg-accent border-accent"
+                    : "bg-card border-border group-hover:border-accent/50"
+                )}
+                style={{ borderRadius: "4px" }}
+              >
+                {agreedToTerms && (
+                  <svg viewBox="0 0 10 8" fill="none" className="w-2.5 h-2.5">
+                    <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent-foreground" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-xs text-muted-foreground leading-relaxed">
+              I agree to the{" "}
+              <Link href="/terms" target="_blank" className="text-accent hover:underline font-medium">
+                Terms of Service
+              </Link>
+              {" "}and{" "}
+              <Link href="/privacy" target="_blank" className="text-accent hover:underline font-medium">
+                Privacy Policy
+              </Link>
+              . Ledge uses virtual credits only — no real money.
+            </span>
+          </label>
+
           {error && <p className="text-sm text-danger font-medium">{error}</p>}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !agreedToTerms}
             className="w-full bg-accent text-accent-foreground font-semibold py-3 text-sm uppercase tracking-wider hover:bg-accent/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: "var(--radius-button)" }}
           >
