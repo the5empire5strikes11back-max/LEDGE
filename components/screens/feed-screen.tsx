@@ -14,6 +14,7 @@ import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-histo
 import { useOnboarding } from "@/lib/onboarding"
 import { rankFeedFirstSession, buildAffinityMap } from "@/lib/feed-ranker"
 import { computeCompoundState, computeIdentitySignal, buildCategoryStats } from "@/lib/feed-signals"
+import { useSessionArc, formatCloseTime } from "@/lib/session-arc"
 import type { ReturnHook } from "@/app/api/return-hooks/route"
 import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
 import type { Persona } from "@/lib/game-engine"
@@ -129,6 +130,9 @@ export function FeedScreen({
   // First-session: user hasn't placed a bet yet
   const isFirstSession = !ob.firstBetAchievementDone
   const TABS = isFirstSession ? FIRST_SESSION_TABS : ALL_TABS
+
+  // Session arc — tracks emotional phase of this session
+  const { arc, recordBet: arcRecordBet, recordInteraction } = useSessionArc()
 
   // ── Odds history — stored in a ref (Map), never causes re-renders on push.
   // A separate version counter forces cards to re-read the ref when new points
@@ -263,6 +267,16 @@ export function FeedScreen({
   const totalVolume = markets.reduce((sum, m) => sum + m.totalCredits, 0)
   const hotCount = openMarkets.filter((m) => (m.hotScore ?? 0) >= 8).length
 
+  // Session arc derived — markets closing within 24h, top idle suggestion
+  const closingTodayCount = useMemo(
+    () => openMarkets.filter((m) => {
+      const hoursLeft = (new Date(m.endTime).getTime() - Date.now()) / 3_600_000
+      return hoursLeft > 0 && hoursLeft <= 24
+    }).length,
+    [openMarkets]
+  )
+  const idleSuggestion = filtered.find((m) => !m.resolved && !m.userBet) ?? null
+
   const openTrade = (market: Market, side: "yes" | "no") => {
     if (market.userBet || market.resolved) return
     // Dismiss feed tooltip when user engages with a trade
@@ -307,6 +321,9 @@ export function FeedScreen({
     if (data?.profile) {
       onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp, market.endTime)
     }
+
+    // Record bet in session arc — drives peaked phase + arc strip copy
+    arcRecordBet(market.title, market.endTime, side)
 
     // Show anticipation panel on first bet
     if (wasFirstBet) {
@@ -373,6 +390,40 @@ export function FeedScreen({
             </>
           )}
         </div>
+
+        {/* Session Arc strip — context-aware copy that shifts with session phase */}
+        {!isFirstSession && arc.phase === "peaked" && arc.lastBet && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-accent/5 border-b border-accent/10">
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse"
+              aria-hidden
+            />
+            <span className="text-[11px] text-accent font-semibold truncate">
+              Bet in play
+            </span>
+            <span className="text-border shrink-0 text-[10px]">·</span>
+            <span className="text-[11px] text-muted-foreground truncate flex-1">
+              {arc.lastBet.marketTitle}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 shrink-0">
+              {formatCloseTime(arc.lastBet.marketEndTime)}
+            </span>
+          </div>
+        )}
+        {!isFirstSession && arc.phase === "idle" && idleSuggestion && returnHooks.length === 0 && (
+          <div
+            className="flex items-center gap-2 px-4 py-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
+            onClick={() => { recordInteraction(); setDetailMarket(idleSuggestion) }}
+          >
+            <span className="text-[10px] text-muted-foreground/60 shrink-0" aria-hidden>⭐</span>
+            <span className="text-[11px] text-muted-foreground font-medium">Top pick right now</span>
+            <span className="text-border shrink-0 text-[10px]">·</span>
+            <span className="text-[11px] text-foreground font-semibold truncate flex-1">
+              {idleSuggestion.title}
+            </span>
+            <span className="text-[10px] text-muted-foreground/50 shrink-0">→</span>
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-4 py-2">
@@ -504,9 +555,9 @@ export function FeedScreen({
                   pulseCTA={pulseCTA}
                   compoundState={compoundState}
                   identitySignal={identitySignal}
-                  onClick={() => setDetailMarket(market)}
-                  onBuyYes={() => openTrade(market, "yes")}
-                  onBuyNo={() => openTrade(market, "no")}
+                  onClick={() => { recordInteraction(); setDetailMarket(market) }}
+                  onBuyYes={() => { recordInteraction(); openTrade(market, "yes") }}
+                  onBuyNo={() => { recordInteraction(); openTrade(market, "no") }}
                 />
               )
             })
