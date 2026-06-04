@@ -10,8 +10,13 @@ import { rateLimit, LIMITS } from '@/lib/rate-limit'
 const getCachedMarkets = unstable_cache(
   async (category: string | null) => {
     const admin = createAdminClient()
+    const nowIso = new Date().toISOString()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query = (admin as any).from('markets').select('*')
+    let query = (admin as any)
+      .from('markets')
+      .select('*')
+      .or('status.eq.live,status.is.null')  // live markets only — queued/archived excluded at DB level
+      .gt('end_time', nowIso)               // exclude expired markets before they're archived
     if (category && category !== 'All') {
       query = query.eq('category', category)
     }
@@ -20,7 +25,7 @@ const getCachedMarkets = unstable_cache(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data ?? []) as any[]
   },
-  ['markets'],
+  ['markets-v2'],
   { revalidate: 30, tags: ['markets'] }
 )
 
