@@ -58,13 +58,8 @@ export default function SignupPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm flex flex-col gap-8">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-12 h-12 bg-accent flex items-center justify-center"
-            style={{ borderRadius: "var(--radius-badge)" }}
-          >
-            <span className="text-accent-foreground font-bold text-xl">L</span>
-          </div>
+        <div className="flex flex-col items-center gap-4">
+          <img src="/icon.svg" alt="Ledge" className="w-16 h-16" style={{ borderRadius: "18px" }} />
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight">Join Ledge</h1>
             <p className="text-sm text-muted-foreground mt-1">Start with 5,000 free credits</p>
