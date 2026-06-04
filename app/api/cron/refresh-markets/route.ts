@@ -136,12 +136,16 @@ export async function POST(request: Request) {
   // ── 5. Insert markets as QUEUED ──────────────────────────────────────────────
   const toInsert = toQueue.map((m) => {
     const seed = seedLiquidity(m.category as MarketCategory, false, m.starter_probability)
-    // Destructure out starter_probability — it's encoded in the virtual pools (seed),
-    // not stored as a separate DB column. Spreading it would cause a DB error.
-    const { starter_probability: _sp, ...marketFields } = m
-    void _sp
+    // Explicitly build insert object — omits starter_probability which is a
+    // transient generation field not stored as a DB column (it's encoded in seed).
     return {
-      ...marketFields,
+      title: m.title,
+      category: m.category,
+      end_time: m.end_time,
+      jackpot_pool: m.jackpot_pool,
+      resolution_criteria: m.resolution_criteria,
+      resolution_source_url: m.resolution_source_url,
+      target_data_key: m.target_data_key,
       ...seed,
       status: 'queued' as const,
       generated_at: now,
