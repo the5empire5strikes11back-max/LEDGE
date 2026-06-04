@@ -334,6 +334,19 @@ export function MarketFeedCard({
           </div>
         </button>
 
+        {/* System estimate notice — shown only on cold-start markets (no real bets yet) */}
+        {!isResolved && totalCredits === 0 && yesPercent !== 50 && (
+          <div className="flex items-center gap-1.5 -mt-1">
+            <span
+              className="inline-flex items-center gap-1 text-[9px] font-medium text-muted-foreground/60 uppercase tracking-wider px-1.5 py-0.5 border border-border/40 bg-muted/20"
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+              System estimate
+            </span>
+          </div>
+        )}
+
         {/* Row 3: YES/NO odds bar */}
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-success/70 font-mono w-8 text-right shrink-0">

@@ -34,6 +34,8 @@ export interface GeneratedMarket {
   resolution_criteria: string
   resolution_source_url: string
   target_data_key: string
+  /** System-estimated YES probability (30–70). Shown as "System estimate" until real bets arrive. */
+  starter_probability: number
 }
 
 export interface GenerationOptions {
@@ -150,6 +152,7 @@ Return ONLY a JSON array, no other text:
     "category": "Sports",
     "hours_until_close": 8,
     "jackpot_pool": 50000,
+    "starter_probability": 45,
     "resolution_criteria": "YES if Lakers win per official NBA box score.",
     "resolution_source_url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
     "target_data_key": "{\"type\":\"espn_game\",\"team\":\"LAL\",\"condition\":\"win\"}"
@@ -161,6 +164,7 @@ Rules:
 - hours_until_close: use 4–12 for events today, 24–48 for tomorrow, up to 168 (7 days) max
 - jackpot_pool must be 10000–500000
 - resolution_criteria: one precise sentence defining exactly what makes this YES vs NO
+- starter_probability: your best estimate (30–70) of the YES likelihood based on context, base rates, and how the headline frames the outcome. Use 50 ONLY when genuinely uncertain. Examples: home-team favourite winning tonight → 58–65; underdog upset → 32–42; incumbent keeping a lead → 60–68; celebrity doing something dramatic → 35–45. Never go below 30 or above 70 — markets must stay debatable.
 
 RESOLUTION STRATEGY — pick in strict priority order:
 
@@ -208,6 +212,7 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
     category: string
     hours_until_close: number
     jackpot_pool: number
+    starter_probability?: number
     resolution_criteria: string
     resolution_source_url?: string
     target_data_key?: string
@@ -217,11 +222,15 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
     const endTime = new Date(now)
     const hours = Math.max(4, Math.min(168, m.hours_until_close ?? 24))
     endTime.setTime(endTime.getTime() + hours * 60 * 60 * 1000)
+    // Clamp starter_probability to 30–70; default to 50 if missing/invalid
+    const rawProb = m.starter_probability ?? 50
+    const starterProbability = Math.max(30, Math.min(70, Math.round(rawProb)))
     return {
       title: m.title,
       category: m.category as GeneratedMarket['category'],
       end_time: endTime.toISOString(),
       jackpot_pool: Math.max(10000, m.jackpot_pool),
+      starter_probability: starterProbability,
       resolution_criteria: m.resolution_criteria ?? 'Resolves YES or NO based on official results.',
       resolution_source_url: m.resolution_source_url ?? '',
       target_data_key: m.target_data_key ?? '',

@@ -93,16 +93,28 @@ export interface LiquiditySeed {
 
 export function seedLiquidity(
   category: MarketCategory,
-  isFeatured = false
+  isFeatured = false,
+  /**
+   * System-estimated YES probability (30–70). Provided by the AI at generation time
+   * based on headline context and base rates. Shown as "System estimate" on the card
+   * until real bets arrive (totalCredits > 0) and the market has user-driven odds.
+   *
+   * Clamped to 30–70 here as a hard guard — markets must always stay debatable.
+   * Defaults to 50 (perfectly neutral) for user-created markets or when not provided.
+   */
+  starterProbability = 50
 ): LiquiditySeed {
   const base = BASE_LIQUIDITY[category]
   const bonus = isFeatured ? FEATURED_LIQUIDITY_BONUS : 0
   const pool = base + bonus
 
+  // Clamp to 30–70 regardless of caller — markets must stay debatable
+  const prob = Math.max(30, Math.min(70, starterProbability)) / 100
+
   return {
-    virtual_yes_pool: pool,
-    virtual_no_pool:  pool,
-    yes_percent:      50,   // always start balanced
+    virtual_yes_pool: Math.round(pool * prob),
+    virtual_no_pool:  Math.round(pool * (1 - prob)),
+    yes_percent:      Math.round(prob * 100),
   }
 }
 
