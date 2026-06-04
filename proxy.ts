@@ -28,8 +28,9 @@ export async function proxy(request: NextRequest) {
   // Redirect unauthenticated users to login (except auth routes)
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isPublicRoute = request.nextUrl.pathname === '/privacy' || request.nextUrl.pathname === '/terms'
 
-  if (!user && !isAuthRoute && !isApiRoute) {
+  if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
