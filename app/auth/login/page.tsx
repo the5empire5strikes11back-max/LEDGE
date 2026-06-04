@@ -113,9 +113,10 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        <div className="flex justify-center gap-4 text-[11px] text-muted-foreground/50">
-          <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy</Link>
-          <Link href="/terms" className="hover:text-muted-foreground transition-colors">Terms</Link>
+        <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+          <Link href="/privacy" className="hover:text-accent transition-colors">Privacy Policy</Link>
+          <span className="text-muted-foreground/30">·</span>
+          <Link href="/terms" className="hover:text-accent transition-colors">Terms of Service</Link>
         </div>
       </div>
     </div>
