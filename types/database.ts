@@ -76,6 +76,8 @@ export interface Database {
           status: 'queued' | 'live' | 'archived'
           published_at: string | null
           generated_at: string | null
+          /** AI quality score 1–100. NULL = legacy market. */
+          quality_score: number | null
         }
         Insert: {
           title: string
@@ -99,6 +101,7 @@ export interface Database {
           status?: 'queued' | 'live' | 'archived'
           published_at?: string | null
           generated_at?: string | null
+          quality_score?: number | null
         }
         Update: {
           yes_percent?: number
@@ -113,6 +116,7 @@ export interface Database {
           status?: 'queued' | 'live' | 'archived'
           published_at?: string | null
           generated_at?: string | null
+          quality_score?: number | null
         }
         Relationships: []
       }
