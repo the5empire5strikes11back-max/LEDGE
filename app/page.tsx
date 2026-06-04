@@ -102,6 +102,16 @@ export default function App() {
   const vetoes   = vetoesFromStreak(streak, isPlus)
   const rankConfig = RANKS[rank]
 
+  // Consecutive win streak — walk betHistory in reverse, count leading wins
+  const winStreak = (() => {
+    let count = 0
+    for (let i = betHistory.length - 1; i >= 0; i--) {
+      if (betHistory[i].won) count++
+      else break
+    }
+    return count
+  })()
+
   const daysSinceActive = profile
     ? Math.floor((Date.now() - new Date(profile.last_active_at).getTime()) / (1000 * 60 * 60 * 24))
     : 0
@@ -339,6 +349,10 @@ export default function App() {
           availableCredits={credits}
           streak={streak}
           decay={decay}
+          persona={persona}
+          winStreak={winStreak}
+          isComeback={profile?.comeback_eligible ?? false}
+          betHistory={betHistory}
           onBet={handleBet}
           onWin={handleWin}
         />

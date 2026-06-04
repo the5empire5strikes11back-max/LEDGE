@@ -12,8 +12,11 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
-import { rankFeedFirstSession } from "@/lib/feed-ranker"
+import { rankFeedFirstSession, buildAffinityMap } from "@/lib/feed-ranker"
+import { computeCompoundState, computeIdentitySignal, buildCategoryStats } from "@/lib/feed-signals"
 import type { ReturnHook } from "@/app/api/return-hooks/route"
+import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
+import type { Persona } from "@/lib/game-engine"
 
 type Category = "All" | "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -58,6 +61,14 @@ interface FeedScreenProps {
   availableCredits: number
   streak: number
   decay: "none" | "warning" | "critical"
+  /** User's current persona — drives identity signals on cards */
+  persona?: Persona | null
+  /** Win streak count for Oracle momentum signal */
+  winStreak?: number
+  /** Whether user is in comeback mode (3+ consecutive losses) */
+  isComeback?: boolean
+  /** Bet history for category affinity ranking */
+  betHistory?: Array<{ category: string; won: boolean }>
   onBet: (
     marketTitle: string,
     marketCategory: string,
@@ -95,7 +106,17 @@ function formatResolveTime(endTime: string): string {
   return `closes in ${mins}m`
 }
 
-export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: FeedScreenProps) {
+export function FeedScreen({
+  availableCredits,
+  streak,
+  decay,
+  persona = null,
+  winStreak = 0,
+  isComeback = false,
+  betHistory = [],
+  onBet,
+  onWin,
+}: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
@@ -200,6 +221,9 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
 
     return () => { supabase.current.removeChannel(channel) }
   }, [])
+
+  // Category affinity + stats — derived from bet history, stable across renders
+  const categoryStats = useMemo(() => buildCategoryStats(betHistory), [betHistory])
 
   // Hide markets the user has already bet on — they move to Profile > Bets Made
   const unbetMarkets = markets.filter((m) => !m.userBet)
@@ -444,6 +468,24 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
                 ((market.hotScore ?? 0) >= 8 || !!market.isFeatured) &&
                 filtered.indexOf(market) === 0
 
+              // Cross-system compound state: hot + momentum → surging, etc.
+              const compoundState = computeCompoundState(
+                market.hotScore ?? 0,
+                market.momentumShift ?? 0,
+                market.yesPercent,
+                market.social
+              )
+
+              // Persona-driven identity signal: contextually relevant hint for this user
+              const identitySignal = computeIdentitySignal(
+                market.category,
+                market.yesPercent,
+                persona,
+                winStreak,
+                isComeback,
+                categoryStats
+              )
+
               return (
                 <MarketFeedCard
                   key={market.id}
@@ -460,6 +502,8 @@ export function FeedScreen({ availableCredits, streak, decay, onBet, onWin }: Fe
                   social={market.social}
                   isSpotlight={isSpotlight}
                   pulseCTA={pulseCTA}
+                  compoundState={compoundState}
+                  identitySignal={identitySignal}
                   onClick={() => setDetailMarket(market)}
                   onBuyYes={() => openTrade(market, "yes")}
                   onBuyNo={() => openTrade(market, "no")}

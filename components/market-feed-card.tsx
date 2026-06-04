@@ -8,6 +8,7 @@ import { OddsSparkline } from "@/components/ui/odds-sparkline"
 import { MarketSocialBar } from "@/components/market-social-bar"
 import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
 import type { MarketSocialData } from "@/lib/social-signals"
+import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -35,6 +36,10 @@ interface MarketFeedCardProps {
   pulseCTA?: boolean
   /** First-session spotlight: pulsing ring + "Popular right now" badge */
   isSpotlight?: boolean
+  /** Cross-system compound market state — drives badge + glow intensity */
+  compoundState?: CompoundState
+  /** Persona-driven identity signal — shown inline when relevant */
+  identitySignal?: IdentitySignal | null
   onClick?: () => void
   onBuyYes?: () => void
   onBuyNo?: () => void
@@ -132,6 +137,18 @@ function MovementLabel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// ── Compound state badge config ───────────────────────────────────────────────
+
+const COMPOUND_BADGE: Record<
+  Exclude<CompoundState, "normal" | "moving">,
+  { label: string; className: string }
+> = {
+  surging:     { label: "Surging",    className: "text-orange-400 bg-orange-400/10 border-orange-400/25 animate-pulse" },
+  "whale-zone":{ label: "🐋 Whale",   className: "text-blue-400 bg-blue-400/10 border-blue-400/25" },
+  contested:   { label: "Contested",  className: "text-yellow-400 bg-yellow-400/10 border-yellow-400/25" },
+  hot:         { label: "Hot",        className: "text-orange-400 bg-transparent border-transparent" },
+}
+
 export function MarketFeedCard({
   title,
   category,
@@ -152,6 +169,8 @@ export function MarketFeedCard({
   className,
   pulseCTA = false,
   isSpotlight = false,
+  compoundState = "normal",
+  identitySignal = null,
   onClick,
   onBuyYes,
   onBuyNo,
@@ -222,16 +241,31 @@ export function MarketFeedCard({
               {categoryLabel[category]}
             </span>
 
-            {/* Live dot — only shown when there's actual movement */}
+            {/* Live dot — shown during movement */}
             {!isResolved && <LiveDot volatility={volatility} />}
 
-            {/* HOT label */}
-            {isHot && !isResolved && volatility === "calm" && (
-              <span className="text-[10px] text-orange-400 font-medium shrink-0">Hot</span>
+            {/* Compound state badge — replaces separate hot/momentum labels */}
+            {!isResolved && compoundState !== "normal" && compoundState !== "moving" && (
+              <span
+                className={cn(
+                  "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border shrink-0",
+                  COMPOUND_BADGE[compoundState as keyof typeof COMPOUND_BADGE]?.className
+                )}
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                {COMPOUND_BADGE[compoundState as keyof typeof COMPOUND_BADGE]?.label}
+              </span>
             )}
 
-            {/* Momentum number — only when no history-based label is available */}
-            {!isResolved && momentumShift >= 3 && !hasMovement && volatility === "calm" && (
+            {/* Moving state: just show the momentum number */}
+            {!isResolved && compoundState === "moving" && momentumShift >= 3 && (
+              <span className="text-[10px] text-accent font-mono shrink-0">
+                ↑{momentumShift.toFixed(1)}%
+              </span>
+            )}
+
+            {/* Fallback: show momentum when compound is "normal" but shift is meaningful */}
+            {!isResolved && compoundState === "normal" && momentumShift >= 3 && !hasMovement && (
               <span className="text-[10px] text-accent font-mono shrink-0">
                 ↑{momentumShift.toFixed(1)}%
               </span>
@@ -286,11 +320,17 @@ export function MarketFeedCard({
             )}
           </div>
 
-          {/* Question */}
+          {/* Question + identity signal */}
           <div className="flex-1 min-w-0 pt-0.5">
             <h3 className="text-[14px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
             </h3>
+            {/* Identity signal — persona-driven contextual hint */}
+            {identitySignal && !isResolved && (
+              <p className={cn("text-[10px] font-medium mt-1 leading-none", identitySignal.color)}>
+                {identitySignal.label}
+              </p>
+            )}
           </div>
         </button>
 

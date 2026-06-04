@@ -35,18 +35,46 @@ export interface RankableMarket {
   momentum_shift: number | null
   total_credits: number | null
   circle_id: string | null
+  category?: string
   /** Set when the market goes from queued → live. Used for freshness boost. */
   published_at?: string | null
+}
+
+// ── Category affinity — maps category name → [0, 1] preference score ─────────
+// Built from the user's bet history. Markets in the user's preferred category
+// get a moderate boost so the feed feels personally relevant.
+
+export type CategoryAffinityMap = Map<string, number>
+
+/**
+ * Build a category affinity map from bet history.
+ * Each category gets a score proportional to its share of the user's bets,
+ * normalized so the highest-bet category = 1.0.
+ */
+export function buildAffinityMap(
+  betHistory: Array<{ category: string }>
+): CategoryAffinityMap {
+  const counts = new Map<string, number>()
+  for (const b of betHistory) {
+    counts.set(b.category, (counts.get(b.category) ?? 0) + 1)
+  }
+  const max = Math.max(...counts.values(), 1)
+  const result = new Map<string, number>()
+  for (const [cat, count] of counts) {
+    result.set(cat, count / max)
+  }
+  return result
 }
 
 // ── Weights — must sum to 1.0 ─────────────────────────────────────────────────
 
 export const WEIGHTS = {
-  velocity:  0.30,  // Bet velocity: bets-per-hour since creation
-  urgency:   0.25,  // Time urgency: exponential ramp as deadline nears
-  momentum:  0.20,  // Momentum shift: recent odds movement
-  hot_score: 0.15,  // Hot score: cumulative engagement (log-scaled)
-  tension:   0.08,  // Tension: how close to 50/50 the odds are
+  velocity:  0.28,  // Bet velocity: bets-per-hour since creation
+  urgency:   0.23,  // Time urgency: exponential ramp as deadline nears
+  momentum:  0.19,  // Momentum shift: recent odds movement
+  hot_score: 0.14,  // Hot score: cumulative engagement (log-scaled)
+  tension:   0.07,  // Tension: how close to 50/50 the odds are
+  affinity:  0.07,  // User affinity: category preference from bet history
   social:    0.02,  // Social: user's circle is involved
 } as const
 
@@ -191,6 +219,19 @@ function socialSignal(
 }
 
 /**
+ * Category affinity: how much does the user prefer this market's category?
+ * Returns [0, 1] from the precomputed affinity map.
+ * Falls back to 0.3 (neutral interest) for categories with no history.
+ */
+function affinitySignal(
+  market: RankableMarket,
+  affinityMap: CategoryAffinityMap
+): number {
+  if (!market.category) return 0.3
+  return affinityMap.get(market.category) ?? 0.3
+}
+
+/**
  * Freshness bonus: temporary additive boost for recently published markets.
  * Decays linearly from FRESHNESS_MAX_BONUS → 0 over FRESHNESS_DECAY_HOURS.
  * Returns 0 if market has no published_at (pre-queue-system markets).
@@ -213,6 +254,7 @@ export interface RankBreakdown {
   momentum: number
   hot_score: number
   tension: number
+  affinity: number
   social: number
   freshness: number
   total: number
@@ -225,12 +267,14 @@ export interface RankBreakdown {
  * @param market        - Market row from the database
  * @param userCircleIds - Set of circle IDs the current user belongs to
  * @param nowMs         - Current timestamp in milliseconds (pass Date.now() for consistency)
+ * @param affinityMap   - Optional category affinity map from user's bet history
  * @returns             Composite score (higher = shown earlier in feed)
  */
 export function computeRankScore(
   market: RankableMarket,
   userCircleIds: Set<string>,
-  nowMs: number
+  nowMs: number,
+  affinityMap: CategoryAffinityMap = new Map()
 ): number {
   // Resolved markets sink below everything bettable
   if (market.resolved) return -1
@@ -241,6 +285,7 @@ export function computeRankScore(
     momentum:  momentumSignal(market),
     hot_score: hotScoreSignal(market),
     tension:   tensionSignal(market),
+    affinity:  affinitySignal(market, affinityMap),
     social:    socialSignal(market, userCircleIds),
   }
 
@@ -250,6 +295,7 @@ export function computeRankScore(
     signals.momentum  * WEIGHTS.momentum +
     signals.hot_score * WEIGHTS.hot_score +
     signals.tension   * WEIGHTS.tension +
+    signals.affinity  * WEIGHTS.affinity +
     signals.social    * WEIGHTS.social
 
   // Freshness boost fades over 2 hours after publish — gives new markets initial air
@@ -313,18 +359,20 @@ export function rankFeedFirstSession<T extends RankableMarket>(markets: T[]): T[
  *
  * @param markets       - Array of enriched market objects (must include RankableMarket fields)
  * @param userCircleIds - Set of circle IDs the current user belongs to
+ * @param affinityMap   - Optional category affinity map from user's bet history
  * @returns             The same array, sorted
  */
 export function rankFeed<T extends RankableMarket>(
   markets: T[],
-  userCircleIds: Set<string>
+  userCircleIds: Set<string>,
+  affinityMap: CategoryAffinityMap = new Map()
 ): T[] {
   const nowMs = Date.now()
 
   // Compute scores once per market to avoid re-computing during sort comparisons
   const scored = markets.map((m) => ({
     market: m,
-    score: computeRankScore(m, userCircleIds, nowMs),
+    score: computeRankScore(m, userCircleIds, nowMs, affinityMap),
   }))
 
   scored.sort((a, b) => b.score - a.score)
@@ -342,7 +390,7 @@ export function debugRankScore(
   nowMs = Date.now()
 ): RankBreakdown {
   if (market.resolved) {
-    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, social: 0, freshness: 0, total: -1, pinned: false }
+    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, affinity: 0, social: 0, freshness: 0, total: -1, pinned: false }
   }
 
   const v = velocitySignal(market, nowMs)
@@ -362,6 +410,7 @@ export function debugRankScore(
     momentum: +m.toFixed(3),
     hot_score: +h.toFixed(3),
     tension: +t.toFixed(3),
+    affinity: 0,
     social: +s.toFixed(3),
     freshness: +fresh.toFixed(3),
     total: +(organic + fresh + (pinned ? FEATURED_PIN_BONUS : 0)).toFixed(3),
