@@ -97,14 +97,14 @@ export async function generateMarkets(
 
   const distributionInstruction = options.sportsHeavy
     ? `CATEGORY DISTRIBUTION (Sports inventory critically low — boost Sports now):
-- Sports: ~12 markets (48%) — game winners, series outcomes, player moments, tournament runs
-- Culture: ~7 markets (28%) — celebrity drama, music drops, movie box office, viral events
-- Politics: ~6 markets (24%) — only genuinely polarising, high-stakes, emotionally charged stories
+- Sports: ~20 markets (50%) — game winners, series outcomes, player moments, tournament runs
+- Culture: ~12 markets (30%) — celebrity drama, music drops, movie box office, viral events
+- Politics: ~8 markets (20%) — only genuinely polarising, high-stakes, emotionally charged stories
 All Sports markets MUST use hours_until_close of 12–48 to match real game timelines.`
-    : `CATEGORY DISTRIBUTION (balanced):
-- Sports: ~9 markets (36%) — game outcomes, player performance, match results
-- Culture: ~10 markets (40%) — entertainment, awards, celebrity beef, music, viral moments
-- Politics: ~6 markets (24%) — only hot-button, viral, emotionally charged political events
+    : `CATEGORY DISTRIBUTION (balanced — 15 per category target):
+- Sports: ~14 markets (35%) — game outcomes, player performance, match results
+- Culture: ~15 markets (37%) — entertainment, awards, celebrity beef, music, viral moments
+- Politics: ~11 markets (28%) — only hot-button, viral, emotionally charged political events
 Sports markets should strongly prefer hours_until_close of 12–48.`
 
   const prompt = `You are generating prediction markets for Ledge — a Gen Z social betting app (fake credits, no real money).
@@ -134,7 +134,7 @@ EXAMPLES OF BAD MARKETS — NEVER GENERATE THESE:
 Here are today's news headlines:
 ${headlines.map((h, i) => `${i + 1}. [${h.category}] ${h.headline}`).join('\n')}
 
-Generate exactly 25 yes/no prediction market questions based on these headlines. Requirements:
+Generate exactly 40 yes/no prediction market questions based on these headlines. Requirements:
 - Must be decidable within 1–7 days from today
 - Exciting and personally relevant to Gen Z
 - Natural, conversational language — like a bet you'd make with your friend
@@ -195,7 +195,7 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 8192,
+    max_tokens: 12000,
     messages: [{ role: 'user', content: prompt }],
   })
 

@@ -17,12 +17,12 @@ function getAnthropicKey(): string | undefined {
   return process.env.ANTHROPIC_API_KEY
 }
 
-// Target live market count — if below this we seed from queue immediately
-const TARGET_LIVE_COUNT = 16
+// Target live market count — must match TARGET_LIVE in release-markets (15/cat × 3 = 45)
+const TARGET_LIVE_COUNT = 45
 // How many markets to immediately publish from the queue to prime the feed
-const PRIME_BATCH_SIZE = 5
+const PRIME_BATCH_SIZE = 15
 // If Sports (live + queued) is below this threshold, bias generation toward Sports
-const SPORTS_LOW_THRESHOLD = CATEGORY_FLOORS['Sports'] + 3  // floor(5) + buffer(3) = 8
+const SPORTS_LOW_THRESHOLD = CATEGORY_FLOORS['Sports'] + 5  // floor(15) + buffer(5) = 20
 
 // Vercel Cron calls this twice daily (06:00 + 18:00 UTC).
 // Also callable manually from admin for ad-hoc generation.
