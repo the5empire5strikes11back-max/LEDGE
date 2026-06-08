@@ -29,13 +29,14 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
   const isPublicRoute =
+    request.nextUrl.pathname === '/landing' ||
     request.nextUrl.pathname === '/privacy' ||
     request.nextUrl.pathname === '/terms' ||
     request.nextUrl.pathname === '/onboarding'
 
   if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
+    url.pathname = '/landing'
     return NextResponse.redirect(url)
   }
 
