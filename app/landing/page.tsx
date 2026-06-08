@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Star, Check, ChevronDown, Quote } from "lucide-react"
+import { PredictionQuiz } from "@/components/landing/prediction-quiz"
 
 // ── Mock market card ─────────────────────────────────────────────────────────
 
@@ -208,6 +209,11 @@ export default function LandingPage() {
           ))}
         </div>
         <style>{`@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+      </section>
+
+      {/* ── Prediction Quiz / Lead Assessment ──────────────────────────────── */}
+      <section className="py-20 px-5 max-w-3xl mx-auto border-b border-[#1C1C24]">
+        <PredictionQuiz />
       </section>
 
       {/* ── Pain point section ──────────────────────────────────────────────── */}
