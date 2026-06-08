@@ -54,13 +54,14 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: market, error: marketError } = await (supabase as any)
     .from('markets')
-    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool')
+    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool, created_by')
     .eq('id', market_id)
     .single() as { data: {
       id: string; title: string; resolved: boolean; end_time: string
       circle_id: string | null; yes_pool: number; no_pool: number
       yes_percent: number; total_credits: number; hot_score: number
       virtual_yes_pool: number; virtual_no_pool: number
+      created_by: string | null
     } | null, error: unknown }
 
   if (marketError) {
@@ -149,6 +150,28 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .select()
     .single()
+
+  // Creator XP reward — fire-and-forget (+15 XP when someone bets your market)
+  if (market.created_by && market.created_by !== user.id) {
+    const creatorId = market.created_by
+    void (async () => {
+      try {
+        const { data: cp } = await admin
+          .from('profiles')
+          .select('xp')
+          .eq('id', creatorId)
+          .single()
+        if (cp) {
+          await admin
+            .from('profiles')
+            .update({ xp: cp.xp + 15 })
+            .eq('id', creatorId)
+        }
+      } catch {
+        // Non-critical — creator XP is best-effort
+      }
+    })()
+  }
 
   // Whale alert — fire-and-forget, never block the response
   if (cappedAmount >= WHALE_BET_THRESHOLD) {

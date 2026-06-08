@@ -8,7 +8,7 @@ import { OddsSparkline } from "@/components/ui/odds-sparkline"
 import { MarketSocialBar } from "@/components/market-social-bar"
 import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
 import type { MarketSocialData } from "@/lib/social-signals"
-import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
+import type { CompoundState } from "@/lib/feed-signals"
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Circle"
 
@@ -38,8 +38,8 @@ interface MarketFeedCardProps {
   isSpotlight?: boolean
   /** Cross-system compound market state — drives badge + glow intensity */
   compoundState?: CompoundState
-  /** Persona-driven identity signal — shown inline when relevant */
-  identitySignal?: IdentitySignal | null
+  /** Username of who created this market; null for AI-generated */
+  creatorUsername?: string | null
   onClick?: () => void
   onBuyYes?: () => void
   onBuyNo?: () => void
@@ -170,7 +170,7 @@ export function MarketFeedCard({
   pulseCTA = false,
   isSpotlight = false,
   compoundState = "normal",
-  identitySignal = null,
+  creatorUsername = null,
   onClick,
   onBuyYes,
   onBuyNo,
@@ -315,37 +315,23 @@ export function MarketFeedCard({
                 points={oddsHistory}
                 trend={trend}
                 width={56}
-                height={14}
+                height={22}
               />
             )}
           </div>
 
-          {/* Question + identity signal */}
+          {/* Question + creator attribution */}
           <div className="flex-1 min-w-0 pt-0.5">
             <h3 className="text-[14px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
             </h3>
-            {/* Identity signal — persona-driven contextual hint */}
-            {identitySignal && !isResolved && (
-              <p className={cn("text-[10px] font-medium mt-1 leading-none", identitySignal.color)}>
-                {identitySignal.label}
+            {creatorUsername && (
+              <p className="text-[10px] text-muted-foreground/50 mt-1">
+                by @{creatorUsername}
               </p>
             )}
           </div>
         </button>
-
-        {/* System estimate notice — shown only on cold-start markets (no real bets yet) */}
-        {!isResolved && totalCredits === 0 && yesPercent !== 50 && (
-          <div className="flex items-center gap-1.5 -mt-1">
-            <span
-              className="inline-flex items-center gap-1 text-[9px] font-medium text-muted-foreground/60 uppercase tracking-wider px-1.5 py-0.5 border border-border/40 bg-muted/20"
-              style={{ borderRadius: "var(--radius-badge)" }}
-            >
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-              System estimate
-            </span>
-          </div>
-        )}
 
         {/* Row 3: YES/NO odds bar */}
         <div className="flex items-center gap-1.5">

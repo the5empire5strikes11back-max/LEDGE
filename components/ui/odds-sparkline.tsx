@@ -10,72 +10,91 @@ interface OddsSparklineProps {
 }
 
 /**
- * Pure SVG sparkline for yes_percent movement.
- * No Recharts, no dependencies — renders ~200 bytes of SVG.
- * Shows a flat dashed baseline when fewer than 2 points exist.
+ * Probability gauge sparkline.
+ *
+ * Y-axis is always fixed 0–100 so the line's vertical position directly
+ * represents the YES probability — a 65% market sits in the upper portion,
+ * a 35% market sits low. A subtle 50% reference tick makes above/below
+ * immediately readable.
+ *
+ * For markets with real price movement the arc traces the full history.
+ * For flat markets (new/no bets) the filled area acts as a bar gauge.
+ *
+ * No dependencies — pure SVG.
  */
 export function OddsSparkline({
   points,
   trend,
   width = 56,
-  height = 16,
+  height = 22,
 }: OddsSparklineProps) {
+  // Color by >/<50% so it matches the big number's green/red at a glance
+  const lastPct = points.length > 0 ? points[points.length - 1].pct : 50
   const color =
-    trend === "up"   ? "var(--color-success, #22c55e)" :
-    trend === "down" ? "var(--color-danger, #ef4444)"  :
-                       "var(--color-muted-foreground, #6B6B7B)"
-
-  // Not enough data yet — flat dashed placeholder
-  if (points.length < 2) {
-    const y = height / 2
-    return (
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" aria-hidden>
-        <line
-          x1={2} y1={y} x2={width - 2} y2={y}
-          stroke="currentColor" strokeOpacity={0.12}
-          strokeWidth={1} strokeDasharray="2 2"
-        />
-      </svg>
-    )
-  }
-
-  // Normalize time axis
-  const minTs = points[0].ts
-  const maxTs = points[points.length - 1].ts
-  const tsRange = Math.max(maxTs - minTs, 1)
-
-  // Normalize value axis — enforce a minimum visible range
-  const values = points.map((p) => p.pct)
-  const rawMin = Math.min(...values)
-  const rawMax = Math.max(...values)
-  const valRange = Math.max(rawMax - rawMin, 2) // min 2pp so flat-ish lines still render
+    lastPct > 50 ? "var(--color-success, #22c55e)" :
+    lastPct < 50 ? "var(--color-danger,  #ef4444)" :
+                   "var(--color-muted-foreground, #6B6B7B)"
 
   const pad = 2
   const drawW = width  - pad * 2
   const drawH = height - pad * 2
 
-  const toXY = (p: OddsPoint) => ({
-    x: pad + ((p.ts - minTs) / tsRange) * drawW,
-    y: pad + drawH - ((p.pct - rawMin) / valRange) * drawH,
+  // Fixed 0–100 axis
+  const toXY = (ts: number, pct: number, minTs: number, tsRange: number) => ({
+    x: pad + ((ts - minTs) / tsRange) * drawW,
+    y: pad + drawH - (pct / 100) * drawH,
   })
 
-  const coords = points.map(toXY)
-  const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ")
+  // 50% reference line — faint horizontal tick
+  const midY = pad + drawH - (50 / 100) * drawH
+
+  // Not enough data — show a static gauge bar using just the last known pct
+  if (points.length < 2) {
+    const gaugeTop = pad + drawH - (lastPct / 100) * drawH
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" aria-hidden>
+        {/* 50% reference */}
+        <line x1={pad} y1={midY} x2={width - pad} y2={midY}
+          stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} strokeDasharray="2 2" />
+        {/* Filled gauge bar */}
+        <rect
+          x={pad} y={gaugeTop}
+          width={drawW} height={drawH - (gaugeTop - pad)}
+          fill={color} opacity={0.2}
+          rx={1}
+        />
+        {/* Top edge line */}
+        <line x1={pad} y1={gaugeTop} x2={width - pad} y2={gaugeTop}
+          stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+      </svg>
+    )
+  }
+
+  const minTs   = points[0].ts
+  const maxTs   = points[points.length - 1].ts
+  const tsRange = Math.max(maxTs - minTs, 1)
+
+  const coords = points.map((p) => toXY(p.ts, p.pct, minTs, tsRange))
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ")
 
   const first = coords[0]
   const last  = coords[coords.length - 1]
+  const bottomY = (height - pad).toFixed(1)
 
-  // Closed area path for subtle fill
-  const area = `${line} L${last.x.toFixed(1)},${(height - pad).toFixed(1)} L${first.x.toFixed(1)},${(height - pad).toFixed(1)} Z`
+  // Area fills from the line DOWN to the chart bottom (= YES territory)
+  const areaPath = `${linePath} L${last.x.toFixed(1)},${bottomY} L${first.x.toFixed(1)},${bottomY} Z`
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" aria-hidden>
-      {/* Area fill — very subtle */}
-      <path d={area} fill={color} opacity={0.1} />
-      {/* Line stroke */}
-      <path d={line} stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      {/* 50% reference line */}
+      <line x1={pad} y1={midY} x2={width - pad} y2={midY}
+        stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} strokeDasharray="2 2" />
+      {/* Area fill */}
+      <path d={areaPath} fill={color} opacity={0.22} />
+      {/* Price line */}
+      <path d={linePath} stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
       {/* Terminal dot */}
-      <circle cx={last.x.toFixed(1)} cy={last.y.toFixed(1)} r={1.8} fill={color} />
+      <circle cx={last.x.toFixed(1)} cy={last.y.toFixed(1)} r={2} fill={color} />
     </svg>
   )
 }

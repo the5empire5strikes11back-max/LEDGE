@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeAchievements } from '@/lib/achievements'
+import { computeCreatorTrust } from '@/lib/creator-trust'
 
 export async function GET() {
   const supabase = await createClient()
@@ -54,14 +55,19 @@ export async function GET() {
   }))
   const achievements = computeAchievements(achievementBets)
 
-  // Near-miss: leaderboard rank gap
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, credits, xp')
-    .order('credits', { ascending: false })
-    .limit(100)
+  // Near-miss: leaderboard rank gap + creator trust (run in parallel)
+  const admin = createAdminClient()
+  const [profilesResult, creatorTrust] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, credits, xp')
+      .order('credits', { ascending: false })
+      .limit(100),
+    computeCreatorTrust(user.id, admin),
+  ])
 
-  const myRankIndex = (profiles ?? []).findIndex((p) => p.id === user.id)
+  const profiles = profilesResult.data ?? []
+  const myRankIndex = profiles.findIndex((p) => p.id === user.id)
   const leaderboardRank = myRankIndex >= 0 ? myRankIndex + 1 : null
   const top10Gap =
     myRankIndex > 9 && profiles?.[9]
@@ -77,5 +83,11 @@ export async function GET() {
     achievements,
     leaderboardRank,
     top10Gap,
+    creatorStats: {
+      liveMarkets: creatorTrust.liveCount,
+      reviewMarkets: creatorTrust.reviewCount,
+      trustScore: creatorTrust.score,
+      trustTier: creatorTrust.tier,
+    },
   })
 }

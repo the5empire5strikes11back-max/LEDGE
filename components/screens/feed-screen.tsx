@@ -7,13 +7,15 @@ import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
 import { ReturnHooksBar } from "@/components/onboarding/return-hooks-bar"
+import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
 import { rankFeedFirstSession, buildAffinityMap } from "@/lib/feed-ranker"
-import { computeCompoundState, computeIdentitySignal, buildCategoryStats } from "@/lib/feed-signals"
+import { computeCompoundState } from "@/lib/feed-signals"
 import { useSessionArc, formatCloseTime } from "@/lib/session-arc"
 import type { ReturnHook } from "@/app/api/return-hooks/route"
 import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
@@ -43,6 +45,7 @@ interface Market {
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
+  creatorUsername?: string | null
 }
 
 interface PostBetInfo {
@@ -62,12 +65,8 @@ interface FeedScreenProps {
   availableCredits: number
   streak: number
   decay: "none" | "warning" | "critical"
-  /** User's current persona — drives identity signals on cards */
+  /** User's current persona */
   persona?: Persona | null
-  /** Win streak count for Oracle momentum signal */
-  winStreak?: number
-  /** Whether user is in comeback mode (3+ consecutive losses) */
-  isComeback?: boolean
   /** Bet history for category affinity ranking */
   betHistory?: Array<{ category: string; won: boolean }>
   onBet: (
@@ -112,8 +111,6 @@ export function FeedScreen({
   streak,
   decay,
   persona = null,
-  winStreak = 0,
-  isComeback = false,
   betHistory = [],
   onBet,
   onWin,
@@ -125,6 +122,7 @@ export function FeedScreen({
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
   const [postBetInfo, setPostBetInfo] = useState<PostBetInfo | null>(null)
   const [returnHooks, setReturnHooks] = useState<ReturnHook[]>([])
+  const [createSheetOpen, setCreateSheetOpen] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   // First-session: user hasn't placed a bet yet
@@ -154,10 +152,17 @@ export function FeedScreen({
     if (res.ok) {
       const data: Market[] = await res.json()
       setMarkets(data)
-      // Seed one baseline point per market from the initial load
+      // Seed opening + current point per market so sparklines show the full arc
       seedOddsHistory(
         oddsHistoryRef.current,
-        data.map((m) => ({ id: m.id, yesPercent: m.yesPercent }))
+        data.map((m) => ({
+          id: m.id,
+          yesPercent: m.yesPercent,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          openingYesPercent: (m as any).openingYesPercent,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          published_at: (m as any).published_at,
+        }))
       )
     }
     setLoading(false)
@@ -226,8 +231,7 @@ export function FeedScreen({
     return () => { supabase.current.removeChannel(channel) }
   }, [])
 
-  // Category affinity + stats — derived from bet history, stable across renders
-  const categoryStats = useMemo(() => buildCategoryStats(betHistory), [betHistory])
+
 
   // Hide markets the user has already bet on — they move to Profile > Bets Made
   const unbetMarkets = markets.filter((m) => !m.userBet)
@@ -350,7 +354,7 @@ export function FeedScreen({
 
   // ── Feed column (shared by mobile full-width + desktop left column) ──────────
   const feedColumn = (
-    <div className="flex flex-col h-full w-full overflow-hidden">
+    <div className="flex flex-col h-full w-full overflow-hidden relative">
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full">
         {/* Screener stats bar */}
         <div className="bg-surface border-b border-border px-4 py-2 flex items-center gap-4 overflow-x-auto scrollbar-none">
@@ -527,16 +531,6 @@ export function FeedScreen({
                 market.social
               )
 
-              // Persona-driven identity signal: contextually relevant hint for this user
-              const identitySignal = computeIdentitySignal(
-                market.category,
-                market.yesPercent,
-                persona,
-                winStreak,
-                isComeback,
-                categoryStats
-              )
-
               return (
                 <MarketFeedCard
                   key={market.id}
@@ -554,7 +548,7 @@ export function FeedScreen({
                   isSpotlight={isSpotlight}
                   pulseCTA={pulseCTA}
                   compoundState={compoundState}
-                  identitySignal={identitySignal}
+                  creatorUsername={market.creatorUsername ?? null}
                   onClick={() => { recordInteraction(); setDetailMarket(market) }}
                   onBuyYes={() => { recordInteraction(); openTrade(market, "yes") }}
                   onBuyNo={() => { recordInteraction(); openTrade(market, "no") }}
@@ -564,6 +558,20 @@ export function FeedScreen({
           )}
         </div>
       </div>
+
+      {/* "+" FAB — create a market */}
+      <button
+        onClick={() => setCreateSheetOpen(true)}
+        aria-label="Create a prediction market"
+        className={cn(
+          "absolute bottom-5 right-4 z-20",
+          "w-11 h-11 rounded-full bg-accent text-accent-foreground",
+          "flex items-center justify-center shadow-lg",
+          "hover:opacity-90 active:scale-95 transition-all duration-150"
+        )}
+      >
+        <Plus className="w-5 h-5" strokeWidth={2.5} />
+      </button>
     </div>
   )
 
@@ -637,6 +645,20 @@ export function FeedScreen({
           onDismiss={() => setPostBetInfo(null)}
         />
       )}
+
+      {/* Create market sheet */}
+      <CreateMarketSheet
+        open={createSheetOpen}
+        onClose={() => setCreateSheetOpen(false)}
+        onCreated={(isReview) => {
+          if (isReview) {
+            toast.info("Prediction submitted for review — it'll go live shortly if approved.")
+          } else {
+            toast.success("Prediction posted! 🎯 Others can now bet on it.")
+            loadMarkets()
+          }
+        }}
+      />
     </>
   )
 }

@@ -80,8 +80,8 @@ export async function rateLimit(
 export const LIMITS = {
   /** Max 8 bets per 30 seconds — prevents credit drain spam */
   bets: { limit: 8, windowMs: 30_000 },
-  /** Max 5 user-created markets per hour */
-  marketsCreate: { limit: 5, windowMs: 60 * 60_000 },
+  /** Max 3 user-created markets per hour — quality control for UGC */
+  marketsCreate: { limit: 3, windowMs: 60 * 60_000 },
   /** Max 3 circles per hour */
   circlesCreate: { limit: 3, windowMs: 60 * 60_000 },
   /** Max 20 general API calls per 10 seconds */

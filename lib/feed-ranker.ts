@@ -1,3 +1,5 @@
+import { scoreInterestMatch } from '@/lib/interest-tags'
+
 /**
  * Feed Ranking System
  *
@@ -26,6 +28,7 @@
 
 export interface RankableMarket {
   id: string
+  title?: string
   created_at: string
   end_time: string
   resolved: boolean
@@ -38,6 +41,11 @@ export interface RankableMarket {
   category?: string
   /** Set when the market goes from queued → live. Used for freshness boost. */
   published_at?: string | null
+  /**
+   * Creator trust score [0.1, 0.95]. Omitted for AI-generated markets.
+   * Used as a subtle additive adjustment to the rank score (±0.04 max).
+   */
+  creator_trust?: number | null
 }
 
 // ── Category affinity — maps category name → [0, 1] preference score ─────────
@@ -69,12 +77,13 @@ export function buildAffinityMap(
 // ── Weights — must sum to 1.0 ─────────────────────────────────────────────────
 
 export const WEIGHTS = {
-  velocity:  0.28,  // Bet velocity: bets-per-hour since creation
-  urgency:   0.23,  // Time urgency: exponential ramp as deadline nears
-  momentum:  0.19,  // Momentum shift: recent odds movement
-  hot_score: 0.14,  // Hot score: cumulative engagement (log-scaled)
+  velocity:  0.26,  // Bet velocity: bets-per-hour since creation
+  urgency:   0.22,  // Time urgency: exponential ramp as deadline nears
+  momentum:  0.18,  // Momentum shift: recent odds movement
+  hot_score: 0.13,  // Hot score: cumulative engagement (log-scaled)
   tension:   0.07,  // Tension: how close to 50/50 the odds are
-  affinity:  0.07,  // User affinity: category preference from bet history
+  affinity:  0.06,  // User affinity: category preference from bet history
+  interest:  0.06,  // Interest match: subcategory preference from quiz/bet history
   social:    0.02,  // Social: user's circle is involved
 } as const
 
@@ -232,6 +241,34 @@ function affinitySignal(
 }
 
 /**
+ * Interest match: subcategory-level preference from quiz and/or bet history.
+ * Returns scoreInterestMatch result: 1.0 match, 0.15 non-match, 0.5 neutral, 0.4 untagged.
+ */
+function interestSignal(
+  market: RankableMarket,
+  userInterests: string[]
+): number {
+  if (!market.title) return 0.5
+  return scoreInterestMatch(market.title, userInterests)
+}
+
+/**
+ * Creator trust adjustment: gentle additive signal derived from the creator's
+ * track record (approval ratio + engagement).
+ *
+ * Maps [0.1, 0.95] → [-0.04, +0.04] so it's meaningful but never dominant.
+ * AI-generated markets (no creator_trust) get 0 adjustment.
+ * Neutral creators (trust=0.5) also get 0 adjustment — no noise for new accounts.
+ */
+function creatorTrustAdjustment(market: RankableMarket): number {
+  const trust = market.creator_trust
+  if (trust == null) return 0            // AI-generated or unknown → no adjustment
+  if (Math.abs(trust - 0.5) < 0.05) return 0  // Near-neutral → no noise
+  // Linear map: trust 0.1→-0.04, 0.5→0, 0.95→+0.04
+  return (trust - 0.5) * (0.04 / 0.45)
+}
+
+/**
  * Freshness bonus: temporary additive boost for recently published markets.
  * Decays linearly from FRESHNESS_MAX_BONUS → 0 over FRESHNESS_DECAY_HOURS.
  * Returns 0 if market has no published_at (pre-queue-system markets).
@@ -255,8 +292,10 @@ export interface RankBreakdown {
   hot_score: number
   tension: number
   affinity: number
+  interest: number
   social: number
   freshness: number
+  creator_trust_adj: number
   total: number
   pinned: boolean
 }
@@ -268,13 +307,15 @@ export interface RankBreakdown {
  * @param userCircleIds - Set of circle IDs the current user belongs to
  * @param nowMs         - Current timestamp in milliseconds (pass Date.now() for consistency)
  * @param affinityMap   - Optional category affinity map from user's bet history
+ * @param userInterests - Optional subcategory interest tags from quiz / bet history
  * @returns             Composite score (higher = shown earlier in feed)
  */
 export function computeRankScore(
   market: RankableMarket,
   userCircleIds: Set<string>,
   nowMs: number,
-  affinityMap: CategoryAffinityMap = new Map()
+  affinityMap: CategoryAffinityMap = new Map(),
+  userInterests: string[] = []
 ): number {
   // Resolved markets sink below everything bettable
   if (market.resolved) return -1
@@ -286,6 +327,7 @@ export function computeRankScore(
     hot_score: hotScoreSignal(market),
     tension:   tensionSignal(market),
     affinity:  affinitySignal(market, affinityMap),
+    interest:  interestSignal(market, userInterests),
     social:    socialSignal(market, userCircleIds),
   }
 
@@ -296,13 +338,17 @@ export function computeRankScore(
     signals.hot_score * WEIGHTS.hot_score +
     signals.tension   * WEIGHTS.tension +
     signals.affinity  * WEIGHTS.affinity +
+    signals.interest  * WEIGHTS.interest +
     signals.social    * WEIGHTS.social
 
   // Freshness boost fades over 2 hours after publish — gives new markets initial air
   const freshness = freshnessBonus(market, nowMs)
 
+  // Creator trust: subtle ±0.04 additive based on creator track record
+  const trustAdj = creatorTrustAdjustment(market)
+
   // Featured markets always appear above organic results
-  return (market.is_featured ? FEATURED_PIN_BONUS : 0) + organic + freshness
+  return (market.is_featured ? FEATURED_PIN_BONUS : 0) + organic + freshness + trustAdj
 }
 
 // ── First-session weights ─────────────────────────────────────────────────────
@@ -360,19 +406,21 @@ export function rankFeedFirstSession<T extends RankableMarket>(markets: T[]): T[
  * @param markets       - Array of enriched market objects (must include RankableMarket fields)
  * @param userCircleIds - Set of circle IDs the current user belongs to
  * @param affinityMap   - Optional category affinity map from user's bet history
+ * @param userInterests - Optional subcategory interest tags from quiz / bet history
  * @returns             The same array, sorted
  */
 export function rankFeed<T extends RankableMarket>(
   markets: T[],
   userCircleIds: Set<string>,
-  affinityMap: CategoryAffinityMap = new Map()
+  affinityMap: CategoryAffinityMap = new Map(),
+  userInterests: string[] = []
 ): T[] {
   const nowMs = Date.now()
 
   // Compute scores once per market to avoid re-computing during sort comparisons
   const scored = markets.map((m) => ({
     market: m,
-    score: computeRankScore(m, userCircleIds, nowMs, affinityMap),
+    score: computeRankScore(m, userCircleIds, nowMs, affinityMap, userInterests),
   }))
 
   scored.sort((a, b) => b.score - a.score)
@@ -390,7 +438,7 @@ export function debugRankScore(
   nowMs = Date.now()
 ): RankBreakdown {
   if (market.resolved) {
-    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, affinity: 0, social: 0, freshness: 0, total: -1, pinned: false }
+    return { velocity: 0, urgency: 0, momentum: 0, hot_score: 0, tension: 0, affinity: 0, interest: 0, social: 0, freshness: 0, creator_trust_adj: 0, total: -1, pinned: false }
   }
 
   const v = velocitySignal(market, nowMs)
@@ -399,6 +447,7 @@ export function debugRankScore(
   const h = hotScoreSignal(market)
   const t = tensionSignal(market)
   const s = socialSignal(market, userCircleIds)
+  const trustAdj = creatorTrustAdjustment(market)
 
   const organic = v * WEIGHTS.velocity + u * WEIGHTS.urgency + m * WEIGHTS.momentum + h * WEIGHTS.hot_score + t * WEIGHTS.tension + s * WEIGHTS.social
   const pinned = market.is_featured === true
@@ -411,9 +460,11 @@ export function debugRankScore(
     hot_score: +h.toFixed(3),
     tension: +t.toFixed(3),
     affinity: 0,
+    interest: 0,
     social: +s.toFixed(3),
     freshness: +fresh.toFixed(3),
-    total: +(organic + fresh + (pinned ? FEATURED_PIN_BONUS : 0)).toFixed(3),
+    creator_trust_adj: +trustAdj.toFixed(3),
+    total: +(organic + fresh + trustAdj + (pinned ? FEATURED_PIN_BONUS : 0)).toFixed(3),
     pinned,
   }
 }

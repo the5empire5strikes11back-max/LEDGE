@@ -22,6 +22,10 @@ export interface Database {
           comeback_eligible: boolean
           last_active_at: string
           created_at: string
+          /** Interest tags selected during onboarding quiz (e.g. ["basketball", "music"]) */
+          interests: string[] | null
+          /** True after the user completes or skips the onboarding interest quiz */
+          onboarding_done: boolean
         }
         Insert: {
           id: string
@@ -36,6 +40,8 @@ export interface Database {
           comeback_eligible?: boolean
           last_active_at?: string
           created_at?: string
+          interests?: string[] | null
+          onboarding_done?: boolean
         }
         Update: {
           rank?: RankKey
@@ -47,6 +53,8 @@ export interface Database {
           loss_streak?: number
           comeback_eligible?: boolean
           last_active_at?: string
+          interests?: string[] | null
+          onboarding_done?: boolean
         }
         Relationships: []
       }
@@ -73,7 +81,7 @@ export interface Database {
           momentum_shift: number
           is_featured: boolean
           // Queue architecture fields
-          status: 'queued' | 'live' | 'archived'
+          status: 'queued' | 'live' | 'archived' | 'review'
           published_at: string | null
           generated_at: string | null
           /** AI quality score 1–100. NULL = legacy market. */

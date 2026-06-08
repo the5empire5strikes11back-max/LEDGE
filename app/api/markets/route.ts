@@ -1,10 +1,14 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { unstable_cache } from 'next/cache'
-import { rankFeed } from '@/lib/feed-ranker'
+import { unstable_cache, revalidatePath } from 'next/cache'
+import { rankFeed, buildAffinityMap } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
+import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
+import { screenMarket, ALLOWED_CATEGORIES } from '@/lib/market-quality'
+import { computeCreatorTrust, batchCreatorTrust } from '@/lib/creator-trust'
+import { logMessage } from '@/lib/logger'
 
 // Cache the full markets list for 30 seconds — same for all users
 const getCachedMarkets = unstable_cache(
@@ -55,17 +59,30 @@ export async function GET(request: Request) {
   }
 
   // Cached queries (shared across all users) + user-specific queries run in parallel
-  const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult] = await Promise.all([
+  const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult, profileResult] = await Promise.all([
     getCachedMarkets(category),
     getCachedRecentBets(),
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('bets')
-      .select('market_id, side, amount, payout, won')
-      .eq('user_id', user.id),
+      .select('market_id, side, amount, payout, won, markets(title, category)')
+      .eq('user_id', user.id) as Promise<{ data: Array<{
+        market_id: string
+        side: string
+        amount: number
+        payout: number | null
+        won: boolean | null
+        markets: { title: string; category: string } | null
+      }> | null }>,
     supabase
       .from('circle_members')
       .select('circle_id')
       .eq('user_id', user.id),
+    supabase
+      .from('profiles')
+      .select('interests')
+      .eq('id', user.id)
+      .single(),
   ])
 
   const recentBetsResult = { data: recentBetsData }
@@ -87,6 +104,19 @@ export async function GET(request: Request) {
   const betMap = new Map(
     (userBetsResult.data ?? []).map((b) => [b.market_id, b])
   )
+
+  // Batch-fetch creator usernames + trust scores for user-created markets
+  const creatorIds = [...new Set(
+    markets.filter((m) => m.created_by).map((m) => m.created_by as string)
+  )]
+  const adminForCreators = createAdminClient()
+  const [creatorProfilesResult, creatorTrustMap] = await Promise.all([
+    creatorIds.length > 0
+      ? adminForCreators.from('profiles').select('id, username').in('id', creatorIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; username: string }> }),
+    batchCreatorTrust(creatorIds, adminForCreators),
+  ])
+  const creatorMap = new Map((creatorProfilesResult.data ?? []).map((p: { id: string; username: string }) => [p.id, p.username]))
   const userCircleIds = new Set(
     (circleMembershipsResult.data ?? []).map((cm) => cm.circle_id)
   )
@@ -94,8 +124,31 @@ export async function GET(request: Request) {
   // Aggregate recent bets into per-market social data (in-memory grouping, O(n) on bets)
   const socialMap = aggregateRecentBets(recentBetsResult.data ?? [])
 
+  // Build interest list: merge quiz-set interests with interests inferred from bets
+  const quizInterests: string[] = (profileResult.data?.interests ?? []) as string[]
+  const betHistoryForInference = (userBetsResult.data ?? []).map((b) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    markets: (b as any).markets as { title: string } | null,
+  }))
+  const inferredInterests = inferInterestsFromBets(betHistoryForInference)
+  const userInterests = mergeInterests(quizInterests, inferredInterests)
+
+  // Build category affinity map from bet history (existing signal)
+  const affinityMap = buildAffinityMap(
+    (userBetsResult.data ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((b) => ({ category: ((b as any).markets as { category?: string } | null)?.category ?? '' }))
+      .filter((b) => b.category)
+  )
+
+  // Attach creator_trust to raw market rows so the ranker can apply the signal
+  const marketsWithTrust = markets.map((m) => ({
+    ...m,
+    creator_trust: m.created_by ? (creatorTrustMap.get(m.created_by)?.score ?? null) : null,
+  }))
+
   // Rank raw DB rows first (they have resolved: boolean, which the ranker needs)
-  const rankedRaw = rankFeed(markets, userCircleIds)
+  const rankedRaw = rankFeed(marketsWithTrust, userCircleIds, affinityMap, userInterests)
 
   // Build a stable rank-order map so we can reorder the enriched output
   const rankOrder = new Map(rankedRaw.map((m, i) => [m.id, i]))
@@ -107,6 +160,18 @@ export async function GET(request: Request) {
       !!market.resolved &&
       (market.yes_percent ?? 50) >= 40 &&
       (market.yes_percent ?? 50) <= 60
+
+    // Compute the AI-set opening probability from the virtual pools.
+    // virtual_yes_pool / (virtual_yes_pool + virtual_no_pool) gives the exact
+    // starter_probability that was embedded at generation time — unaffected by real bets.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = market as any
+    const vYes = typeof m.virtual_yes_pool === 'number' ? m.virtual_yes_pool : 0
+    const vNo  = typeof m.virtual_no_pool  === 'number' ? m.virtual_no_pool  : 0
+    const openingYesPercent =
+      vYes + vNo > 0
+        ? Math.round((vYes / (vYes + vNo)) * 100)
+        : (market.yes_percent ?? 50)
 
     return {
       ...market,
@@ -120,9 +185,15 @@ export async function GET(request: Request) {
       momentumShift: market.momentum_shift ?? 0,
       isFeatured: market.is_featured ?? false,
       isNearMiss,
+      /** AI-set opening odds — used to seed the sparkline history anchor */
+      openingYesPercent,
       resolved: market.resolved ? { winner: market.winner } : undefined,
       userBet: userBet ? { side: userBet.side, amount: userBet.amount } : undefined,
       social: socialMap.get(market.id) ?? null,
+      /** Username of the person who created this market (null for AI-generated) */
+      creatorUsername: market.created_by ? (creatorMap.get(market.created_by) ?? null) : null,
+      /** Creator trust score [0.1, 0.95] — null for AI-generated markets */
+      creator_trust: market.created_by ? (creatorTrustMap.get(market.created_by)?.score ?? null) : null,
     }
   })
 
@@ -152,9 +223,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Rate limit — max 5 user-created markets per hour
-  const adminForRl = createAdminClient()
-  const rl = await rateLimit(adminForRl, { key: `${user.id}:marketsCreate`, ...LIMITS.marketsCreate })
+  // Rate limit — max 3 user-created markets per hour
+  const admin = createAdminClient()
+  const rl = await rateLimit(admin, { key: `${user.id}:marketsCreate`, ...LIMITS.marketsCreate })
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Too many markets created. Try again later.' },
@@ -163,24 +234,64 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, category, end_time, jackpot_pool } = body
+  const { title, category, end_time } = body
 
-  if (!title || !category || !end_time) {
+  // ── Basic field presence ──────────────────────────────────────────────────
+  if (!title || typeof title !== 'string' || !category || !end_time) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // Seed virtual liquidity for the new market
+  const trimmedTitle = title.trim()
+
+  // ── Category allowlist (server-side) ─────────────────────────────────────
+  if (!(ALLOWED_CATEGORIES as readonly string[]).includes(category)) {
+    return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
+  }
+
+  // ── Fetch creator trust + existing titles in parallel ────────────────────
+  const [trustResult, existingMarketsResult] = await Promise.all([
+    computeCreatorTrust(user.id, admin),
+    admin
+      .from('markets')
+      .select('title')
+      .in('status', ['live', 'queued', 'review'])
+      .gt('end_time', new Date().toISOString()),
+  ])
+  const existingTitles = (existingMarketsResult.data ?? []).map((m: { title: string }) => m.title)
+
+  // ── Quality screening (safety, clarity, duplicates, spam, trust) ──────────
+  const screen = screenMarket({
+    title: trimmedTitle,
+    category,
+    endTimeIso: new Date(end_time).toISOString(),
+    existingTitles,
+    creatorTrust: trustResult.score,
+  })
+
+  logMessage(
+    `[market-quality] user=${user.id} trust=${trustResult.score.toFixed(2)} tier=${trustResult.tier} verdict=${screen.verdict} flags=[${screen.flags.join(',')}] title="${trimmedTitle.slice(0, 60)}"`,
+    { context: 'markets:POST' }
+  )
+
+  if (screen.verdict === 'reject') {
+    return NextResponse.json({ error: screen.reason }, { status: 422 })
+  }
+
+  // review → hidden from feed until manually approved; accept → live immediately
+  const status = screen.verdict === 'review' ? 'review' : 'live'
   const liquiditySeed = seedLiquidity(category as MarketCategory, false)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('markets')
     .insert({
-      title,
+      title: trimmedTitle,
       category,
       end_time,
-      jackpot_pool: jackpot_pool ?? 0,
+      jackpot_pool: 0,
       created_by: user.id,
+      status,
+      published_at: status === 'live' ? new Date().toISOString() : null,
       ...liquiditySeed,
     })
     .select()
@@ -190,5 +301,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json(data, { status: 201 })
+  // Bust the shared feed cache so live markets appear on next load
+  if (status === 'live') {
+    revalidatePath('/', 'layout')
+  }
+
+  return NextResponse.json(
+    {
+      ...data,
+      _review: screen.verdict === 'review',
+      _reviewReason: screen.verdict === 'review' ? screen.reason : undefined,
+    },
+    { status: 201 }
+  )
 }

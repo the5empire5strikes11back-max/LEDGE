@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils"
 import { ShareCardModal } from "@/components/share-card"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { compressToSquare } from "@/lib/compress-image"
+import { CreatorAnalytics } from "@/components/creator-analytics"
+import type { CreatorMarket } from "@/app/api/creator/markets/route"
 
 interface ProfileScreenProps {
   xp: number
@@ -37,6 +39,12 @@ interface UserStats {
   achievements: Achievement[]
   leaderboardRank: number | null
   top10Gap: number | null
+  creatorStats?: {
+    liveMarkets: number
+    reviewMarkets: number
+    trustScore: number
+    trustTier: 'trusted' | 'normal' | 'restricted'
+  }
 }
 
 interface LeaderboardEntry {
@@ -80,6 +88,7 @@ export function ProfileScreen({
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [pnlHistory, setPnlHistory] = useState<PnlPoint[]>([])
   const [bets, setBets] = useState<BetRecord[]>([])
+  const [creatorMarkets, setCreatorMarkets] = useState<CreatorMarket[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl ?? null)
@@ -92,6 +101,7 @@ export function ProfileScreen({
     fetch('/api/leaderboard').then((r) => r.ok ? r.json() : null).then((d) => d && setLeaderboard(d))
     fetch('/api/pnl-history').then((r) => r.ok ? r.json() : null).then((d) => d && setPnlHistory(d))
     fetch('/api/bets').then((r) => r.ok ? r.json() : null).then((d) => Array.isArray(d) && setBets(d))
+    fetch('/api/creator/markets').then((r) => r.ok ? r.json() : []).then((d) => Array.isArray(d) && setCreatorMarkets(d))
   }, [])
 
   const pnlDelta = pnlHistory.length >= 2
@@ -196,8 +206,8 @@ export function ProfileScreen({
                     </span>
                   )}
                 </div>
-                {/* Rank + persona on one line */}
-                <div className="flex items-center gap-2 mt-1">
+                {/* Rank + persona + trusted creator badge on one line */}
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 border",
@@ -210,6 +220,16 @@ export function ProfileScreen({
                   <span className="text-[10px] text-muted-foreground truncate">
                     {persona.emoji} {persona.label}
                   </span>
+                  {stats?.creatorStats?.trustTier === 'trusted' &&
+                   (stats.creatorStats.liveMarkets ?? 0) >= 3 && (
+                    <span
+                      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-success/15 text-success border border-success/30 shrink-0"
+                      style={{ borderRadius: "var(--radius-badge)" }}
+                      title="Your markets consistently go live and attract bets"
+                    >
+                      ✦ Trusted Creator
+                    </span>
+                  )}
                 </div>
               </div>
               {/* Credits — primary value */}
@@ -370,7 +390,80 @@ export function ProfileScreen({
                 {(progress.required - progress.current).toLocaleString()} XP to {progress.nextRank}
               </p>
             )}
+            {(stats?.creatorStats?.liveMarkets ?? 0) > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                {stats!.creatorStats!.liveMarkets} market{stats!.creatorStats!.liveMarkets !== 1 ? 's' : ''} created
+                {stats!.creatorStats!.reviewMarkets > 0 && (
+                  <span className="text-muted-foreground/50"> · {stats!.creatorStats!.reviewMarkets} pending review</span>
+                )}
+              </p>
+            )}
           </div>
+
+          {/* Calibration panel — category-level accuracy breakdown */}
+          {(() => {
+            const TRACKED = ["Sports", "Politics", "Culture"] as const
+            type TrackedCat = typeof TRACKED[number]
+
+            const resolvedBets = bets.filter((b) => b.won !== null && b.markets?.category)
+            const byCategory = TRACKED.reduce<Record<TrackedCat, { wins: number; total: number }>>(
+              (acc, cat) => { acc[cat] = { wins: 0, total: 0 }; return acc },
+              {} as Record<TrackedCat, { wins: number; total: number }>
+            )
+            for (const bet of resolvedBets) {
+              const cat = bet.markets?.category as TrackedCat | undefined
+              if (!cat || !byCategory[cat]) continue
+              byCategory[cat].total += 1
+              if (bet.won) byCategory[cat].wins += 1
+            }
+            const rows = TRACKED
+              .map((cat) => ({ cat, ...byCategory[cat], rate: byCategory[cat].total >= 3 ? Math.round((byCategory[cat].wins / byCategory[cat].total) * 100) : null }))
+              .filter((r) => r.total >= 3)
+
+            if (rows.length === 0) return null
+
+            return (
+              <div
+                className="bg-card border border-border px-4 py-4"
+                style={{ borderRadius: "var(--radius-card)" }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                    Calibration
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">win rate by category</span>
+                </div>
+                <div className="space-y-3">
+                  {rows.map(({ cat, wins, total, rate }) => {
+                    const pct = rate ?? 0
+                    const color = pct >= 60 ? "bg-success" : pct >= 50 ? "bg-accent" : "bg-danger"
+                    const textColor = pct >= 60 ? "text-success" : pct >= 50 ? "text-accent" : "text-danger"
+                    return (
+                      <div key={cat} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-foreground font-medium">{cat}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground/60 font-mono">
+                              {wins}/{total}
+                            </span>
+                            <span className={cn("text-[11px] font-bold font-mono tabular-nums", textColor)}>
+                              {pct}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative h-1 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
+                          <div
+                            className={cn("absolute inset-y-0 left-0 transition-all duration-700", color)}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Achievements — compact */}
           {(stats?.achievements?.length ?? 0) > 0 && (
@@ -389,6 +482,9 @@ export function ProfileScreen({
               <AchievementsGrid earned={stats?.achievements ?? []} />
             </div>
           )}
+
+          {/* Creator analytics — only renders when the user has created markets */}
+          <CreatorAnalytics markets={creatorMarkets} />
 
           {/* Bets Made */}
           {bets.length > 0 && (
