@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -10,6 +10,80 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Share2, TrendingUp, Zap } from "lucide-react"
+
+// ── Confetti burst ────────────────────────────────────────────────────────────
+function ConfettiBurst({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animRef   = useRef<number | undefined>(undefined)
+
+  const spawn = useCallback(() => {
+    const colors = ["#22C55E", "#F5A623", "#FFD700", "#86EFAC", "#FFFFFF"]
+    return Array.from({ length: 70 }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / 70 + Math.random() * 0.4
+      const vel   = 2.5 + Math.random() * 5.5
+      return {
+        x: 0, y: 0,
+        vx: Math.cos(angle) * vel,
+        vy: Math.sin(angle) * vel - 1.5,   // slight upward bias
+        size: 2 + Math.random() * 3.5,
+        opacity: 1,
+        rotation: Math.random() * 360,
+        rotSpeed: (Math.random() - 0.5) * 12,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!active || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const ctx    = canvas.getContext("2d")
+    if (!ctx) return
+
+    canvas.width  = 320
+    canvas.height = 220
+
+    let particles = spawn().map((p) => ({ ...p, x: canvas.width / 2, y: canvas.height / 2 }))
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      particles = particles
+        .map((p) => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.14, vx: p.vx * 0.985, opacity: p.opacity - 0.013, rotation: p.rotation + p.rotSpeed }))
+        .filter((p) => p.opacity > 0)
+
+      particles.forEach((p) => {
+        ctx.save()
+        ctx.translate(p.x, p.y)
+        ctx.rotate((p.rotation * Math.PI) / 180)
+        ctx.globalAlpha = p.opacity
+        ctx.fillStyle   = p.color
+        ctx.shadowColor = p.color
+        ctx.shadowBlur  = 6
+        ctx.beginPath()
+        ctx.moveTo(0, -p.size)
+        ctx.lineTo(p.size * 0.55, 0)
+        ctx.lineTo(0, p.size)
+        ctx.lineTo(-p.size * 0.55, 0)
+        ctx.closePath()
+        ctx.fill()
+        ctx.restore()
+      })
+
+      if (particles.length > 0) animRef.current = requestAnimationFrame(animate)
+    }
+
+    animRef.current = requestAnimationFrame(animate)
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
+  }, [active, spawn])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0"
+      style={{ width: 320, height: 220 }}
+    />
+  )
+}
 
 interface WinReceiptModalProps {
   open: boolean
@@ -51,15 +125,18 @@ export function WinReceiptModal({
   xpGained,
   username,
 }: WinReceiptModalProps) {
-  const [visible, setVisible] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [visible,  setVisible]  = useState(false)
+  const [burst,    setBurst]    = useState(false)
+  const [copied,   setCopied]   = useState(false)
 
   useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => setVisible(true), 100)
-      return () => clearTimeout(timer)
+      const t1 = setTimeout(() => setVisible(true), 100)
+      const t2 = setTimeout(() => setBurst(true),   400)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
     } else {
       setVisible(false)
+      setBurst(false)
     }
   }, [open])
 
@@ -88,6 +165,11 @@ export function WinReceiptModal({
 
         <DialogTitle className="sr-only">Win Receipt</DialogTitle>
         <DialogDescription className="sr-only">Your winning bet receipt</DialogDescription>
+
+        {/* Confetti burst — fires at the profit number */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
+          <ConfettiBurst active={burst} />
+        </div>
 
         <div className="relative z-10 flex flex-col items-center py-6 gap-5">
           {/* Header badge */}

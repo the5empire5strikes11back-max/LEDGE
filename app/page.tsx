@@ -474,7 +474,7 @@ export default function App() {
               <span className="flex items-center gap-1.5">
                 {decay === "critical"
                   ? <><AlertTriangle className="w-3 h-3 shrink-0" />Rank decaying</>
-                  : <><Flame className="w-3 h-3 shrink-0" />Streak at risk</>}
+                  : <><Flame className="w-3 h-3 shrink-0 streak-flame" />Streak at risk</>}
               </span>
             </div>
           )}

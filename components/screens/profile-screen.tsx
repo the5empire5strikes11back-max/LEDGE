@@ -388,7 +388,7 @@ export function ProfileScreen({
             {streak > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent">
-                  <Flame className="w-3.5 h-3.5 shrink-0" />{streak}-day streak
+                  <Flame className="w-3.5 h-3.5 shrink-0 streak-flame" />{streak}-day streak
                 </span>
                 {/* Shields: 1 per 7-day milestone, max 3 */}
                 {Math.min(Math.floor(streak / 7), 3) > 0 && (

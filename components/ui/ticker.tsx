@@ -57,11 +57,13 @@ export function Ticker({
   return (
     <span
       className={cn(
-        "font-mono tabular-nums inline-flex items-center transition-colors duration-200",
-        direction === "up" && "text-success",
+        "font-mono tabular-nums inline-flex items-center transition-all duration-200",
+        direction === "up"   && "text-success scale-[1.08]",
         direction === "down" && "text-danger",
+        !direction && "scale-100",
         className
       )}
+      style={direction === "up" ? { textShadow: "0 0 12px rgba(34,197,94,0.6)" } : undefined}
     >
       {prefix}
       {displayValue.toFixed(decimals)}

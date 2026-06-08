@@ -26,9 +26,16 @@ function formatCredits(value: number): string {
 }
 
 export function BetModal({ market, initialSide, availableCredits, onClose, onSubmit }: BetModalProps) {
-  const [side, setSide] = useState<"yes" | "no">(initialSide)
+  const [side, setSide]       = useState<"yes" | "no">(initialSide)
+  const [popping, setPopping] = useState<"yes" | "no" | null>(null)
   const [rawAmount, setRawAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
+
+  function selectSide(s: "yes" | "no") {
+    setSide(s)
+    setPopping(s)
+    setTimeout(() => setPopping(null), 250)
+  }
   const inputRef = useRef<HTMLInputElement>(null)
   const { state: ob } = useOnboarding()
   const showHint = !ob.firstBetAchievementDone  // show until first bet is done
@@ -91,13 +98,14 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
           {/* Side selector */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setSide("yes")}
+              onClick={() => selectSide("yes")}
               className={cn(
                 "relative flex flex-col items-center gap-1 py-3 px-4 border",
-                "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.97]",
+                "transition-all duration-150 ease-[var(--ease-sharp)] active:scale-[0.97]",
                 side === "yes"
                   ? "bg-success/20 border-success ring-1 ring-success/40"
-                  : "bg-success/5 border-success/20 hover:bg-success/10 active:bg-success/15"
+                  : "bg-success/5 border-success/20 hover:bg-success/10 active:bg-success/15",
+                popping === "yes" && "scale-[1.07]"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
@@ -109,13 +117,14 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             </button>
 
             <button
-              onClick={() => setSide("no")}
+              onClick={() => selectSide("no")}
               className={cn(
                 "relative flex flex-col items-center gap-1 py-3 px-4 border",
-                "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.97]",
+                "transition-all duration-150 ease-[var(--ease-sharp)] active:scale-[0.97]",
                 side === "no"
                   ? "bg-danger/20 border-danger ring-1 ring-danger/40"
-                  : "bg-danger/5 border-danger/20 hover:bg-danger/10 active:bg-danger/15"
+                  : "bg-danger/5 border-danger/20 hover:bg-danger/10 active:bg-danger/15",
+                popping === "no" && "scale-[1.07]"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >

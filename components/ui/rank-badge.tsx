@@ -49,7 +49,7 @@ export function StreakBadge({ streak, className }: StreakBadgeProps) {
       )}
       style={{ borderRadius: "var(--radius-badge)" }}
     >
-      <Flame className="w-3 h-3" />{streak}
+      <Flame className="w-3 h-3 streak-flame" />{streak}
     </span>
   )
 }

@@ -403,6 +403,15 @@
   50%       { box-shadow: 0 0 12px rgba(245, 166,  35, 0.07); }
 }
 
+/* ══ Streak flame ════════════════════════════════════════════════════════════ */
+@keyframes flame-flicker {
+  0%,  100% { transform: scale(1)    rotate(-2deg); opacity: 1;    filter: drop-shadow(0 0 3px rgba(245,166,35,0.6)); }
+  25%        { transform: scale(1.15) rotate(2deg);  opacity: 0.9;  filter: drop-shadow(0 0 7px rgba(245,166,35,0.9)); }
+  50%        { transform: scale(0.95) rotate(-1deg); opacity: 1;    filter: drop-shadow(0 0 5px rgba(245,166,35,0.7)); }
+  75%        { transform: scale(1.1)  rotate(3deg);  opacity: 0.85; filter: drop-shadow(0 0 8px rgba(251,146,60,0.8)); }
+}
+.streak-flame { animation: flame-flicker 1.8s ease-in-out infinite; }
+
 .market-volatile-yes     { animation: card-border-breathe-yes     3.0s ease-in-out infinite; }
 .market-volatile-no      { animation: card-border-breathe-no      3.0s ease-in-out infinite; }
 .market-volatile-neutral { animation: card-border-breathe-neutral 3.0s ease-in-out infinite; }

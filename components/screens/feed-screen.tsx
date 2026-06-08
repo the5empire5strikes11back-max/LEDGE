@@ -480,7 +480,7 @@ export function FeedScreen({
               ? "bg-danger/5 border-danger/15"
               : "bg-accent/5 border-accent/10"
           )}>
-            <Flame className={cn("w-3.5 h-3.5 shrink-0", decay === "critical" ? "text-danger" : "text-accent")} aria-hidden="true" />
+            <Flame className={cn("w-3.5 h-3.5 shrink-0 streak-flame", decay === "critical" ? "text-danger" : "text-accent")} aria-hidden="true" />
             <span className={cn(
               "text-[11px] font-semibold",
               decay === "critical" ? "text-danger" : "text-accent"
