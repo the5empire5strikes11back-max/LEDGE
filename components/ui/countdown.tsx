@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface CountdownProps {
@@ -73,7 +74,7 @@ export function Countdown({ endTime, resolved, className }: CountdownProps) {
       )}
       suppressHydrationWarning
     >
-      {isCritical && "⚡ "}{label}
+      {isCritical && <Zap className="w-3 h-3 shrink-0 inline-block mr-1" />}{label}
     </span>
   )
 }

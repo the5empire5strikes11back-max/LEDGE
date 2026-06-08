@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TrendingUp, Users, User, Zap } from "lucide-react"
+import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -9,6 +9,7 @@ import { DailyDropModal } from "@/components/daily-drop-modal"
 import { RankUpModal } from "@/components/rank-up-modal"
 import { WinReceiptModal } from "@/components/win-receipt-modal"
 import { MysteryChestModal } from "@/components/mystery-chest-modal"
+import { CreditShopModal } from "@/components/credit-shop-modal"
 import { FeedScreen } from "@/components/screens/feed-screen"
 import { CirclesScreen } from "@/components/screens/circles-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
@@ -17,6 +18,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { FirstBetAchievement } from "@/components/onboarding/achievement-toast"
 import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { useOnboarding } from "@/lib/onboarding"
+import { applyAccentTheme, getSavedAccent } from "@/lib/accent-theme"
 import {
   rankFromXP,
   calculatePersona,
@@ -91,6 +93,7 @@ export default function App() {
   const [winReceipt, setWinReceipt] = useState<WinReceiptData | null>(null)
   const [rankUpFrom, setRankUpFrom] = useState<RankKey | null>(null)
   const [chestOpen, setChestOpen] = useState(false)
+  const [shopOpen, setShopOpen] = useState(false)
   const supabase = createClient()
 
   const credits  = profile?.credits ?? 0
@@ -172,19 +175,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem("ledge_accent")
-    if (saved) {
-      const ACCENT_FG: Record<string, string> = {
-        "#F5A623": "#0A0A0B", "#3B82F6": "#ffffff", "#22C55E": "#0A0A0B",
-        "#8B5CF6": "#ffffff", "#EF4444": "#ffffff", "#EC4899": "#ffffff",
-        "#06B6D4": "#0A0A0B", "#E2E8F0": "#0A0A0B",
-      }
-      const fg = ACCENT_FG[saved] ?? "#0A0A0B"
-      document.documentElement.style.setProperty("--accent", saved)
-      document.documentElement.style.setProperty("--accent-foreground", fg)
-      document.documentElement.style.setProperty("--primary", saved)
-      document.documentElement.style.setProperty("--ring", saved)
-    }
+    applyAccentTheme(getSavedAccent())
   }, [])
 
   // Fetch return hooks count for nav badge + welcome-back toast
@@ -232,6 +223,38 @@ export default function App() {
     loadBetHistory()
     checkDailyDrop()
   }, [loadProfile, loadBetHistory, checkDailyDrop])
+
+  // Handle Stripe redirect back to app
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (!payment) return
+
+    // Clean URL immediately
+    window.history.replaceState({}, '', '/')
+
+    if (payment === 'success') {
+      const type   = params.get('type')
+      const amount = params.get('amount')
+
+      if (type === 'credits' && amount) {
+        toast.success(`+${Number(amount).toLocaleString()} CR added!`, {
+          description: 'Credits are in your account',
+          duration: 5000,
+        })
+        // Reload profile to reflect new credits
+        setTimeout(loadProfile, 1500)
+      }
+
+      if (type === 'plus') {
+        toast.success('Welcome to Ledge Plus! ✦', {
+          description: '2× daily credits and more — starting now',
+          duration: 6000,
+        })
+        setTimeout(loadProfile, 1500)
+      }
+    }
+  }, [loadProfile])
 
   const handleDailyDropClose = async () => {
     setDailyDropOpen(false)
@@ -353,6 +376,7 @@ export default function App() {
           betHistory={betHistory}
           onBet={handleBet}
           onWin={handleWin}
+          onOpenShop={() => setShopOpen(true)}
         />
       )}
       {screen === "circles" && (
@@ -365,6 +389,7 @@ export default function App() {
           username={profile.username}
           avatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
           isPlus={isPlus}
+          onOpenShop={() => setShopOpen(true)}
         />
       )}
     </>
@@ -446,7 +471,11 @@ export default function App() {
                 ? "bg-danger/8 border border-danger/25 text-danger"
                 : "bg-accent/8 border border-accent/20 text-accent"
             )} style={{ borderRadius: "var(--radius-button)" }}>
-              {decay === "critical" ? "⚠ Rank decaying" : "🔥 Streak at risk"}
+              <span className="flex items-center gap-1.5">
+                {decay === "critical"
+                  ? <><AlertTriangle className="w-3 h-3 shrink-0" />Rank decaying</>
+                  : <><Flame className="w-3 h-3 shrink-0" />Streak at risk</>}
+              </span>
             </div>
           )}
 
@@ -474,19 +503,26 @@ export default function App() {
             </div>
           </button>
 
-          {/* Credits */}
-          <div
-            className="flex items-center justify-between px-3 py-2 bg-surface border border-border"
+          {/* Credits — tap to open shop */}
+          <button
+            onClick={() => setShopOpen(true)}
+            className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
             style={{ borderRadius: "var(--radius-button)" }}
           >
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="font-mono text-sm font-bold text-accent tabular-nums">
                 <Ticker value={credits} decimals={0} />
               </span>
               <span className="text-[10px] text-muted-foreground">CR</span>
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                + Buy
+              </span>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 
@@ -506,12 +542,22 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border" style={{ borderRadius: "var(--radius-button)" }}>
+        <button
+          onClick={() => setShopOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
+          style={{ borderRadius: "var(--radius-button)" }}
+        >
           <span className="font-mono text-sm font-semibold tabular-nums text-accent">
             <Ticker value={credits} decimals={0} />
           </span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
-        </div>
+          <span
+            className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+            style={{ borderRadius: "var(--radius-badge)" }}
+          >
+            +
+          </span>
+        </button>
       </header>
 
       {/* ── Main content area ─────────────────────────────────────────────── */}
@@ -520,16 +566,19 @@ export default function App() {
         <div className="lg:hidden h-[57px] shrink-0" />
 
         {/* Screen */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden pb-[65px] lg:pb-0">
+        <main
+          className="flex-1 min-w-0 flex flex-col overflow-hidden"
+          style={{ paddingBottom: "var(--main-pb)" }}
+        >
           {screenContent}
         </main>
-
-        {/* Mobile bottom padding */}
-        <div className="lg:hidden h-[65px] shrink-0" />
       </div>
 
       {/* ── MOBILE: Bottom Navigation ─────────────────────────────────────── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-background border-t border-border">
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-background border-t border-border"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <div className="flex">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
             const feedBadge  = id === 'feed'    && returnHookCount > 0 && screen !== id
@@ -595,6 +644,12 @@ export default function App() {
         tier={dailyDropData?.chestTier ?? "common"}
         amount={dailyDropData?.chestCredits ?? 0}
       />
+      <CreditShopModal
+        open={shopOpen}
+        onClose={() => setShopOpen(false)}
+        isPlus={isPlus}
+      />
+
       <Toaster position="top-center" toastOptions={{ style: { borderRadius: "var(--radius-button)" } }} />
 
       {/* ── Onboarding overlays ──────────────────────────────────────────── */}
@@ -606,7 +661,7 @@ export default function App() {
       {/* Streak progressive tip */}
       <ProgressiveTip
         show={!ob.streakTipDone && (dailyDropData?.newStreak ?? streak) >= 2}
-        icon="🔥"
+        icon={Flame}
         title="Daily Streak"
         body="Log in and bet every day to build your streak. Longer streaks unlock bonus credits and exclusive chest rewards."
         onDismiss={() => completeOb("streakTipDone")}
@@ -615,7 +670,7 @@ export default function App() {
       {/* Rank progressive tip — shown after first rank-up if not yet seen */}
       <ProgressiveTip
         show={!ob.rankTipDone && !rankUpFrom && xp >= 120}
-        icon="⭐"
+        icon={Star}
         title="Rank System"
         body="Earn XP by placing bets and winning. Higher ranks unlock bigger daily credits and exclusive profile badges."
         onDismiss={() => completeOb("rankTipDone")}

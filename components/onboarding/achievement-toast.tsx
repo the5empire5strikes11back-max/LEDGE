@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { Target } from "lucide-react"
 import { Confetti } from "./confetti"
 
 interface FirstBetAchievementProps {
@@ -46,7 +47,7 @@ export function FirstBetAchievement({ show, onDone }: FirstBetAchievementProps) 
             boxShadow: "0 0 40px rgba(245,166,35,0.35), 0 8px 32px rgba(0,0,0,0.6)",
           }}
         >
-          <span className="text-3xl shrink-0" role="img" aria-label="target">🎯</span>
+          <Target className="w-8 h-8 shrink-0 text-accent-foreground" />
           <div className="min-w-0">
             <p className="text-accent-foreground text-sm font-black uppercase tracking-widest leading-tight">
               First Prediction!

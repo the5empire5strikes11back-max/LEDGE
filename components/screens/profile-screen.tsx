@@ -6,7 +6,7 @@ import { LeaderboardRow } from "@/components/leaderboard-row"
 import { Sparkline } from "@/components/ui/sparkline"
 import { AchievementsGrid } from "@/components/achievements-grid"
 import { xpProgress } from "@/lib/game-engine"
-import { Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2, CheckCircle2, XCircle, Clock, ExternalLink, Flame, ShieldCheck, Zap, Gift, Star } from "lucide-react"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { Persona } from "@/lib/game-engine"
 import type { Achievement } from "@/lib/achievements"
@@ -28,6 +28,7 @@ interface ProfileScreenProps {
   username: string
   avatarUrl?: string | null
   isPlus?: boolean
+  onOpenShop?: () => void
 }
 
 interface UserStats {
@@ -72,6 +73,139 @@ interface BetRecord {
   markets: { title: string; category: string } | null
 }
 
+// ── Ledge Plus cards ─────────────────────────────────────────────────────────
+
+const PLUS_PERKS = [
+  { icon: Zap,          label: "2× daily credits",    detail: "500 → 1,000 CR/day" },
+  { icon: Gift,         label: "Monthly bonus drop",  detail: "2,000 CR on the 1st" },
+  { icon: ShieldCheck,  label: "Streak shields",      detail: "Never lose your streak" },
+  { icon: Star,         label: "Exclusive Plus badge", detail: "Stand out on the leaderboard" },
+]
+
+function PlusUpsellCard() {
+  const [loading, setLoading] = useState(false)
+
+  const handleUpgrade = async () => {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/stripe/checkout', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'plus' }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      className="border border-accent/25 bg-accent/4 px-4 py-4"
+      style={{ borderRadius: "var(--radius-card)" }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-foreground">Ledge Plus</span>
+            <span
+              className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-accent/20 text-accent border border-accent/30"
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              PLUS
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Everything you need to dominate the leaderboard.
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-xl font-bold text-accent font-mono">$20</span>
+          <p className="text-[10px] text-muted-foreground">/year</p>
+          <p className="text-[9px] text-muted-foreground/50">$1.67/mo</p>
+        </div>
+      </div>
+
+      {/* Perks grid */}
+      <div className="grid grid-cols-2 gap-1.5 mb-3">
+        {PLUS_PERKS.map((p) => (
+          <div key={p.label} className="flex items-start gap-1.5">
+            <p.icon className="w-3.5 h-3.5 text-accent shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] text-foreground font-medium leading-tight">{p.label}</p>
+              <p className="text-[10px] text-muted-foreground/60 leading-tight">{p.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={handleUpgrade}
+        disabled={loading}
+        className={cn(
+          "w-full py-2.5 bg-accent text-accent-foreground text-xs font-bold uppercase tracking-wider",
+          "hover:bg-accent/90 active:scale-[0.98] active:opacity-80 transition-all duration-[80ms]",
+          "disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2"
+        )}
+        style={{ borderRadius: "var(--radius-button)" }}
+      >
+        {loading ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          "Upgrade for $20/year"
+        )}
+      </button>
+      <p className="text-[10px] text-muted-foreground/40 text-center mt-1.5">
+        Cancel anytime · Instant access
+      </p>
+    </div>
+  )
+}
+
+function PlusManageCard() {
+  const [loading, setLoading] = useState(false)
+
+  const handlePortal = async () => {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      className="border border-success/25 bg-success/4 px-4 py-3 flex items-center justify-between gap-3"
+      style={{ borderRadius: "var(--radius-card)" }}
+    >
+      <div>
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-xs font-bold text-success">✦ Ledge Plus</span>
+          <span
+            className="text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 bg-success/15 text-success border border-success/30"
+            style={{ borderRadius: "var(--radius-badge)" }}
+          >
+            Active
+          </span>
+        </div>
+        <p className="text-[10px] text-muted-foreground">2× daily credits · Streak shields · Monthly bonus</p>
+      </div>
+      <button
+        onClick={handlePortal}
+        disabled={loading}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground active:opacity-70 transition-colors shrink-0 disabled:opacity-50"
+      >
+        {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+        Manage
+      </button>
+    </div>
+  )
+}
+
 function formatCredits(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`
@@ -80,7 +214,7 @@ function formatCredits(value: number): string {
 
 
 export function ProfileScreen({
-  xp, rank, credits, streak, persona, decay, username, avatarUrl: initialAvatarUrl, isPlus = false
+  xp, rank, credits, streak, persona, decay, username, avatarUrl: initialAvatarUrl, isPlus = false, onOpenShop,
 }: ProfileScreenProps) {
   const progress = xpProgress(xp)
   const rankConfig = RANKS[rank]
@@ -232,20 +366,38 @@ export function ProfileScreen({
                   )}
                 </div>
               </div>
-              {/* Credits — primary value */}
-              <div className="text-right shrink-0">
-                <span className="font-mono text-lg font-bold text-foreground tabular-nums">
-                  {formatCredits(credits)}
-                </span>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</p>
+              {/* Credits + buy button */}
+              <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                <div>
+                  <span className="font-mono text-lg font-bold text-foreground tabular-nums">
+                    {formatCredits(credits)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider ml-1">CR</span>
+                </div>
+                <button
+                  onClick={onOpenShop}
+                  className="text-[10px] font-bold px-2 py-0.5 bg-accent/15 text-accent hover:bg-accent/25 active:scale-[0.94] transition-all duration-[80ms]"
+                  style={{ borderRadius: "var(--radius-badge)" }}
+                >
+                  + Buy Credits
+                </button>
               </div>
             </div>
 
-            {/* Streak (only if active) */}
+            {/* Streak (only if active) — with earned shields */}
             {streak > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Login streak</span>
-                <span className="font-mono text-xs font-bold text-accent">{streak}d 🔥</span>
+              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent">
+                  <Flame className="w-3.5 h-3.5 shrink-0" />{streak}-day streak
+                </span>
+                {/* Shields: 1 per 7-day milestone, max 3 */}
+                {Math.min(Math.floor(streak / 7), 3) > 0 && (
+                  <div className="flex items-center gap-0.5" title={`${Math.min(Math.floor(streak / 7), 3)} streak shield${Math.min(Math.floor(streak / 7), 3) !== 1 ? 's' : ''} earned`}>
+                    {Array.from({ length: Math.min(Math.floor(streak / 7), 3) }).map((_, i) => (
+                      <ShieldCheck key={i} className="w-3.5 h-3.5 text-accent/70" />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -292,8 +444,8 @@ export function ProfileScreen({
                     value: `${stats.winRate}%`,
                     color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger",
                   },
-                  { label: "Markets", value: String(stats.marketsPlayed), color: "text-foreground" },
-                  { label: "Correct",  value: String(stats.correct),      color: "text-foreground" },
+                  { label: "Played",   value: String(stats.marketsPlayed), color: "text-foreground" },
+                  { label: "Wins",     value: String(stats.correct),      color: "text-foreground" },
                   { label: "Best Run", value: String(stats.bestStreak),   color: "text-foreground" },
                 ].map((stat) => (
                   <div
@@ -372,35 +524,53 @@ export function ProfileScreen({
             </div>
           </div>
 
-          {/* XP progress — metadata, not the hero */}
+          {/* XP progress */}
           <div
             className="bg-card border border-border px-4 py-3"
             style={{ borderRadius: "var(--radius-card)" }}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                XP · {rankConfig.label}
-              </span>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                {progress.current.toLocaleString()} / {progress.required.toLocaleString()}
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 border",
+                    rankConfig.bg, rankConfig.border, rankConfig.color
+                  )}
+                  style={{ borderRadius: "var(--radius-badge)" }}
+                >
+                  {rankConfig.icon} {rankConfig.label}
+                </span>
+                {progress.nextRank && (
+                  <span className="text-[10px] text-muted-foreground">
+                    → {progress.nextRank}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
+                {progress.current.toLocaleString()} / {progress.required.toLocaleString()} XP
               </span>
             </div>
-            <div className="relative h-1 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
+            <div className="relative h-1.5 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
               <div
                 className="absolute inset-y-0 left-0 bg-accent transition-all duration-700"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
             {progress.nextRank && (
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                {(progress.required - progress.current).toLocaleString()} XP to {progress.nextRank}
+              <p className="text-[10px] text-muted-foreground/60 mt-1.5">
+                {(progress.required - progress.current).toLocaleString()} XP to unlock {progress.nextRank}
+              </p>
+            )}
+            {!progress.nextRank && (
+              <p className="text-[10px] text-accent mt-1.5 font-semibold">
+                Max rank reached ✦
               </p>
             )}
             {(stats?.creatorStats?.liveMarkets ?? 0) > 0 && (
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                {stats!.creatorStats!.liveMarkets} market{stats!.creatorStats!.liveMarkets !== 1 ? 's' : ''} created
+              <p className="text-[10px] text-muted-foreground/60 mt-1">
+                {stats!.creatorStats!.liveMarkets} market{stats!.creatorStats!.liveMarkets !== 1 ? 's' : ''} live
                 {stats!.creatorStats!.reviewMarkets > 0 && (
-                  <span className="text-muted-foreground/50"> · {stats!.creatorStats!.reviewMarkets} pending review</span>
+                  <span> · {stats!.creatorStats!.reviewMarkets} pending review</span>
                 )}
               </p>
             )}
@@ -422,6 +592,19 @@ export function ProfileScreen({
               byCategory[cat].total += 1
               if (bet.won) byCategory[cat].wins += 1
             }
+            /** Mastery tier based on win rate + sample size */
+            function masteryTier(wins: number, total: number): { label: string; tier: 'gold' | 'silver' | 'bronze' } | null {
+              if (total >= 15 && wins / total >= 0.70) return { label: "Gold",   tier: "gold" }
+              if (total >= 10 && wins / total >= 0.62) return { label: "Silver", tier: "silver" }
+              if (total >= 5  && wins / total >= 0.55) return { label: "Bronze", tier: "bronze" }
+              return null
+            }
+            const masteryStyle = {
+              gold:   "bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30",
+              silver: "bg-[#94A3B8]/15 text-[#94A3B8] border border-[#94A3B8]/30",
+              bronze: "bg-[#CD7F32]/15 text-[#CD7F32] border border-[#CD7F32]/30",
+            } as const
+
             const rows = TRACKED
               .map((cat) => ({ cat, ...byCategory[cat], rate: byCategory[cat].total >= 3 ? Math.round((byCategory[cat].wins / byCategory[cat].total) * 100) : null }))
               .filter((r) => r.total >= 3)
@@ -444,10 +627,22 @@ export function ProfileScreen({
                     const pct = rate ?? 0
                     const color = pct >= 60 ? "bg-success" : pct >= 50 ? "bg-accent" : "bg-danger"
                     const textColor = pct >= 60 ? "text-success" : pct >= 50 ? "text-accent" : "text-danger"
+                    const mastery = masteryTier(wins, total)
                     return (
                       <div key={cat} className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-foreground font-medium">{cat}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-foreground font-medium">{cat}</span>
+                            {mastery && (
+                              <span
+                                className={cn("text-[9px] font-bold px-1 py-0.5", masteryStyle[mastery.tier])}
+                                style={{ borderRadius: "var(--radius-badge)" }}
+                                title={`${mastery.label} mastery`}
+                              >
+                                {mastery.label}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground/60 font-mono">
                               {wins}/{total}
@@ -571,23 +766,11 @@ export function ProfileScreen({
             </div>
           )}
 
-          {/* Ledge Plus — understated upsell */}
-          {!isPlus && (
-            <div
-              className="border border-border bg-surface px-4 py-4 flex items-center justify-between"
-              style={{ borderRadius: "var(--radius-card)" }}
-            >
-              <div>
-                <p className="text-sm font-semibold text-foreground">Ledge Plus</p>
-                <p className="text-xs text-muted-foreground mt-0.5">2× daily credits · Early features</p>
-              </div>
-              <button
-                className="px-3 py-1.5 bg-accent text-accent-foreground text-xs font-semibold uppercase tracking-wider hover:bg-accent/90 active:scale-[0.96] active:opacity-80 transition-all duration-[80ms] ease-[var(--ease-sharp)] shrink-0"
-                style={{ borderRadius: "var(--radius-button)" }}
-              >
-                $39/yr
-              </button>
-            </div>
+          {/* Ledge Plus — upsell or manage */}
+          {!isPlus ? (
+            <PlusUpsellCard />
+          ) : (
+            <PlusManageCard />
           )}
 
           <div className="pb-4" />

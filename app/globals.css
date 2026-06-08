@@ -11,36 +11,38 @@
 :root {
   /* ── Palette ──────────────────────────────────────────────────────────── */
 
-  /* Backgrounds — two surfaces max */
+  /* Backgrounds — 4 layers, ~5% distance each (dark mode "double distance" rule) */
   --background:   #0A0A0B;   /* True dark canvas */
-  --surface:      #111114;   /* Card / panel base */
-  --surface-2:    #17171C;   /* Elevated: sheets, modals, popovers */
+  --surface:      #111116;   /* Card / panel base          (+5% from bg) */
+  --surface-2:    #18181F;   /* Elevated: sheets, modals   (+5% from surface) */
 
   /* Foreground */
-  --foreground:         #F0F0F0;
-  --surface-foreground: #F0F0F0;
+  --foreground:         #EBEBEB;   /* Primary — headings, labels (~92% white) */
+  --foreground-dim:     #B0B0C8;   /* Body — readable secondary text (~70% white) */
+  --surface-foreground: #EBEBEB;
 
   /* Card system (mirrors surface) */
-  --card:             #111114;
-  --card-foreground:  #F0F0F0;
-  --popover:          #17171C;
-  --popover-foreground: #F0F0F0;
+  --card:             #111116;
+  --card-foreground:  #EBEBEB;
+  --popover:          #18181F;
+  --popover-foreground: #EBEBEB;
 
-  /* Muted / secondary */
-  --secondary:            #1E1E24;
-  --secondary-foreground: #F0F0F0;
-  --muted:                #1E1E24;
-  --muted-foreground:     #72728A;   /* Slightly brighter than before for readability */
+  /* Muted / secondary — hover states and de-emphasis backgrounds */
+  --secondary:            #202028;   /* Nav hover, tag backgrounds */
+  --secondary-foreground: #EBEBEB;
+  --muted:                #202028;
+  --muted-foreground:     #8585A0;   /* Subtext / metadata (~54% white) */
 
-  /* Borders — two levels */
-  --border:        #1E1E24;   /* Structural dividers */
-  --border-subtle: #18181D;   /* Inner dividers, de-emphasis */
-  --input:         #1E1E24;
+  /* Borders — two levels, distinct from muted backgrounds */
+  --border:        #2A2A36;   /* Structural: card edges, dividers (visible) */
+  --border-subtle: #1C1C24;   /* Inner dividers, de-emphasis */
+  --input:         #2A2A36;
   --ring:          #F5A623;
 
   /* ── Accent — Electric Amber ─────────────────────────────────────────── */
-  --accent:             #F5A623;
+  --accent:             #F5A623;   /* Primary interactive (OKLCH H=70) */
   --accent-foreground:  #0A0A0B;
+  --accent-hover:       color-mix(in srgb, var(--accent) 82%, black);
   --primary:            #F5A623;
   --primary-foreground: #0A0A0B;
 
@@ -56,12 +58,14 @@
   --featured:            #6366F1;   /* Premium / featured / identity */
   --featured-foreground: #FFFFFF;
 
-  /* ── Chart Colors ─────────────────────────────────────────────────── */
-  --chart-1: #F5A623;
-  --chart-2: #22C55E;
-  --chart-3: #EF4444;
-  --chart-4: #72728A;
-  --chart-5: #6366F1;
+  /* ── Chart Colors — OKLCH uniform spectrum (L≈0.72 C≈0.13 across hues) */
+  /* Brand amber kept as chart-1 anchor; others stepped +60° around the wheel */
+  /* so all five colors have equal perceived brightness on dark backgrounds.  */
+  --chart-1: #F5A623;   /* amber   H=70  — brand */
+  --chart-2: #2CBDA8;   /* teal    H=185 — distinct from success */
+  --chart-3: #5B90D4;   /* sky     H=230 — distinct from featured */
+  --chart-4: #A07BD0;   /* violet  H=290 — distinct from featured/indigo */
+  --chart-5: #D07090;   /* rose    H=355 — distinct from danger */
 
   /* ── Radius Scale ─────────────────────────────────────────────────── */
   --radius:        8px;
@@ -92,14 +96,25 @@
   --glow-danger:  0 0 16px rgba(239,  68,  68, 0.14);
 
   /* ── Sidebar ──────────────────────────────────────────────────────── */
-  --sidebar:                  #0A0A0B;
-  --sidebar-foreground:       #F0F0F0;
+  --sidebar:                  #0D0D10;
+  --sidebar-foreground:       #EBEBEB;
   --sidebar-primary:          #F5A623;
   --sidebar-primary-foreground: #0A0A0B;
-  --sidebar-accent:           #1E1E24;
-  --sidebar-accent-foreground: #F0F0F0;
-  --sidebar-border:           #1E1E24;
+  --sidebar-accent:           #202028;
+  --sidebar-accent-foreground: #EBEBEB;
+  --sidebar-border:           #2A2A36;
   --sidebar-ring:             #F5A623;
+
+  /* ── Layout helpers ───────────────────────────────────────────────────── */
+  /* Bottom padding for the main content area — accounts for mobile tab bar
+     and iOS safe area. Resets to 0 on lg+ (desktop has no bottom nav). */
+  --main-pb: calc(65px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --main-pb: 0px;
+  }
 }
 
 /* ── Tailwind theme mapping ─────────────────────────────────────────────── */
@@ -111,6 +126,7 @@
   /* Color aliases */
   --color-background:         var(--background);
   --color-foreground:         var(--foreground);
+  --color-foreground-dim:     var(--foreground-dim);
   --color-surface:            var(--surface);
   --color-surface-2:          var(--surface-2);
   --color-surface-foreground: var(--surface-foreground);
@@ -126,6 +142,7 @@
   --color-muted-foreground:   var(--muted-foreground);
   --color-accent:             var(--accent);
   --color-accent-foreground:  var(--accent-foreground);
+  --color-accent-hover:       var(--accent-hover);
   --color-destructive:        var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success:            var(--success);

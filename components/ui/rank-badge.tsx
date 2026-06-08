@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { Flame } from "lucide-react"
 
 type RankTier = "gold" | "silver" | "bronze" | "default"
 
@@ -48,7 +49,7 @@ export function StreakBadge({ streak, className }: StreakBadgeProps) {
       )}
       style={{ borderRadius: "var(--radius-badge)" }}
     >
-      🔥 {streak}
+      <Flame className="w-3 h-3" />{streak}
     </span>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useOnboarding } from "@/lib/onboarding"
@@ -97,13 +97,13 @@ function SignalTile({
     neutral: "text-foreground",
     yes:     "text-success",
     no:      "text-danger",
-    alert:   "text-amber-400",
+    alert:   "text-review",
     whale:   "text-accent",
   }
   return (
     <div
       className="flex flex-col gap-0.5 bg-surface border border-border px-3 py-2.5"
-      style={{ borderRadius: "var(--radius-button)" }}
+      style={{ borderRadius: "var(--radius-card)" }}
     >
       <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
       <span className={cn("text-xs font-semibold leading-snug", valueColor[tone])}>{value}</span>
@@ -212,18 +212,21 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           <span
             className={cn(
               "shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 border",
-              market.category === "Sports"   ? "bg-[#3B82F6]/15 text-[#60A5FA] border-[#3B82F6]/30"
-              : market.category === "Politics" ? "bg-[#8B5CF6]/15 text-[#A78BFA] border-[#8B5CF6]/30"
-              : market.category === "Culture"  ? "bg-[#EC4899]/15 text-[#F472B6] border-[#EC4899]/30"
-              :                                  "bg-accent/15 text-accent border-accent/30"
+              market.category === "Sports"
+                ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                : market.category === "Politics"
+                ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                : market.category === "Culture"
+                ? "bg-pink-500/10 text-pink-400 border-pink-500/20"
+                : "bg-accent/10 text-accent border-accent/20"
             )}
             style={{ borderRadius: "var(--radius-badge)" }}
           >
             {market.category}
           </span>
           {isHot && (
-            <span className="shrink-0 text-[9px] font-black text-orange-400 uppercase tracking-wider px-1.5 py-0.5 bg-orange-500/15 border border-orange-500/30 animate-pulse" style={{ borderRadius: "var(--radius-badge)" }}>
-              🔥 HOT
+            <span className="inline-flex items-center gap-0.5 shrink-0 text-[9px] font-black text-review uppercase tracking-wider px-1.5 py-0.5 bg-review/10 border border-review/20 animate-pulse" style={{ borderRadius: "var(--radius-badge)" }}>
+              <Flame className="w-2.5 h-2.5" />HOT
             </span>
           )}
           {hasMomentum && !isHot && (
@@ -232,13 +235,43 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             </span>
           )}
         </div>
-        <button onClick={onClose} className="shrink-0 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+        <button
+          onClick={onClose}
+          className="shrink-0 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto min-h-0">
+        {loading ? (
+          /* Loading skeleton — mirrors real layout so there's no layout shift */
+          <div className="px-4 pt-4 flex flex-col gap-5 pb-32 animate-pulse">
+            {/* Title */}
+            <div className="space-y-2">
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-3/4" />
+            </div>
+            {/* Probability tiles */}
+            <div className="flex items-stretch gap-3">
+              <div className="skeleton flex-1 h-24" style={{ borderRadius: "var(--radius-card)" }} />
+              <div className="skeleton flex-1 h-24" style={{ borderRadius: "var(--radius-card)" }} />
+            </div>
+            {/* Odds bar */}
+            <div className="skeleton h-1.5 w-full" style={{ borderRadius: "9999px" }} />
+            {/* Stats row */}
+            <div className="skeleton h-14 w-full" style={{ borderRadius: "var(--radius-button)" }} />
+            {/* Chart */}
+            <div className="skeleton h-36 w-full" style={{ borderRadius: "var(--radius-card)" }} />
+            {/* Signal tiles */}
+            <div className="grid grid-cols-2 gap-2">
+              {[0,1,2,3].map((i) => (
+                <div key={i} className="skeleton h-12" style={{ borderRadius: "var(--radius-card)" }} />
+              ))}
+            </div>
+          </div>
+        ) : (
         <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-32")}>
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
@@ -261,7 +294,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 divide-x divide-border border border-border" style={{ borderRadius: "var(--radius-button)" }}>
+          <div className="grid grid-cols-3 divide-x divide-border border border-border" style={{ borderRadius: "var(--radius-card)" }}>
             <div className="flex flex-col items-center py-2.5 px-2">
               <span className="font-mono text-sm font-bold text-foreground tabular-nums">{formatCredits(market.totalCredits)}</span>
               <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Volume</span>
@@ -419,11 +452,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Recent Trades</span>
             </div>
-            {loading ? (
-              <div className="py-6 flex justify-center">
-                <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : bets.length === 0 ? (
+            {bets.length === 0 ? (
               <div className="px-4 py-5 text-center bg-surface border border-border" style={{ borderRadius: "var(--radius-card)" }}>
                 <p className="text-xs text-muted-foreground">No trades yet. Open a position.</p>
               </div>
@@ -456,6 +485,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           </div>
 
         </div>
+        )} {/* end loading ternary */}
       </div>
 
       {/* Bottom action bar */}
@@ -464,13 +494,13 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           "shrink-0 bg-background border-t border-border px-4 py-3 flex gap-3",
           !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
         )}>
-          <button onClick={onBuyYes} className="flex-1 flex items-center justify-center gap-2 py-3 bg-success text-success-foreground font-bold text-sm uppercase tracking-wide transition-all hover:bg-success/90" style={{ borderRadius: "var(--radius-button)" }}>
+          <button onClick={onBuyYes} className="flex-1 flex items-center justify-center gap-2 py-3 bg-success text-success-foreground font-bold text-sm uppercase tracking-wide transition-all duration-[80ms] hover:bg-success/90 active:scale-[0.97] active:opacity-80" style={{ borderRadius: "var(--radius-button)" }}>
             <TrendingUp className="w-4 h-4" />
-            Buy YES · {yesPercent.toFixed(0)}¢
+            YES · {yesPercent.toFixed(0)}¢
           </button>
-          <button onClick={onBuyNo} className="flex-1 flex items-center justify-center gap-2 py-3 bg-danger text-danger-foreground font-bold text-sm uppercase tracking-wide transition-all hover:bg-danger/90" style={{ borderRadius: "var(--radius-button)" }}>
+          <button onClick={onBuyNo} className="flex-1 flex items-center justify-center gap-2 py-3 bg-danger text-danger-foreground font-bold text-sm uppercase tracking-wide transition-all duration-[80ms] hover:bg-danger/90 active:scale-[0.97] active:opacity-80" style={{ borderRadius: "var(--radius-button)" }}>
             <TrendingDown className="w-4 h-4" />
-            Buy NO · {noPercent.toFixed(0)}¢
+            NO · {noPercent.toFixed(0)}¢
           </button>
         </div>
       )}
@@ -490,7 +520,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
       {!isPanel && (
         <ProgressiveTip
           show={!loading && signals.hasWhale && !ob.whaleTipDone}
-          icon="🐳"
+          icon={Fish}
           title="Whale Alert"
           body="A large position was placed on this market. Whales often have strong conviction — but can also be wrong. Use this as a signal, not a guarantee."
           onDismiss={() => completeOb("whaleTipDone")}

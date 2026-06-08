@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { X, Clock } from "lucide-react"
+import { X, Clock, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PostBetPanelProps {
@@ -92,7 +92,7 @@ export function PostBetPanel({
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-base">🎯</span>
+              <Target className="w-3.5 h-3.5 text-accent shrink-0" />
               <span className="text-xs font-bold text-foreground uppercase tracking-wider">
                 Prediction locked in
               </span>

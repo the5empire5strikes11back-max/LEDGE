@@ -7,10 +7,11 @@ import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
 import { ReturnHooksBar } from "@/components/onboarding/return-hooks-bar"
+import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import { Plus, Flame, Star, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
@@ -86,6 +87,8 @@ interface FeedScreenProps {
     bet: { side: "yes" | "no"; amount: number },
     payout: number
   ) => void
+  /** Open the credit shop modal */
+  onOpenShop?: () => void
 }
 
 function formatCredits(value: number): string {
@@ -114,6 +117,7 @@ export function FeedScreen({
   betHistory = [],
   onBet,
   onWin,
+  onOpenShop,
 }: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
   const [markets, setMarkets] = useState<Market[]>([])
@@ -283,6 +287,11 @@ export function FeedScreen({
 
   const openTrade = (market: Market, side: "yes" | "no") => {
     if (market.userBet || market.resolved) return
+    // If user has no credits, open the shop instead
+    if (availableCredits < 50) {
+      onOpenShop?.()
+      return
+    }
     // Dismiss feed tooltip when user engages with a trade
     if (!ob.feedTooltipDone) completeOb("feedTooltipDone")
     setTradeModal({ market, side })
@@ -310,8 +319,15 @@ export function FeedScreen({
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      console.error('Bet failed:', err?.error ?? `Server error (${res.status})`)
+      const errMsg = err?.error ?? `Server error (${res.status})`
+      // Roll back optimistic credit deduction
       onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
+      // If out of credits, open the shop
+      if (res.status === 400 && errMsg === 'Insufficient credits') {
+        onOpenShop?.()
+      } else {
+        console.error('Bet failed:', errMsg)
+      }
       return
     }
 
@@ -385,8 +401,8 @@ export function FeedScreen({
                 <>
                   <span className="text-border shrink-0">·</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-orange-400 uppercase tracking-wider font-semibold">
-                      🔥 <span className="font-mono">{hotCount}</span> hot
+                    <span className="inline-flex items-center gap-1 text-[10px] text-orange-400 uppercase tracking-wider font-semibold">
+                      <Flame className="w-3 h-3 shrink-0" /><span className="font-mono">{hotCount}</span> hot
                     </span>
                   </div>
                 </>
@@ -419,7 +435,7 @@ export function FeedScreen({
             className="flex items-center gap-2 px-4 py-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
             onClick={() => { recordInteraction(); setDetailMarket(idleSuggestion) }}
           >
-            <span className="text-[10px] text-muted-foreground/60 shrink-0" aria-hidden>⭐</span>
+            <Star className="w-3 h-3 text-muted-foreground/60 shrink-0" aria-hidden="true" />
             <span className="text-[11px] text-muted-foreground font-medium">Top pick right now</span>
             <span className="text-border shrink-0 text-[10px]">·</span>
             <span className="text-[11px] text-foreground font-semibold truncate flex-1">
@@ -427,6 +443,11 @@ export function FeedScreen({
             </span>
             <span className="text-[10px] text-muted-foreground/50 shrink-0">→</span>
           </div>
+        )}
+
+        {/* Daily Challenges — shown to returning users only */}
+        {!isFirstSession && (
+          <DailyChallenges />
         )}
 
         {/* Filter tabs */}
@@ -459,7 +480,7 @@ export function FeedScreen({
               ? "bg-danger/5 border-danger/15"
               : "bg-accent/5 border-accent/10"
           )}>
-            <span className="text-sm shrink-0" aria-hidden>🔥</span>
+            <Flame className={cn("w-3.5 h-3.5 shrink-0", decay === "critical" ? "text-danger" : "text-accent")} aria-hidden="true" />
             <span className={cn(
               "text-[11px] font-semibold",
               decay === "critical" ? "text-danger" : "text-accent"
@@ -537,8 +558,23 @@ export function FeedScreen({
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-muted-foreground text-sm">No {activeTab.toLowerCase()} markets right now.</p>
+            <div className="py-16 flex flex-col items-center gap-3 text-center">
+              <span className="text-3xl" aria-hidden>🔭</span>
+              <p className="text-sm font-medium text-foreground">Nothing here yet</p>
+              <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
+                {activeTab === "All"
+                  ? "New markets are added daily. Check back soon."
+                  : `No ${activeTab} markets right now. Try another category or check back later.`}
+              </p>
+              {activeTab !== "All" && (
+                <button
+                  onClick={() => setActiveTab("All")}
+                  className="mt-1 px-4 py-2 text-xs font-semibold bg-accent text-accent-foreground active:scale-[0.96] active:opacity-80 transition-all duration-[80ms]"
+                  style={{ borderRadius: "var(--radius-button)" }}
+                >
+                  See all markets
+                </button>
+              )}
             </div>
           ) : (
             filtered.map((market, idx) => {
@@ -591,16 +627,17 @@ export function FeedScreen({
         </div>
       </div>
 
-      {/* "+" FAB — create a market */}
+      {/* "+" FAB — create a market, pinned above the tab bar */}
       <button
         onClick={() => setCreateSheetOpen(true)}
         aria-label="Create a prediction market"
         className={cn(
-          "absolute bottom-5 right-4 z-20",
+          "fixed right-4 z-30 lg:absolute lg:bottom-5 lg:right-4",
           "w-11 h-11 rounded-full bg-accent text-accent-foreground",
           "flex items-center justify-center shadow-lg",
           "hover:opacity-90 active:scale-95 transition-all duration-150"
         )}
+        style={{ bottom: "calc(65px + env(safe-area-inset-bottom) + 16px)" }}
       >
         <Plus className="w-5 h-5" strokeWidth={2.5} />
       </button>
@@ -629,7 +666,7 @@ export function FeedScreen({
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground select-none">
               <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center">
-                <span className="text-xl">📊</span>
+                <BarChart2 className="w-6 h-6 text-muted-foreground/40" />
               </div>
               <p className="text-sm font-medium">Select a market to view details</p>
               <p className="text-xs text-muted-foreground/60">Click any card on the left</p>

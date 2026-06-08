@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Share2, TrendingUp } from "lucide-react"
+import { Share2, TrendingUp, Zap } from "lucide-react"
 
 interface WinReceiptModalProps {
   open: boolean
@@ -150,7 +150,7 @@ export function WinReceiptModal({
               className="px-3 py-1.5 bg-accent/10 border border-accent/30 flex items-center gap-2"
               style={{ borderRadius: "9999px" }}
             >
-              <span className="text-accent text-sm">⚡</span>
+              <Zap className="w-3.5 h-3.5 text-accent shrink-0" />
               <span className="text-accent text-xs font-semibold">+{xpGained} XP</span>
               <span className="text-muted-foreground text-xs">— {newXP.toLocaleString()} total</span>
             </div>

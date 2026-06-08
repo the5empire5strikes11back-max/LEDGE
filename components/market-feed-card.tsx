@@ -141,13 +141,12 @@ function MovementLabel({
 // ── Compound state badge config ───────────────────────────────────────────────
 
 const COMPOUND_BADGE: Record<
-  Exclude<CompoundState, "normal" | "moving">,
+  Exclude<CompoundState, "normal" | "moving" | "hot">,
   { label: string; className: string }
 > = {
-  surging:     { label: "Surging",    className: "text-orange-400 bg-orange-400/10 border-orange-400/25 animate-pulse" },
-  "whale-zone":{ label: "🐋 Whale",   className: "text-blue-400 bg-blue-400/10 border-blue-400/25" },
-  contested:   { label: "Contested",  className: "text-yellow-400 bg-yellow-400/10 border-yellow-400/25" },
-  hot:         { label: "Hot",        className: "text-orange-400 bg-transparent border-transparent" },
+  surging:     { label: "Surging",   className: "text-review bg-review/10 border-review/20 animate-pulse" },
+  "whale-zone":{ label: "Whale",    className: "text-featured bg-featured/10 border-featured/20" },
+  contested:   { label: "Contested", className: "text-foreground bg-muted/50 border-border" },
 }
 
 export function MarketFeedCard({
@@ -246,8 +245,8 @@ export function MarketFeedCard({
             {/* Live dot — shown during movement */}
             {!isResolved && <LiveDot volatility={volatility} />}
 
-            {/* Compound state badge — replaces separate hot/momentum labels */}
-            {!isResolved && compoundState !== "normal" && compoundState !== "moving" && (
+            {/* Compound state badge — excludes "hot" (already shown via live dot + glow) */}
+            {!isResolved && compoundState !== "normal" && compoundState !== "moving" && compoundState !== "hot" && (
               <span
                 className={cn(
                   "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border shrink-0",
@@ -304,11 +303,11 @@ export function MarketFeedCard({
               )}
             />
             <span className={cn(
-              "text-[9px] font-semibold uppercase tracking-widest",
-              yesPercent > 50 ? "text-success/50" :
-              yesPercent < 50 ? "text-danger/50"  : "text-muted-foreground"
+              "text-[9px] font-medium uppercase tracking-widest",
+              yesPercent > 50 ? "text-success/40" :
+              yesPercent < 50 ? "text-danger/40"  : "text-muted-foreground/40"
             )}>
-              % YES
+              YES
             </span>
 
             {/* Sparkline — lives directly below the percentage */}
@@ -328,27 +327,19 @@ export function MarketFeedCard({
               {title}
             </h3>
             {creatorUsername && (
-              <p className="text-[10px] text-muted-foreground/50 mt-1">
-                by @{creatorUsername}
+              <p className="text-[10px] text-muted-foreground/40 mt-1 font-mono">
+                @{creatorUsername}
               </p>
             )}
           </div>
         </button>
 
         {/* Row 3: YES/NO odds bar */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-success/70 font-mono w-8 text-right shrink-0">
-            {yesPercent.toFixed(0)}%
-          </span>
-          <div className="flex-1 relative h-1 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
-            <div
-              className="absolute inset-y-0 left-0 bg-success transition-all duration-500 ease-out"
-              style={{ width: `${yesPercent}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-danger/70 font-mono w-8 shrink-0">
-            {noPercent.toFixed(0)}%
-          </span>
+        <div className="relative h-1.5 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
+          <div
+            className="absolute inset-y-0 left-0 bg-success transition-all duration-500 ease-out"
+            style={{ width: `${yesPercent}%` }}
+          />
         </div>
 
         {/* Row 3b: Movement label — only when there's real activity to show */}
@@ -460,28 +451,34 @@ export function MarketFeedCard({
           </p>
         )}
 
-        {/* Footer: market data */}
-        <div className="flex items-center gap-3 pt-1 border-t border-border/50">
-          <span className="text-[10px] font-mono text-muted-foreground/70">
-            {formatCredits(totalCredits)} vol
-          </span>
-          {totalPool > 0 && (
-            <span className="text-[10px] font-mono text-muted-foreground/70">
-              {formatCredits(totalPool)} pool
-            </span>
-          )}
-          <span className="text-[10px] font-mono text-muted-foreground/70">
-            {hotScore} trades
-          </span>
-          {onClick && (
-            <button
-              onClick={onClick}
-              className="ml-auto text-[10px] text-muted-foreground/40 hover:text-accent transition-colors"
-            >
-              Details →
-            </button>
-          )}
-        </div>
+        {/* Footer: market data — only show when there's meaningful activity */}
+        {(totalCredits > 0 || hotScore > 0 || onClick) && (
+          <div className="flex items-center gap-3 pt-1 border-t border-border/50">
+            {totalCredits > 0 && (
+              <span className="text-[10px] font-mono text-muted-foreground/70">
+                {formatCredits(totalCredits)} vol
+              </span>
+            )}
+            {totalPool > 0 && (
+              <span className="text-[10px] font-mono text-muted-foreground/70">
+                {formatCredits(totalPool)} pool
+              </span>
+            )}
+            {hotScore > 0 && (
+              <span className="text-[10px] font-mono text-muted-foreground/70">
+                {hotScore} trades
+              </span>
+            )}
+            {onClick && (
+              <button
+                onClick={onClick}
+                className="ml-auto text-[10px] text-muted-foreground/40 hover:text-accent active:scale-[0.94] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+              >
+                Details →
+              </button>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

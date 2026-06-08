@@ -1,3 +1,4 @@
+import { isAdminRequest } from '@/lib/validate'
 /**
  * GET /api/markets/rank-debug
  *
@@ -25,11 +26,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { debugRankScore, WEIGHTS } from '@/lib/feed-ranker'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user || !isAdminRequest(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const [marketsResult, circleMembershipsResult] = await Promise.all([
     supabase

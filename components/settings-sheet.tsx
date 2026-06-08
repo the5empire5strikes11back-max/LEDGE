@@ -6,28 +6,7 @@ import { useRouter } from "next/navigation"
 import { X, LogOut, Palette, User, Info, ChevronRight, Check, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-
-const ACCENT_COLORS = [
-  { name: "Amber",      value: "#F5A623", fg: "#0A0A0B" },
-  { name: "Blue",       value: "#3B82F6", fg: "#ffffff" },
-  { name: "Green",      value: "#22C55E", fg: "#0A0A0B" },
-  { name: "Purple",     value: "#8B5CF6", fg: "#ffffff" },
-  { name: "Red",        value: "#EF4444", fg: "#ffffff" },
-  { name: "Pink",       value: "#EC4899", fg: "#ffffff" },
-  { name: "Cyan",       value: "#06B6D4", fg: "#0A0A0B" },
-  { name: "White",      value: "#E2E8F0", fg: "#0A0A0B" },
-]
-
-const STORAGE_KEY = "ledge_accent"
-
-function applyAccent(hex: string, fg: string) {
-  const root = document.documentElement
-  root.style.setProperty("--accent", hex)
-  root.style.setProperty("--accent-foreground", fg)
-  root.style.setProperty("--primary", hex)
-  root.style.setProperty("--primary-foreground", fg)
-  root.style.setProperty("--ring", hex)
-}
+import { ACCENT_COLORS, AccentColor, saveAndApplyAccent } from "@/lib/accent-theme"
 
 interface SettingsSheetProps {
   open: boolean
@@ -36,7 +15,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
-  const [activeAccent, setActiveAccent] = useState(ACCENT_COLORS[0])
+  const [activeAccent, setActiveAccent] = useState<AccentColor>(ACCENT_COLORS[0])
   const [loggingOut, setLoggingOut] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
   const router = useRouter()
@@ -44,20 +23,16 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
 
   // Load saved accent on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = localStorage.getItem('ledge_accent')
     if (saved) {
       const found = ACCENT_COLORS.find((c) => c.value === saved)
-      if (found) {
-        setActiveAccent(found)
-        applyAccent(found.value, found.fg)
-      }
+      if (found) setActiveAccent(found)
     }
   }, [])
 
-  const handleAccentChange = (color: typeof ACCENT_COLORS[0]) => {
+  const handleAccentChange = (color: AccentColor) => {
     setActiveAccent(color)
-    applyAccent(color.value, color.fg)
-    localStorage.setItem(STORAGE_KEY, color.value)
+    saveAndApplyAccent(color.value)
   }
 
   const handleLogout = async () => {

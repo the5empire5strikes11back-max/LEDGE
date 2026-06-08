@@ -1,17 +1,17 @@
 "use client"
 
-import { X } from "lucide-react"
+import { X, LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProgressiveTipProps {
   show: boolean
-  icon: string
+  icon: LucideIcon
   title: string
   body: string
   onDismiss: () => void
 }
 
-export function ProgressiveTip({ show, icon, title, body, onDismiss }: ProgressiveTipProps) {
+export function ProgressiveTip({ show, icon: Icon, title, body, onDismiss }: ProgressiveTipProps) {
   if (!show) return null
 
   return (
@@ -30,7 +30,7 @@ export function ProgressiveTip({ show, icon, title, body, onDismiss }: Progressi
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm" aria-hidden>{icon}</span>
+          <Icon className="w-3.5 h-3.5 text-accent shrink-0" aria-hidden />
           <span className="text-[10px] text-accent uppercase tracking-widest font-bold">{title}</span>
         </div>
         <button

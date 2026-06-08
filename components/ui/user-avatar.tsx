@@ -75,19 +75,19 @@ export function UserAvatar({ username, avatarUrl, size = 32, className }: UserAv
 
 // ── CircleAvatar — gradient fallback with rounded-xl shape ─────────────────
 
-const CIRCLE_GRADIENTS = [
-  ["#F5A623", "#EF4444"],
-  ["#3B82F6", "#06B6D4"],
-  ["#22C55E", "#14B8A6"],
-  ["#8B5CF6", "#EC4899"],
-  ["#F97316", "#F59E0B"],
-  ["#EF4444", "#8B5CF6"],
+const CIRCLE_COLORS = [
+  { bg: "#1E2A3A", fg: "#60A5FA" },
+  { bg: "#1A2E22", fg: "#4ADE80" },
+  { bg: "#2A1E3A", fg: "#A78BFA" },
+  { bg: "#2E1E1A", fg: "#FB923C" },
+  { bg: "#1A2A2E", fg: "#22D3EE" },
+  { bg: "#2A2A1E", fg: "#FACC15" },
 ]
 
-function pickGradient(name: string): [string, string] {
+function pickCircleColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff
-  return CIRCLE_GRADIENTS[h % CIRCLE_GRADIENTS.length] as [string, string]
+  return CIRCLE_COLORS[h % CIRCLE_COLORS.length]
 }
 
 export interface CircleAvatarProps {
@@ -99,7 +99,7 @@ export interface CircleAvatarProps {
 
 export function CircleAvatar({ name, avatarUrl, size = 40, className }: CircleAvatarProps) {
   const [failed, setFailed] = useState(false)
-  const [from, to] = pickGradient(name || "?")
+  const { bg, fg } = pickCircleColor(name || "?")
   const initial = (name[0] ?? "?").toUpperCase()
 
   if (avatarUrl && !failed) {
@@ -118,12 +118,13 @@ export function CircleAvatar({ name, avatarUrl, size = 40, className }: CircleAv
   return (
     <div
       aria-label={name}
-      className={cn("rounded-xl shrink-0 select-none flex items-center justify-center font-bold text-white", className)}
+      className={cn("rounded-xl shrink-0 select-none flex items-center justify-center font-bold", className)}
       style={{
         width: size,
         height: size,
         minWidth: size,
-        background: `linear-gradient(135deg, ${from}, ${to})`,
+        backgroundColor: bg,
+        color: fg,
         fontSize: Math.round(size * 0.42),
       }}
     >

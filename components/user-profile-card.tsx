@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
+import { Flame, Zap } from "lucide-react"
 
 // Rank definitions with premium styling
 const RANKS = {
   rookie: {
     label: "Rookie",
     color: "text-[#6B6B7B]",
-    bg: "bg-[#1E1E24]",
+    bg: "bg-[#202028]",
     border: "border-[#2A2A32]",
     icon: "◆",
     gradient: null,
@@ -274,7 +275,7 @@ export function UserProfileCard({
               style={{ borderRadius: "var(--radius-badge)" }}
               title="Ledge Plus"
             >
-              <span className="text-accent-foreground text-[9px] font-black">⚡</span>
+              <Zap className="w-2.5 h-2.5 text-accent-foreground" />
             </div>
           )}
         </div>
@@ -308,7 +309,7 @@ export function UserProfileCard({
           <span className="text-xs text-muted-foreground uppercase tracking-wider block mb-1">Streak</span>
           {streak > 0 ? (
             <div className="flex items-center gap-1">
-              <span className="text-lg">🔥</span>
+              <Flame className="w-5 h-5 text-accent shrink-0" />
               <span className="font-mono text-2xl font-bold text-accent tabular-nums">{streak}</span>
             </div>
           ) : (

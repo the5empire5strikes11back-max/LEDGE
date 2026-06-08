@@ -4,6 +4,7 @@ import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRE
 import { pushToMarketBettors } from '@/lib/push'
 import { computeYesPercent, type PoolState } from '@/lib/liquidity'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
+import { validateBetAmount } from '@/lib/validate'
 import { logError } from '@/lib/logger'
 
 export async function GET() {
@@ -46,9 +47,15 @@ export async function POST(request: Request) {
     amount?: number
   }
 
-  if (!market_id || !side || !amount || amount <= 0) {
+  if (!market_id || typeof market_id !== 'string' || !side || !['yes','no'].includes(side) || !amount) {
     return NextResponse.json({ error: 'Invalid bet data' }, { status: 400 })
   }
+  const amountValidation = validateBetAmount(amount)
+  if (!amountValidation.ok) {
+    return NextResponse.json({ error: amountValidation.error }, { status: 400 })
+  }
+  // amount is now validated and defined
+  const safeAmount = amount as number
 
   // Fetch market — include virtual pools for liquidity-aware odds calculation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,7 +82,7 @@ export async function POST(request: Request) {
   }
 
   // Anti-Sybil: cap bets inside user-created Circle markets
-  const cappedAmount = market.circle_id ? Math.min(amount, CIRCLE_BET_MAX_CR) : amount
+  const cappedAmount = market.circle_id ? Math.min(safeAmount, CIRCLE_BET_MAX_CR) : safeAmount
 
   // Lock payout at current odds — fixed at time of bet, never changes
   const impliedProbPct = side === 'yes'

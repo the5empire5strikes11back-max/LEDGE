@@ -1,6 +1,6 @@
 "use client"
 
-import { X } from "lucide-react"
+import { X, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface FeedTooltipProps {
@@ -23,7 +23,7 @@ export function FeedTooltip({ visible, onDismiss }: FeedTooltipProps) {
       aria-live="polite"
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-sm shrink-0" aria-hidden>⚡</span>
+        <Zap className="w-3.5 h-3.5 text-accent shrink-0" aria-hidden />
         <p className="text-[11px] text-accent/90 font-medium leading-snug">
           Tap <span className="text-success font-bold">YES</span> or <span className="text-danger font-bold">NO</span> on any card to make your prediction — free credits, no real money.
         </p>

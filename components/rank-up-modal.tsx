@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
+import { Flame } from "lucide-react"
 import { RANK_DAILY_MULTIPLIER } from "@/lib/game-engine"
 
 interface RankUpModalProps {
@@ -208,7 +209,7 @@ export function RankUpModal({ open, onClose, newRank, previousRank }: RankUpModa
               borderRadius: "var(--radius-button)"
             }}
           >
-            Let's Go 🔥
+            Let's Go
           </Button>
         </div>
       </DialogContent>

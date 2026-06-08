@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
+import { Flame } from "lucide-react"
 
 interface Particle {
   id: number
@@ -257,7 +258,7 @@ function StreakBonus({
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
       )}
     >
-      <span className="text-xl">🔥</span>
+      <Flame className="w-5 h-5 text-success shrink-0" />
       <span className="font-mono font-semibold tabular-nums">
         +{amount.toLocaleString()} bonus
       </span>

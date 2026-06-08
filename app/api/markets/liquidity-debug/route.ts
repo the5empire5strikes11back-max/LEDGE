@@ -1,3 +1,4 @@
+import { isAdminRequest } from '@/lib/validate'
 /**
  * GET /api/markets/liquidity-debug
  *
@@ -10,11 +11,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeYesPercent, virtualDecayFactor, liquidityLabel, type PoolState } from '@/lib/liquidity'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user || !isAdminRequest(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: markets, error } = await (supabase as any)
