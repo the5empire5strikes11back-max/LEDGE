@@ -66,7 +66,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="relative w-full max-w-[430px] bg-background border-t border-border animate-in slide-in-from-bottom-4 duration-250">
+      <div className="relative w-full max-w-[430px] bg-surface-2 border-t border-border animate-in slide-in-from-bottom-4 duration-[350ms]" style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}>
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
@@ -94,10 +94,11 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             <button
               onClick={() => setSide("yes")}
               className={cn(
-                "relative flex flex-col items-center gap-1 py-3 px-4 border transition-all duration-150",
+                "relative flex flex-col items-center gap-1 py-3 px-4 border",
+                "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.97]",
                 side === "yes"
                   ? "bg-success/20 border-success ring-1 ring-success/40"
-                  : "bg-success/5 border-success/20 hover:bg-success/10"
+                  : "bg-success/5 border-success/20 hover:bg-success/10 active:bg-success/15"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
@@ -112,10 +113,11 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             <button
               onClick={() => setSide("no")}
               className={cn(
-                "relative flex flex-col items-center gap-1 py-3 px-4 border transition-all duration-150",
+                "relative flex flex-col items-center gap-1 py-3 px-4 border",
+                "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.97]",
                 side === "no"
                   ? "bg-danger/20 border-danger ring-1 ring-danger/40"
-                  : "bg-danger/5 border-danger/20 hover:bg-danger/10"
+                  : "bg-danger/5 border-danger/20 hover:bg-danger/10 active:bg-danger/15"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
@@ -159,7 +161,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 <button
                   key={v}
                   onClick={() => setRawAmount(String(v))}
-                  className="px-2.5 py-1 text-[11px] font-mono font-medium text-muted-foreground bg-secondary hover:text-foreground hover:bg-secondary/80 transition-colors"
+                  className="px-2.5 py-1 text-[11px] font-mono font-medium text-muted-foreground bg-secondary hover:text-foreground hover:bg-secondary/80 active:scale-[0.94] active:bg-muted transition-all duration-[80ms] ease-[var(--ease-sharp)]"
                   style={{ borderRadius: "var(--radius-badge)" }}
                 >
                   {v >= 1_000 ? `${v / 1_000}K` : v}
@@ -167,7 +169,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
               ))}
               <button
                 onClick={() => setRawAmount(String(availableCredits))}
-                className="px-2.5 py-1 text-[11px] font-mono font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+                className="px-2.5 py-1 text-[11px] font-mono font-medium text-accent bg-accent/10 hover:bg-accent/20 active:scale-[0.94] active:bg-accent/25 transition-all duration-[80ms] ease-[var(--ease-sharp)]"
                 style={{ borderRadius: "var(--radius-badge)" }}
               >
                 MAX
@@ -241,8 +243,10 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             onClick={handleSubmit}
             disabled={!isValid || submitting}
             className={cn(
-              "w-full py-3.5 text-sm font-bold uppercase tracking-widest transition-all duration-200",
-              "disabled:opacity-40 disabled:cursor-not-allowed",
+              "w-full py-3.5 text-sm font-bold uppercase tracking-widest",
+              "transition-all duration-[80ms] ease-[var(--ease-sharp)]",
+              "disabled:opacity-35 disabled:cursor-not-allowed",
+              "active:scale-[0.98] active:opacity-80",
               side === "yes"
                 ? "bg-success text-success-foreground hover:bg-success/90"
                 : "bg-danger text-danger-foreground hover:bg-danger/90"

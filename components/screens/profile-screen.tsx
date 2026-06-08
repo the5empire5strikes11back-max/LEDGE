@@ -144,14 +144,14 @@ export function ProfileScreen({
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShareOpen(true)}
-              className="p-1.5 text-muted-foreground hover:text-accent transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-accent active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
               title="Share identity card"
             >
               <Share2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -277,33 +277,39 @@ export function ProfileScreen({
           <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
             {/* Performance stats */}
             <div className="grid grid-cols-4 lg:grid-cols-2 gap-2">
-              {[
-                {
-                  label: "Win Rate",
-                  value: stats ? `${stats.winRate}%` : "—",
-                  color: stats
-                    ? stats.winRate >= 60 ? "text-success"
-                    : stats.winRate >= 50 ? "text-accent"
-                    : "text-danger"
-                    : "text-foreground",
-                },
-                { label: "Markets", value: stats?.marketsPlayed ?? "—", color: "text-foreground" },
-                { label: "Correct", value: stats?.correct ?? "—", color: "text-foreground" },
-                { label: "Best Run", value: stats?.bestStreak ?? "—", color: "text-foreground" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="bg-card border border-border px-2 py-3 text-center"
-                  style={{ borderRadius: "var(--radius-card)" }}
-                >
-                  <span className={cn("text-base font-bold font-mono tabular-nums", stat.color)}>
-                    {stat.value}
-                  </span>
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
-                    {stat.label}
-                  </p>
-                </div>
-              ))}
+              {stats === null ? (
+                /* Skeleton state — mirrors real chip structure */
+                [0,1,2,3].map((i) => (
+                  <div key={i} className="bg-card border border-border px-2 py-3 flex flex-col items-center gap-1.5" style={{ borderRadius: "var(--radius-card)" }}>
+                    <div className="skeleton h-4 w-10" style={{ borderRadius: "var(--radius-badge)" }} />
+                    <div className="skeleton h-2.5 w-8" style={{ borderRadius: "var(--radius-badge)" }} />
+                  </div>
+                ))
+              ) : (
+                [
+                  {
+                    label: "Win Rate",
+                    value: `${stats.winRate}%`,
+                    color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger",
+                  },
+                  { label: "Markets", value: String(stats.marketsPlayed), color: "text-foreground" },
+                  { label: "Correct",  value: String(stats.correct),      color: "text-foreground" },
+                  { label: "Best Run", value: String(stats.bestStreak),   color: "text-foreground" },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="bg-card border border-border px-2 py-3 text-center"
+                    style={{ borderRadius: "var(--radius-card)" }}
+                  >
+                    <span className={cn("text-base font-bold font-mono tabular-nums", stat.color)}>
+                      {stat.value}
+                    </span>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
+                      {stat.label}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Wealth history sparkline */}
@@ -576,7 +582,7 @@ export function ProfileScreen({
                 <p className="text-xs text-muted-foreground mt-0.5">2× daily credits · Early features</p>
               </div>
               <button
-                className="px-3 py-1.5 bg-accent text-accent-foreground text-xs font-semibold uppercase tracking-wider hover:bg-accent/90 transition-all shrink-0"
+                className="px-3 py-1.5 bg-accent text-accent-foreground text-xs font-semibold uppercase tracking-wider hover:bg-accent/90 active:scale-[0.96] active:opacity-80 transition-all duration-[80ms] ease-[var(--ease-sharp)] shrink-0"
                 style={{ borderRadius: "var(--radius-button)" }}
               >
                 $39/yr

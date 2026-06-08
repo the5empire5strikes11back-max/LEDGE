@@ -350,8 +350,6 @@ export default function App() {
           streak={streak}
           decay={decay}
           persona={persona}
-          winStreak={winStreak}
-          isComeback={profile?.comeback_eligible ?? false}
           betHistory={betHistory}
           onBet={handleBet}
           onWin={handleWin}

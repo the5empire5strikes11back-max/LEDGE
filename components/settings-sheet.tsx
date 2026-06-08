@@ -90,10 +90,11 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
       <div
         className={cn(
           "fixed bottom-0 left-1/2 -translate-x-1/2 z-50",
-          "w-full max-w-[430px] bg-background border-t border-border",
-          "rounded-t-2xl overflow-hidden",
-          "animate-in slide-in-from-bottom-4 duration-300"
+          "w-full max-w-[430px] bg-surface-2 border-t border-border",
+          "overflow-hidden",
+          "animate-in slide-in-from-bottom-4 duration-[350ms]"
         )}
+        style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">

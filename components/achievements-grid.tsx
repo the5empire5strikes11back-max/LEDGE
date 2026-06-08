@@ -31,17 +31,19 @@ export function AchievementsGrid({ earned }: AchievementsGridProps) {
           <div
             key={a.id}
             className={cn(
-              "flex flex-col items-center gap-1 px-2 py-3 border text-center",
+              "flex flex-col items-center gap-1.5 px-2 py-3 border text-center",
               s.bg, s.border
             )}
             style={{ borderRadius: "var(--radius-card)" }}
-            title={a.description}
           >
             <span className="text-2xl leading-none">{a.emoji}</span>
             <span className={cn("text-[10px] font-bold uppercase tracking-wider leading-tight", s.label)}>
               {a.label}
             </span>
-            <span className={cn("text-[8px] uppercase tracking-widest opacity-70", s.label)}>
+            <span className="text-[9px] text-muted-foreground leading-tight">
+              {a.description}
+            </span>
+            <span className={cn("text-[8px] uppercase tracking-widest opacity-60 mt-0.5", s.label)}>
               {a.rarity}
             </span>
           </div>

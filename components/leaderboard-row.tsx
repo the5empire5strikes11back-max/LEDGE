@@ -31,7 +31,7 @@ export function LeaderboardRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 border-b border-border hover:bg-secondary/50 transition-colors",
+        "flex items-center gap-3 px-3 py-2.5 border-b border-border hover:bg-secondary/50 active:bg-muted transition-colors duration-[80ms]",
         isCurrentUser && "bg-accent/5 border-l-2 border-l-accent",
         className
       )}

@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { seedLiquidity } from '@/lib/liquidity'
 
 // GET /api/circles/[id]/markets — fetch all markets for a circle
@@ -121,12 +122,18 @@ export async function POST(
       circle_id: id,
       created_by: user.id,
       jackpot_pool: 0,
+      // Circle markets bypass the AI queue — go live immediately
+      status: 'live',
+      published_at: new Date().toISOString(),
       ...liquiditySeed,
     })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Bust the main feed cache so the new market appears on next load
+  revalidatePath('/', 'layout')
 
   return NextResponse.json(market, { status: 201 })
 }

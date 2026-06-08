@@ -73,17 +73,48 @@ export function pushOddsPoint(
 
 /**
  * Seed initial history from the markets API response.
- * Called once on page load. Only sets the seed point if the market
- * has no history yet (idempotent).
+ * Called once on page load. Idempotent — skips markets already in the map.
+ *
+ * Seeds TWO points per market so the sparkline always has a line to draw:
+ *   1. The AI-set opening odds at published_at time (or a synthetic past anchor)
+ *   2. The current odds at "now"
+ *
+ * If openingYesPercent differs from current yesPercent, the sparkline shows
+ * the full arc of how much the market has moved since the AI set the opening.
  */
 export function seedOddsHistory(
   historyMap: Map<string, OddsPoint[]>,
-  markets: Array<{ id: string; yesPercent: number }>,
+  markets: Array<{
+    id: string
+    yesPercent: number
+    /** AI-set opening odds (computed from virtual pools). Falls back to yesPercent. */
+    openingYesPercent?: number
+    /** ISO timestamp when the market went live. Used to anchor the opening point. */
+    published_at?: string | null
+  }>,
   nowMs = Date.now()
 ): void {
   for (const m of markets) {
-    if (!historyMap.has(m.id)) {
-      historyMap.set(m.id, [{ ts: nowMs, pct: m.yesPercent }])
+    if (historyMap.has(m.id)) continue
+
+    const opening = m.openingYesPercent ?? m.yesPercent
+    const openTs = m.published_at
+      ? new Date(m.published_at).getTime()
+      : nowMs - 24 * 60 * 60_000 // fallback: 24h ago
+
+    if (opening === m.yesPercent || Math.abs(opening - m.yesPercent) < 1) {
+      // No meaningful movement — seed a single flat line spanning from open to now
+      // (two identical points so the sparkline renders a solid baseline, not dashed)
+      historyMap.set(m.id, [
+        { ts: openTs, pct: opening },
+        { ts: nowMs,  pct: m.yesPercent },
+      ])
+    } else {
+      // Movement detected — seed opening → current so sparkline shows the arc
+      historyMap.set(m.id, [
+        { ts: openTs, pct: opening },
+        { ts: nowMs,  pct: m.yesPercent },
+      ])
     }
   }
 }

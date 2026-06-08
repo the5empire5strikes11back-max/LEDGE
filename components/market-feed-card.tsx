@@ -204,7 +204,7 @@ export function MarketFeedCard({
     <div
       style={{ borderRadius: "var(--radius-card)", ...style }}
       className={cn(
-        "relative bg-card border overflow-hidden transition-colors duration-200 w-full",
+        "relative bg-card border overflow-hidden w-full",
         // Spotlight: slow-pulse ring for first-session
         isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
         // Featured: subtle left accent

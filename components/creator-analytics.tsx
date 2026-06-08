@@ -214,7 +214,7 @@ export function CreatorAnalytics({ markets }: CreatorAnalyticsProps) {
 
         {/* Insight copy */}
         {insight && (
-          <div className="flex items-start gap-2 px-3 py-2 bg-accent/5 border border-accent/15 rounded-sm">
+          <div className="flex items-start gap-2 px-3 py-2 bg-accent/5 border border-accent/15" style={{ borderRadius: "var(--radius-badge)" }}>
             <span className="text-accent text-xs shrink-0 mt-px">→</span>
             <p className="text-[11px] text-muted-foreground leading-snug">{insight}</p>
           </div>
