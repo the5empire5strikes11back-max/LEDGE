@@ -106,8 +106,9 @@ export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps)
         className={cn(
           "fixed z-50 bg-background border border-border shadow-2xl",
           "bottom-0 left-0 right-0 rounded-t-2xl",
+          "max-h-[92vh] flex flex-col",
           "lg:bottom-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2",
-          "lg:w-[420px] lg:rounded-2xl"
+          "lg:w-[420px] lg:rounded-2xl lg:max-h-[90vh]"
         )}
       >
         {/* Handle bar (mobile) */}
@@ -130,6 +131,9 @@ export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps)
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 pb-safe">
 
         {/* Credit packs */}
         <div className="px-5 pb-2 grid grid-cols-3 gap-2.5">
@@ -335,6 +339,8 @@ export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps)
             </div>
           </div>
         )}
+
+        </div>{/* end scrollable body */}
       </div>
     </>
   )
