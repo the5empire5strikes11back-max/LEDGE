@@ -1,140 +1,180 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Ledge Design System - Social Prediction Market */
-/* Target: Gen Z | Aesthetic: Bloomberg terminal meets streetwear */
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEDGE DESIGN SYSTEM
+   Target:    Gen Z — mobile-first social prediction market
+   Aesthetic: Bloomberg terminal meets streetwear drop
+   Principle: Less but better. Every pixel earns its place.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Core Palette */
-  --background: #0A0A0B;
-  --foreground: #F0F0F0;
-  --surface: #111114;
+  /* ── Palette ──────────────────────────────────────────────────────────── */
+
+  /* Backgrounds — two surfaces max */
+  --background:   #0A0A0B;   /* True dark canvas */
+  --surface:      #111114;   /* Card / panel base */
+  --surface-2:    #17171C;   /* Elevated: sheets, modals, popovers */
+
+  /* Foreground */
+  --foreground:         #F0F0F0;
   --surface-foreground: #F0F0F0;
-  
-  /* Card System */
-  --card: #111114;
-  --card-foreground: #F0F0F0;
-  --popover: #111114;
+
+  /* Card system (mirrors surface) */
+  --card:             #111114;
+  --card-foreground:  #F0F0F0;
+  --popover:          #17171C;
   --popover-foreground: #F0F0F0;
-  
-  /* Accent - Electric Amber */
-  --accent: #F5A623;
-  --accent-foreground: #0A0A0B;
-  --primary: #F5A623;
-  --primary-foreground: #0A0A0B;
-  
-  /* Secondary/Muted */
-  --secondary: #1E1E24;
+
+  /* Muted / secondary */
+  --secondary:            #1E1E24;
   --secondary-foreground: #F0F0F0;
-  --muted: #1E1E24;
-  --muted-foreground: #6B6B7B;
-  
-  /* Borders */
-  --border: #1E1E24;
-  --input: #1E1E24;
-  --ring: #F5A623;
-  
-  /* Semantic Colors */
-  --success: #22C55E;
-  --success-foreground: #0A0A0B;
-  --danger: #EF4444;
-  --danger-foreground: #FFFFFF;
-  --destructive: #EF4444;
+  --muted:                #1E1E24;
+  --muted-foreground:     #72728A;   /* Slightly brighter than before for readability */
+
+  /* Borders — two levels */
+  --border:        #1E1E24;   /* Structural dividers */
+  --border-subtle: #18181D;   /* Inner dividers, de-emphasis */
+  --input:         #1E1E24;
+  --ring:          #F5A623;
+
+  /* ── Accent — Electric Amber ─────────────────────────────────────────── */
+  --accent:             #F5A623;
+  --accent-foreground:  #0A0A0B;
+  --primary:            #F5A623;
+  --primary-foreground: #0A0A0B;
+
+  /* ── Semantic Colors (meaning is load-bearing — never reassign) ────── */
+  --success:             #22C55E;   /* YES / win / approved / live */
+  --success-foreground:  #0A0A0B;
+  --danger:              #EF4444;   /* NO / loss / rejected */
+  --danger-foreground:   #FFFFFF;
+  --destructive:         #EF4444;
   --destructive-foreground: #FFFFFF;
-  
-  /* Chart Colors - Data Visualization */
+  --review:              #F59E0B;   /* Pending / under review */
+  --review-foreground:   #0A0A0B;
+  --featured:            #6366F1;   /* Premium / featured / identity */
+  --featured-foreground: #FFFFFF;
+
+  /* ── Chart Colors ─────────────────────────────────────────────────── */
   --chart-1: #F5A623;
   --chart-2: #22C55E;
   --chart-3: #EF4444;
-  --chart-4: #6B6B7B;
-  --chart-5: #3B82F6;
-  
-  /* Radius System */
-  --radius: 8px;
-  --radius-card: 8px;
-  --radius-button: 6px;
-  --radius-badge: 4px;
-  
-  /* Glow Effects */
-  --glow-amber: 0 0 20px rgba(245, 166, 35, 0.15);
-  --glow-amber-hover: 0 0 30px rgba(245, 166, 35, 0.25);
-  --glow-success: 0 0 20px rgba(34, 197, 94, 0.2);
-  --glow-danger: 0 0 20px rgba(239, 68, 68, 0.2);
-  
-  /* Sidebar */
-  --sidebar: #0A0A0B;
-  --sidebar-foreground: #F0F0F0;
-  --sidebar-primary: #F5A623;
+  --chart-4: #72728A;
+  --chart-5: #6366F1;
+
+  /* ── Radius Scale ─────────────────────────────────────────────────── */
+  --radius:        8px;
+  --radius-badge:  4px;    /* Status chips, micro labels */
+  --radius-button: 6px;    /* All buttons */
+  --radius-card:   8px;    /* Cards, panels */
+  --radius-sheet:  12px;   /* Bottom sheets, modals */
+  --radius-pill:   9999px; /* Toggle tracks, progress bars */
+
+  /* ── Motion Scale ─────────────────────────────────────────────────── */
+  /* Duration */
+  --dur-instant:  80ms;
+  --dur-fast:     150ms;
+  --dur-base:     250ms;
+  --dur-moderate: 350ms;
+  --dur-slow:     500ms;
+  --dur-celebrate:700ms;
+
+  /* Easing */
+  --ease-sharp:  cubic-bezier(0.4, 0, 0.2, 1);   /* Most UI transitions */
+  --ease-out:    cubic-bezier(0, 0, 0.2, 1);      /* Elements entering */
+  --ease-in:     cubic-bezier(0.4, 0, 1, 1);      /* Elements leaving */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* Celebratory only */
+
+  /* ── Glow Effects (restrained — max 1 active per card) ───────────── */
+  --glow-amber:   0 0 20px rgba(245, 166,  35, 0.12);
+  --glow-success: 0 0 16px rgba( 34, 197,  94, 0.14);
+  --glow-danger:  0 0 16px rgba(239,  68,  68, 0.14);
+
+  /* ── Sidebar ──────────────────────────────────────────────────────── */
+  --sidebar:                  #0A0A0B;
+  --sidebar-foreground:       #F0F0F0;
+  --sidebar-primary:          #F5A623;
   --sidebar-primary-foreground: #0A0A0B;
-  --sidebar-accent: #1E1E24;
+  --sidebar-accent:           #1E1E24;
   --sidebar-accent-foreground: #F0F0F0;
-  --sidebar-border: #1E1E24;
-  --sidebar-ring: #F5A623;
+  --sidebar-border:           #1E1E24;
+  --sidebar-ring:             #F5A623;
 }
 
+/* ── Tailwind theme mapping ─────────────────────────────────────────────── */
 @theme inline {
   /* Typography */
   --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
-  
-  /* Colors */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
+
+  /* Color aliases */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-surface:            var(--surface);
+  --color-surface-2:          var(--surface-2);
   --color-surface-foreground: var(--surface-foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
+  --color-primary:            var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
+  --color-secondary:          var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
+  --color-muted:              var(--muted);
+  --color-muted-foreground:   var(--muted-foreground);
+  --color-accent:             var(--accent);
+  --color-accent-foreground:  var(--accent-foreground);
+  --color-destructive:        var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
+  --color-success:            var(--success);
   --color-success-foreground: var(--success-foreground);
-  --color-danger: var(--danger);
-  --color-danger-foreground: var(--danger-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  
+  --color-danger:             var(--danger);
+  --color-danger-foreground:  var(--danger-foreground);
+  --color-review:             var(--review);
+  --color-review-foreground:  var(--review-foreground);
+  --color-featured:           var(--featured);
+  --color-featured-foreground: var(--featured-foreground);
+  --color-border:             var(--border);
+  --color-border-subtle:      var(--border-subtle);
+  --color-input:              var(--input);
+  --color-ring:               var(--ring);
+  --color-chart-1:            var(--chart-1);
+  --color-chart-2:            var(--chart-2);
+  --color-chart-3:            var(--chart-3);
+  --color-chart-4:            var(--chart-4);
+  --color-chart-5:            var(--chart-5);
+
   /* Radius */
   --radius-sm: var(--radius-badge);
   --radius-md: var(--radius-button);
   --radius-lg: var(--radius-card);
-  --radius-xl: calc(var(--radius-card) + 4px);
-  
+  --radius-xl: var(--radius-sheet);
+
   /* Sidebar */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar:                  var(--sidebar);
+  --color-sidebar-foreground:       var(--sidebar-foreground);
+  --color-sidebar-primary:          var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent:           var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border:           var(--sidebar-border);
+  --color-sidebar-ring:             var(--sidebar-ring);
 }
 
+/* ── Base layer ──────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   html {
     @apply bg-background;
     overflow-x: hidden;
     width: 100%;
+    /* Smooth scrolling only for anchors — not scroll containers */
+    scroll-behavior: smooth;
   }
 
   body {
@@ -142,196 +182,229 @@
     overflow-x: hidden;
     width: 100%;
     position: relative;
+    /* Better font rendering on dark backgrounds */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
+/* ── Components ──────────────────────────────────────────────────────────── */
 @layer components {
-  /* Card Glow Effect */
-  .card-glow {
-    @apply transition-shadow duration-300;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+
+  /* ── Button press feedback ──────────────────────────────────────────── */
+  /* Apply to any interactive element for satisfying tap response */
+  .pressable {
+    transition: transform var(--dur-instant) var(--ease-sharp),
+                opacity   var(--dur-instant) var(--ease-sharp);
   }
-  
-  .card-glow:hover {
-    box-shadow: var(--glow-amber-hover), 0 4px 12px rgba(0, 0, 0, 0.4);
+  .pressable:active {
+    transform: scale(0.97);
+    opacity: 0.9;
   }
-  
-  /* Ticker Animation */
+
+  /* ── Card system ────────────────────────────────────────────────────── */
+  .card-base {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+
+  .card-interactive {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    transition: border-color var(--dur-fast) var(--ease-sharp),
+                background   var(--dur-fast) var(--ease-sharp);
+  }
+  .card-interactive:active {
+    background: var(--surface-2);
+    border-color: #2A2A35;
+  }
+
+  /* ── Skeleton loader ────────────────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      rgba(114, 114, 138, 0.08) 50%,
+      var(--muted) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-badge);
+  }
+
+  .skeleton-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+
+  /* ── Ticker number animation ────────────────────────────────────────── */
   .ticker-up {
-    animation: ticker-up 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: ticker-up var(--dur-base) var(--ease-sharp);
   }
-  
+
   .ticker-down {
-    animation: ticker-down 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: ticker-down var(--dur-base) var(--ease-sharp);
   }
-  
-  /* Badge with Gradient (rank badges only) */
+
+  /* ── Rank badges ────────────────────────────────────────────────────── */
   .badge-rank-gold {
     background: linear-gradient(135deg, #F5A623 0%, #FCD34D 50%, #F5A623 100%);
     color: #0A0A0B;
   }
-  
+
   .badge-rank-silver {
     background: linear-gradient(135deg, #6B6B7B 0%, #A1A1AA 50%, #6B6B7B 100%);
     color: #0A0A0B;
   }
-  
+
   .badge-rank-bronze {
     background: linear-gradient(135deg, #CD7F32 0%, #E9A96C 50%, #CD7F32 100%);
     color: #0A0A0B;
   }
-  
-  /* Monospace Numbers */
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
+
+  /* ── Card enter animation ───────────────────────────────────────────── */
+  /* Add to feed cards for staggered entry feel */
+  .card-enter {
+    animation: card-enter var(--dur-base) var(--ease-out) both;
   }
-  
-  /* Dense Data Grid */
+
+  /* ── Success flash ──────────────────────────────────────────────────── */
+  /* Apply on bet confirmation, achievement unlock */
+  .flash-success {
+    animation: flash-success var(--dur-celebrate) var(--ease-spring);
+  }
+
+  /* ── Dense data ─────────────────────────────────────────────────────── */
   .data-dense {
     @apply text-sm leading-tight tracking-tight;
   }
 }
 
+/* ── Utilities ───────────────────────────────────────────────────────────── */
 @layer utilities {
-  /* Glow utilities */
-  .glow-amber {
-    box-shadow: var(--glow-amber);
-  }
-  
-  .glow-success {
-    box-shadow: var(--glow-success);
-  }
-  
-  .glow-danger {
-    box-shadow: var(--glow-danger);
-  }
-  
-  /* Text utilities */
-  .text-balance {
-    text-wrap: balance;
-  }
+  /* Glow */
+  .glow-amber   { box-shadow: var(--glow-amber); }
+  .glow-success { box-shadow: var(--glow-success); }
+  .glow-danger  { box-shadow: var(--glow-danger); }
+
+  /* Text */
+  .text-balance { text-wrap: balance; }
+
+  /* Mono tabular numbers — use on all financial/stat figures */
+  .nums { font-variant-numeric: tabular-nums; }
 }
 
-/* Animations */
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAMES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Number ticker — direction-aware */
 @keyframes ticker-up {
-  0% {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
-
 @keyframes ticker-down {
-  0% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
 }
 
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: var(--glow-amber);
-  }
-  50% {
-    box-shadow: var(--glow-amber-hover);
-  }
+/* Skeleton shimmer */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
+/* Card enter (stagger via animation-delay on each card) */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Count-up reveal for stats */
 @keyframes count-up {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Subtle pulse for non-critical live indicators */
 @keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.85;
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.8; }
 }
-
 .animate-pulse-subtle {
-  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-subtle 2s var(--ease-sharp) infinite;
 }
 
-/* ── Market liveness animations ─────────────────────────────────────────── */
+/* Success flash — bet confirm, achievement */
+@keyframes flash-success {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  70%  { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
 
-/* Live indicator dot — slow breathe for "moving", faster for "volatile/surging" */
+/* Glow pulse (amber) */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: var(--glow-amber); }
+  50%       { box-shadow: 0 0 28px rgba(245, 166, 35, 0.22); }
+}
+
+/* ══ Market liveness animations ════════════════════════════════════════════ */
+
 @keyframes live-dot-breathe {
-  0%, 100% { opacity: 1;   transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.7); }
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
 }
 
-.live-dot-moving {
-  animation: live-dot-breathe 2.4s ease-in-out infinite;
-}
+.live-dot-moving   { animation: live-dot-breathe 2.4s ease-in-out infinite; }
+.live-dot-volatile { animation: live-dot-breathe 1.4s ease-in-out infinite; }
+.live-dot-surging  { animation: live-dot-breathe 0.8s ease-in-out infinite; }
 
-.live-dot-volatile {
-  animation: live-dot-breathe 1.4s ease-in-out infinite;
-}
-
-.live-dot-surging {
-  animation: live-dot-breathe 0.8s ease-in-out infinite;
-}
-
-/* Card border glow — extremely subtle, only for volatile/surging */
+/* Card border breathe — restrained, only volatile/surging */
 @keyframes card-border-breathe-yes {
-  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(34, 197, 94, 0.10); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 12px rgba(34, 197,  94, 0.09); }
 }
-
 @keyframes card-border-breathe-no {
-  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(239, 68, 68, 0.10); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 12px rgba(239,  68,  68, 0.09); }
 }
-
 @keyframes card-border-breathe-neutral {
-  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-  50%       { box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(245, 166, 35, 0.08); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 12px rgba(245, 166,  35, 0.07); }
 }
 
-.market-volatile-yes     { animation: card-border-breathe-yes     3s ease-in-out infinite; }
-.market-volatile-no      { animation: card-border-breathe-no      3s ease-in-out infinite; }
-.market-volatile-neutral { animation: card-border-breathe-neutral 3s ease-in-out infinite; }
+.market-volatile-yes     { animation: card-border-breathe-yes     3.0s ease-in-out infinite; }
+.market-volatile-no      { animation: card-border-breathe-no      3.0s ease-in-out infinite; }
+.market-volatile-neutral { animation: card-border-breathe-neutral 3.0s ease-in-out infinite; }
 .market-surging-yes      { animation: card-border-breathe-yes     1.6s ease-in-out infinite; }
 .market-surging-no       { animation: card-border-breathe-no      1.6s ease-in-out infinite; }
 .market-surging-neutral  { animation: card-border-breathe-neutral 1.6s ease-in-out infinite; }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
-::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
-
-/* Selection */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SELECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
 ::selection {
-  background: rgba(245, 166, 35, 0.3);
+  background: rgba(245, 166, 35, 0.25);
   color: var(--foreground);
 }
