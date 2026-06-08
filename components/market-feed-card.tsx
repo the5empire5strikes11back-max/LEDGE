@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import React, { useState, useRef, useEffect, useMemo } from "react"
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
@@ -40,6 +40,7 @@ interface MarketFeedCardProps {
   compoundState?: CompoundState
   /** Username of who created this market; null for AI-generated */
   creatorUsername?: string | null
+  style?: React.CSSProperties
   onClick?: () => void
   onBuyYes?: () => void
   onBuyNo?: () => void
@@ -171,6 +172,7 @@ export function MarketFeedCard({
   isSpotlight = false,
   compoundState = "normal",
   creatorUsername = null,
+  style,
   onClick,
   onBuyYes,
   onBuyNo,
@@ -200,6 +202,7 @@ export function MarketFeedCard({
 
   return (
     <div
+      style={{ borderRadius: "var(--radius-card)", ...style }}
       className={cn(
         "relative bg-card border overflow-hidden transition-colors duration-200 w-full",
         // Spotlight: slow-pulse ring for first-session
@@ -217,7 +220,6 @@ export function MarketFeedCard({
         glowClass,
         className
       )}
-      style={{ borderRadius: "var(--radius-card)" }}
     >
       {/* Spotlight banner */}
       {isSpotlight && !isResolved && (
@@ -372,8 +374,9 @@ export function MarketFeedCard({
             <button
               onClick={onBuyYes}
               className={cn(
-                "flex items-center justify-between py-2.5 px-3 border transition-all duration-150",
-                "bg-success/8 border-success/20 hover:bg-success/15 hover:border-success/35 active:scale-[0.98]",
+                "flex items-center justify-between py-2.5 px-3 border",
+                "bg-success/8 border-success/20 hover:bg-success/14 hover:border-success/30",
+                "active:scale-[0.96] active:bg-success/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-success/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
@@ -390,8 +393,9 @@ export function MarketFeedCard({
             <button
               onClick={onBuyNo}
               className={cn(
-                "flex items-center justify-between py-2.5 px-3 border transition-all duration-150",
-                "bg-danger/8 border-danger/20 hover:bg-danger/15 hover:border-danger/35 active:scale-[0.98]",
+                "flex items-center justify-between py-2.5 px-3 border",
+                "bg-danger/8 border-danger/20 hover:bg-danger/14 hover:border-danger/30",
+                "active:scale-[0.96] active:bg-danger/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-danger/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}

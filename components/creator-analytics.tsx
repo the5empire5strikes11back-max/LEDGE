@@ -31,7 +31,7 @@ function statusLabel(status: CreatorMarket["status"]): {
 } {
   switch (status) {
     case "live":     return { text: "Live",     className: "text-success bg-success/10 border-success/20" }
-    case "review":   return { text: "Review",   className: "text-accent bg-accent/10 border-accent/20" }
+    case "review":   return { text: "Review",   className: "text-review bg-review/10 border-review/20" }
     case "queued":   return { text: "Queued",   className: "text-muted-foreground bg-muted/20 border-border" }
     case "archived": return { text: "Archived", className: "text-muted-foreground/50 bg-muted/10 border-border/50" }
   }

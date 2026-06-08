@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
@@ -437,10 +437,11 @@ export function FeedScreen({
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "shrink-0 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-150",
+                  "shrink-0 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                  "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.94]",
                   activeTab === tab
                     ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary active:bg-muted"
                 )}
                 style={{ borderRadius: "var(--radius-badge)" }}
               >
@@ -503,15 +504,44 @@ export function FeedScreen({
         {/* Markets */}
         <div className="w-full px-4 py-3 space-y-3">
           {loading ? (
-            <div className="py-16 flex justify-center">
-              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            /* Skeleton cards — match real card structure */
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="skeleton-card p-4 space-y-3" style={{ animationDelay: `${i * 80}ms` }}>
+                  {/* Row 1: category + time */}
+                  <div className="flex items-center justify-between">
+                    <div className="skeleton h-3 w-16" />
+                    <div className="skeleton h-3 w-12" />
+                  </div>
+                  {/* Row 2: big number + title */}
+                  <div className="flex items-start gap-4">
+                    <div className="space-y-1 shrink-0">
+                      <div className="skeleton h-9 w-12" style={{ borderRadius: "var(--radius-badge)" }} />
+                      <div className="skeleton h-2.5 w-10" />
+                      <div className="skeleton h-3.5 w-14 mt-1" style={{ borderRadius: "var(--radius-pill)" }} />
+                    </div>
+                    <div className="flex-1 space-y-2 pt-1">
+                      <div className="skeleton h-3.5 w-full" />
+                      <div className="skeleton h-3.5 w-4/5" />
+                      <div className="skeleton h-3.5 w-3/5" />
+                    </div>
+                  </div>
+                  {/* Row 3: odds bar */}
+                  <div className="skeleton h-1.5 w-full" style={{ borderRadius: "var(--radius-pill)" }} />
+                  {/* Row 4: buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="skeleton h-10" style={{ borderRadius: "var(--radius-button)" }} />
+                    <div className="skeleton h-10" style={{ borderRadius: "var(--radius-button)" }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-muted-foreground text-sm">No {activeTab.toLowerCase()} markets right now.</p>
             </div>
           ) : (
-            filtered.map((market) => {
+            filtered.map((market, idx) => {
               const isSpotlight = market.id === spotlightId
               // Pulse CTA buttons only when tooltip is still showing (no spotlight)
               const pulseCTA =
@@ -534,6 +564,8 @@ export function FeedScreen({
               return (
                 <MarketFeedCard
                   key={market.id}
+                  className={cn("card-enter")}
+                  style={{ animationDelay: `${Math.min(idx * 40, 200)}ms` } as React.CSSProperties}
                   {...market}
                   endTime={new Date(market.endTime)}
                   yesPool={market.yesPool ?? 0}

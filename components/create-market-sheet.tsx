@@ -125,13 +125,13 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
       {/* Sheet — slides up from bottom */}
       <div
         className={cn(
-          "fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border",
+          "fixed bottom-0 inset-x-0 z-50 bg-surface-2 border-t border-border",
           "max-h-[90dvh] overflow-y-auto"
         )}
-        style={{ borderRadius: "var(--radius-card) var(--radius-card) 0 0" }}
+        style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-background">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-surface-2">
           <span className="text-sm font-semibold text-foreground">New Prediction</span>
           <button
             onClick={handleClose}
@@ -187,10 +187,11 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                   key={cat}
                   onClick={() => setCategory(cat)}
                   className={cn(
-                    "flex-1 py-2 text-xs font-semibold uppercase tracking-wider border transition-all duration-150",
+                    "flex-1 py-2 text-xs font-semibold uppercase tracking-wider border",
+                    "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.96]",
                     category === cat
                       ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground"
+                      : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground active:bg-muted"
                   )}
                   style={{ borderRadius: "var(--radius-badge)" }}
                 >
@@ -211,10 +212,11 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                   key={opt.label}
                   onClick={() => setEndTime(opt.value)}
                   className={cn(
-                    "py-2 text-xs font-semibold border transition-all duration-150",
+                    "py-2 text-xs font-semibold border",
+                    "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.96]",
                     endTime === opt.value
                       ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground"
+                      : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground active:bg-muted"
                   )}
                   style={{ borderRadius: "var(--radius-badge)" }}
                 >
@@ -234,9 +236,10 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
             onClick={handleSubmit}
             disabled={!canSubmit}
             className={cn(
-              "w-full py-3 text-sm font-bold uppercase tracking-wider border transition-all duration-150",
+              "w-full py-3 text-sm font-bold uppercase tracking-wider border",
+              "transition-all duration-[80ms] ease-[var(--ease-sharp)]",
               canSubmit
-                ? "bg-accent text-accent-foreground border-accent hover:opacity-90 active:scale-[0.98]"
+                ? "bg-accent text-accent-foreground border-accent hover:opacity-90 active:scale-[0.97] active:opacity-80"
                 : "bg-muted/30 text-muted-foreground border-border cursor-not-allowed"
             )}
             style={{ borderRadius: "var(--radius-button)" }}
