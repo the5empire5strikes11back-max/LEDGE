@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests. Try again shortly.' }, { status: 429 })
   }
 
-  const body = await request.json() as { type: 'plus' | 'credits'; packId?: CreditPackId }
+  const body = await request.json() as { type: 'plus' | 'credits' | 'credits-custom'; packId?: CreditPackId; customCredits?: number }
   const { type, packId } = body
 
   // ── Resolve or create Stripe customer ────────────────────────────────────
@@ -76,6 +76,37 @@ export async function POST(request: Request) {
       success_url: `${APP_URL}/?payment=success&type=credits&amount=${pack.credits}`,
       cancel_url:  `${APP_URL}/?payment=cancelled`,
       metadata: { userId: user.id, type: 'credits', credits: String(pack.credits) },
+    })
+
+    return NextResponse.json({ url: session.url })
+  }
+
+  if (type === 'credits-custom') {
+    const credits = Math.floor(body.customCredits ?? 0)
+    if (credits < 500 || credits > 50_000) {
+      return NextResponse.json({ error: 'Custom credits must be between 500 and 50,000' }, { status: 400 })
+    }
+
+    // $0.001 per CR, minimum charge $0.50 (Stripe minimum)
+    const unitAmountCents = Math.max(50, Math.round(credits * 0.1))
+
+    const session = await getStripe().checkout.sessions.create({
+      customer: customerId,
+      mode: 'payment',
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: unitAmountCents,
+          product_data: {
+            name: `${credits.toLocaleString()} Ledge Credits`,
+            description: 'Virtual credits for predictions — no real money at risk.',
+          },
+        },
+      }],
+      success_url: `${APP_URL}/?payment=success&type=credits&amount=${credits}`,
+      cancel_url:  `${APP_URL}/?payment=cancelled`,
+      metadata: { userId: user.id, type: 'credits', credits: String(credits) },
     })
 
     return NextResponse.json({ url: session.url })
