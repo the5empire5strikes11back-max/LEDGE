@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Star, Check, ChevronDown, Quote } from "lucide-react"
+import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Check, ChevronDown, Quote } from "lucide-react"
 import { PredictionQuiz } from "@/components/landing/prediction-quiz"
 
 // ── Mock market card ─────────────────────────────────────────────────────────
@@ -66,11 +66,6 @@ const MARKETS = [
   { title: "Will Kendrick drop another album in 2025?", yes: 47, no: 53, category: "Culture", hot: true },
 ]
 
-const ABOVE_FOLD_STATS = [
-  { value: "1,000 CR", label: "Free on signup" },
-  { value: "500 CR", label: "Every day you return" },
-  { value: "$0", label: "Real money, ever" },
-]
 
 const FEATURES = [
   { icon: Target, title: "Predict anything", body: "Sports, politics, culture, crypto — if it can be called, it's on Ledge." },
@@ -125,14 +120,13 @@ export default function LandingPage() {
       </nav>
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section className="pt-32 pb-16 px-5 text-center max-w-2xl mx-auto">
-        {/* Badge */}
-        <div
-          className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#F5A623]/10 border border-[#F5A623]/25 text-[#F5A623] text-[11px] font-bold uppercase tracking-widest mb-6"
-          style={{ borderRadius: "999px" }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623] animate-pulse" />
-          1,000 free credits on signup · No real money
+      <section className="pt-36 pb-16 px-5 text-center max-w-2xl mx-auto">
+
+        {/* Editorial overline — replaces noisy pill badge */}
+        <div className="flex items-center justify-center gap-3 mb-10">
+          <div className="h-px w-10 bg-[#F5A623]/30" />
+          <span className="text-[10px] text-[#F5A623]/60 uppercase tracking-[0.22em] font-medium">Prediction Market</span>
+          <div className="h-px w-10 bg-[#F5A623]/30" />
         </div>
 
         {/* Headline */}
@@ -141,13 +135,13 @@ export default function LandingPage() {
           <span className="text-[#F5A623]">Now you have proof.</span>
         </h1>
 
-        {/* Sub-headline: pain point → solution */}
-        <p className="text-[#8585A0] text-lg leading-relaxed mb-8 max-w-md mx-auto">
+        {/* Sub-headline */}
+        <p className="text-[#8585A0] text-lg leading-relaxed mb-10 max-w-md mx-auto">
           Stop arguing on social media with no record to back it up. Bet on sports, politics, and culture — track your accuracy, build your streak, and beat your friends. Free forever.
         </p>
 
         {/* CTA */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
           <Link
             href="/auth/signup"
             className="flex items-center gap-2 px-7 py-3.5 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all active:scale-95 w-full sm:w-auto justify-center"
@@ -164,37 +158,30 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        {/* FUD reducers near CTA */}
-        <div className="flex items-center justify-center gap-6 sm:gap-8 mb-8">
-          {ABOVE_FOLD_STATS.map((s) => (
-            <div key={s.label} className="text-center">
-              <p className="font-mono font-black text-lg text-[#F5A623]">{s.value}</p>
-              <p className="text-[10px] text-[#8585A0] uppercase tracking-wider mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Social proof above the fold */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+        {/* Unified trust line — social proof + FUD reducers in one clean row */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
           <div className="flex items-center gap-2">
-            <div className="flex -space-x-1.5">
+            <div className="flex -space-x-1">
               {["#E74C3C","#3498DB","#2ECC71","#F39C12"].map((c) => (
-                <div key={c} className="w-6 h-6 rounded-full border-2 border-[#0A0A0B]" style={{ background: c }} />
+                <div key={c} className="w-5 h-5 rounded-full border border-[#1A1A22]" style={{ background: c }} />
               ))}
             </div>
             <span className="text-xs text-[#8585A0]">
-              <span className="text-[#EBEBEB] font-semibold">2,400+</span> active predictors
+              <span className="text-[#EBEBEB] font-semibold">2,400+</span> predictors
             </span>
           </div>
-          <span className="hidden sm:block text-[#2A2A36]">·</span>
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5">
-              {[1,2,3,4,5].map((i) => (
-                <Star key={i} className={`w-3 h-3 ${i <= 4 ? "fill-[#F5A623] text-[#F5A623]" : "fill-[#F5A623]/40 text-[#F5A623]/40"}`} />
-              ))}
-            </div>
-            <span className="text-xs text-[#8585A0]"><span className="text-[#EBEBEB] font-semibold">4.8</span> avg prediction accuracy</span>
-          </div>
+          <span className="text-[#2A2A36] text-xs select-none">·</span>
+          <span className="text-xs text-[#8585A0]">
+            <span className="font-mono font-bold text-[#F5A623]">1,000 CR</span> free on signup
+          </span>
+          <span className="text-[#2A2A36] text-xs select-none">·</span>
+          <span className="text-xs text-[#8585A0]">
+            <span className="font-mono font-bold text-[#F5A623]">500 CR</span> every day
+          </span>
+          <span className="text-[#2A2A36] text-xs select-none">·</span>
+          <span className="text-xs text-[#8585A0]">
+            <span className="font-semibold text-[#EBEBEB]">$0</span> real money, ever
+          </span>
         </div>
       </section>
 
