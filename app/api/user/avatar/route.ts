@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const BUCKET = 'avatars'
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
@@ -8,6 +9,13 @@ export async function POST(request: Request) {
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rate limit: max 5 avatar uploads per 10 minutes
+  const admin = createAdminClient()
+  const rl = await rateLimit(admin, { key: `${user.id}:avatar-upload`, limit: 5, windowMs: 10 * 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many uploads. Try again later.' }, { status: 429 })
+  }
 
   const formData = await request.formData()
   const file = formData.get('file') as File | null

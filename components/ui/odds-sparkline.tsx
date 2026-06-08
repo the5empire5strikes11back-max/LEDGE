@@ -22,14 +22,23 @@ interface OddsSparklineProps {
  *
  * No dependencies — pure SVG.
  */
+/** Minimum pct-point range required to show the sparkline. */
+const MIN_RANGE = 2
+
 export function OddsSparkline({
   points,
   trend,
   width = 56,
   height = 22,
 }: OddsSparklineProps) {
+  // Need at least 3 points and a meaningful range to be worth rendering
+  if (points.length < 3) return null
+  const pcts  = points.map((p) => p.pct)
+  const range = Math.max(...pcts) - Math.min(...pcts)
+  if (range < MIN_RANGE) return null
+
   // Color by >/<50% so it matches the big number's green/red at a glance
-  const lastPct = points.length > 0 ? points[points.length - 1].pct : 50
+  const lastPct = points[points.length - 1].pct
   const color =
     lastPct > 50 ? "var(--color-success, #22c55e)" :
     lastPct < 50 ? "var(--color-danger,  #ef4444)" :
@@ -47,28 +56,6 @@ export function OddsSparkline({
 
   // 50% reference line — faint horizontal tick
   const midY = pad + drawH - (50 / 100) * drawH
-
-  // Not enough data — show a static gauge bar using just the last known pct
-  if (points.length < 2) {
-    const gaugeTop = pad + drawH - (lastPct / 100) * drawH
-    return (
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" aria-hidden>
-        {/* 50% reference */}
-        <line x1={pad} y1={midY} x2={width - pad} y2={midY}
-          stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} strokeDasharray="2 2" />
-        {/* Filled gauge bar */}
-        <rect
-          x={pad} y={gaugeTop}
-          width={drawW} height={drawH - (gaugeTop - pad)}
-          fill={color} opacity={0.2}
-          rx={1}
-        />
-        {/* Top edge line */}
-        <line x1={pad} y1={gaugeTop} x2={width - pad} y2={gaugeTop}
-          stroke={color} strokeWidth={1.5} strokeLinecap="round" />
-      </svg>
-    )
-  }
 
   const minTs   = points[0].ts
   const maxTs   = points[points.length - 1].ts

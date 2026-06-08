@@ -78,12 +78,11 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Place Trade</p>
               <h2 className="text-sm font-medium text-foreground leading-snug">{market.title}</h2>
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              className="shrink-0 w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -107,7 +106,6 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 <span className="text-xs font-bold text-success uppercase tracking-wide">YES</span>
               </div>
               <span className="font-mono text-xl font-black text-success tabular-nums">{yesPercent.toFixed(1)}%</span>
-              <span className="text-[10px] text-success/60 font-mono">{yesPercent.toFixed(0)}¢ / share</span>
             </button>
 
             <button
@@ -126,7 +124,6 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 <span className="text-xs font-bold text-danger uppercase tracking-wide">NO</span>
               </div>
               <span className="font-mono text-xl font-black text-danger tabular-nums">{noPercent.toFixed(1)}%</span>
-              <span className="text-[10px] text-danger/60 font-mono">{noPercent.toFixed(0)}¢ / share</span>
             </button>
           </div>
 
@@ -196,33 +193,25 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
               className="flex flex-col gap-2 px-3 py-3 bg-surface border border-border"
               style={{ borderRadius: "var(--radius-button)" }}
             >
-              {/* Locked payout — the big number, emphasised */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px]">🔒</span>
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Locked payout</span>
+              {/* Primary: profit if correct — what the user actually cares about */}
+              <div className="flex justify-between items-baseline">
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wider">If correct</span>
+                <div className="text-right">
+                  <span className={cn(
+                    "font-mono text-base font-bold",
+                    side === "yes" ? "text-success" : "text-danger"
+                  )}>
+                    +{formatCredits(profit)} CR
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono ml-1.5">
+                    ({formatCredits(lockedPayout)} total)
+                  </span>
                 </div>
-                <span className={cn(
-                  "font-mono text-sm font-bold",
-                  side === "yes" ? "text-success" : "text-danger"
-                )}>
-                  {formatCredits(lockedPayout)} CR
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Profit if correct</span>
-                <span className={cn("font-mono text-sm font-bold", profit >= 0 ? "text-success" : "text-danger")}>
-                  {profit >= 0 ? "+" : ""}{formatCredits(profit)} CR
-                </span>
               </div>
               <div className="h-px bg-border" />
               <div className="flex justify-between items-center">
                 <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Multiplier</span>
                 <span className="font-mono text-sm text-muted-foreground">{multiplier}×</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Current odds</span>
-                <span className="font-mono text-sm text-muted-foreground">{impliedProbPct.toFixed(0)}¢ / share</span>
               </div>
             </div>
           )}

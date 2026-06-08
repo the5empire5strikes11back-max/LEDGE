@@ -1,10 +1,19 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createAdminClient()
+
+  // Rate limit: max 10 join attempts per minute (prevents invite-code brute-forcing)
+  const rl = await rateLimit(supabase, { key: `${user.id}:circles-join`, limit: 10, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many attempts. Slow down.' }, { status: 429 })
+  }
 
   const body = await request.json()
   const { invite_code } = body as { invite_code?: string }
@@ -13,8 +22,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
-  const code = invite_code.trim().toUpperCase()
+  // Invite codes are always 8 chars — reject anything wildly different
+  const raw = invite_code.trim()
+  if (raw.length > 20) {
+    return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 })
+  }
+
+  const code = raw.toUpperCase()
 
   // Case-insensitive lookup — stored codes are uppercase but be defensive
   const { data: circle, error: findError } = await supabase

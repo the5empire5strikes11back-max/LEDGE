@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import {
   rankFromXP,
@@ -7,6 +7,7 @@ import {
   rollChestTier,
   chestAmount,
 } from '@/lib/game-engine'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function GET() {
   const supabase = await createClient()
@@ -36,6 +37,13 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit: max 5 attempts per minute (idempotent check below guards actual grant)
+  const admin = createAdminClient()
+  const rl = await rateLimit(admin, { key: `${user.id}:daily-drop`, limit: 5, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
   // Check if already claimed today

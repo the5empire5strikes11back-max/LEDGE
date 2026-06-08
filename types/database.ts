@@ -17,6 +17,8 @@ export interface Database {
           credits: number
           streak: number
           is_plus: boolean
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           margin_debt: number
           loss_streak: number
           comeback_eligible: boolean
@@ -35,6 +37,8 @@ export interface Database {
           credits?: number
           streak?: number
           is_plus?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           margin_debt?: number
           loss_streak?: number
           comeback_eligible?: boolean
@@ -49,6 +53,8 @@ export interface Database {
           credits?: number
           streak?: number
           is_plus?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           margin_debt?: number
           loss_streak?: number
           comeback_eligible?: boolean

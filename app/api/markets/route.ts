@@ -5,6 +5,7 @@ import { rankFeed, buildAffinityMap } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
+import { validateMarketTitle, validateEndTime } from '@/lib/validate'
 import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
 import { screenMarket, ALLOWED_CATEGORIES } from '@/lib/market-quality'
 import { computeCreatorTrust, batchCreatorTrust } from '@/lib/creator-trust'
@@ -241,7 +242,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const trimmedTitle = title.trim()
+  const titleValidation = validateMarketTitle(title)
+  if (!titleValidation.ok) {
+    return NextResponse.json({ error: titleValidation.error }, { status: 400 })
+  }
+  const trimmedTitle = (title as string).trim()
+
+  const endTimeValidation = validateEndTime(end_time)
+  if (!endTimeValidation.ok) {
+    return NextResponse.json({ error: endTimeValidation.error }, { status: 400 })
+  }
 
   // ── Category allowlist (server-side) ─────────────────────────────────────
   if (!(ALLOWED_CATEGORIES as readonly string[]).includes(category)) {

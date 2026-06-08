@@ -1,3 +1,4 @@
+import { isAdminRequest } from '@/lib/validate'
 /**
  * GET /api/markets/quality-debug
  *
