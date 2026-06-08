@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Star, Check, ChevronDown } from "lucide-react"
+import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Star, Check, ChevronDown, Quote } from "lucide-react"
 
 // ── Mock market card ─────────────────────────────────────────────────────────
 
@@ -164,13 +164,36 @@ export default function LandingPage() {
         </div>
 
         {/* FUD reducers near CTA */}
-        <div className="flex items-center justify-center gap-6 sm:gap-8">
+        <div className="flex items-center justify-center gap-6 sm:gap-8 mb-8">
           {ABOVE_FOLD_STATS.map((s) => (
             <div key={s.label} className="text-center">
               <p className="font-mono font-black text-lg text-[#F5A623]">{s.value}</p>
               <p className="text-[10px] text-[#8585A0] uppercase tracking-wider mt-0.5">{s.label}</p>
             </div>
           ))}
+        </div>
+
+        {/* Social proof above the fold */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-1.5">
+              {["#E74C3C","#3498DB","#2ECC71","#F39C12"].map((c) => (
+                <div key={c} className="w-6 h-6 rounded-full border-2 border-[#0A0A0B]" style={{ background: c }} />
+              ))}
+            </div>
+            <span className="text-xs text-[#8585A0]">
+              <span className="text-[#EBEBEB] font-semibold">2,400+</span> active predictors
+            </span>
+          </div>
+          <span className="hidden sm:block text-[#2A2A36]">·</span>
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-0.5">
+              {[1,2,3,4,5].map((i) => (
+                <Star key={i} className={`w-3 h-3 ${i <= 4 ? "fill-[#F5A623] text-[#F5A623]" : "fill-[#F5A623]/40 text-[#F5A623]/40"}`} />
+              ))}
+            </div>
+            <span className="text-xs text-[#8585A0]"><span className="text-[#EBEBEB] font-semibold">4.8</span> avg prediction accuracy</span>
+          </div>
         </div>
       </section>
 
@@ -215,8 +238,50 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── How it works ────────────────────────────────────────────────────── */}
+      {/* ── Testimonials ────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 bg-[#111116] border-y border-[#1C1C24]">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">What players are saying</p>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-12">
+            Real takes. Real receipts.
+          </h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {[
+              {
+                handle: "@SharpTake23",
+                tag: "Sports",
+                quote: "Been saying LeBron was washed for 2 years. Now I have the streak to prove I called it.",
+              },
+              {
+                handle: "@PoliticsNerd",
+                tag: "Politics",
+                quote: "Called the rate cut in April and the Fed pause in June. My group thinks I work at a hedge fund.",
+              },
+              {
+                handle: "@SportsProphet",
+                tag: "Multi-category",
+                quote: "Lost my first 5 bets. Checked my stats, found the pattern, fixed it. Now 67% on the season.",
+              },
+            ].map((t) => (
+              <div
+                key={t.handle}
+                className="bg-[#0A0A0B] border border-[#2A2A36] p-5 flex flex-col gap-4"
+                style={{ borderRadius: "12px" }}
+              >
+                <Quote className="w-4 h-4 text-[#F5A623]/40 shrink-0" />
+                <p className="text-sm text-[#EBEBEB] leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
+                <div className="flex items-center justify-between gap-2 mt-auto">
+                  <span className="text-xs font-bold text-[#8585A0]">{t.handle}</span>
+                  <span className="text-[10px] font-bold text-[#F5A623]/70 uppercase tracking-wider bg-[#F5A623]/10 px-2 py-0.5" style={{ borderRadius: "4px" }}>{t.tag}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ────────────────────────────────────────────────────── */}
+      <section className="py-20 px-5 bg-[#0A0A0B] border-b border-[#1C1C24]">
         <div className="max-w-3xl mx-auto">
           <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">How it works</p>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2">
@@ -254,12 +319,12 @@ export default function LandingPage() {
 
       {/* ── Features ────────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 max-w-3xl mx-auto">
-        <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">Features</p>
+        <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">What you get</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2">
-          Everything you need to dominate
+          Every tool to prove you were right
         </h2>
         <p className="text-[#8585A0] text-sm text-center mb-12 max-w-sm mx-auto">
-          Built for people who actually have opinions and want to prove them right.
+          Built for people who have opinions and want the record to show it.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
@@ -300,7 +365,7 @@ export default function LandingPage() {
       <section className="py-20 px-5 max-w-2xl mx-auto">
         <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">FAQ</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-12">
-          Questions before you commit?
+          No catch. Here&apos;s the proof.
         </h2>
         <div className="bg-[#111116] border border-[#2A2A36] px-6 py-2" style={{ borderRadius: "12px" }}>
           {FAQS.map((faq) => (
