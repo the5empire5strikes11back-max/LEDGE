@@ -411,12 +411,15 @@ export default function App() {
         <div className="flex items-center gap-2.5 px-5 h-[57px] border-b border-border shrink-0">
           <LedgeLogo size={28} />
           <span className="font-bold text-base tracking-tight">Ledge</span>
-          {decay !== "none" && (
-            <div className={cn(
-              "ml-auto w-1.5 h-1.5 rounded-full animate-pulse shrink-0",
-              decay === "critical" ? "bg-danger" : "bg-accent"
-            )} />
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {decay !== "none" && (
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full animate-pulse shrink-0",
+                decay === "critical" ? "bg-danger" : "bg-accent"
+              )} />
+            )}
+            <NotificationCenter username={profile?.username ?? null} />
+          </div>
         </div>
 
         {/* Nav */}
@@ -509,7 +512,7 @@ export default function App() {
             </div>
           </button>
 
-          {/* Credits + bell in one row */}
+          {/* Credits */}
           <button
             onClick={() => setShopOpen(true)}
             className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
@@ -529,14 +532,6 @@ export default function App() {
               </span>
             </div>
           </button>
-          {/* Bell — sits below credits, full width */}
-          <div
-            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border hover:border-accent/40 transition-colors cursor-pointer"
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <NotificationCenter username={profile?.username ?? null} />
-            <span className="text-[10px] text-muted-foreground">Notifications</span>
-          </div>
         </div>
       </aside>
 
