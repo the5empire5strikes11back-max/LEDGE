@@ -20,14 +20,14 @@ export async function GET(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: comments, error } = await (supabase as any)
     .from('market_comments')
-    .select('id, body, image_url, like_count, dislike_count, created_at, user_id, profiles(username, avatar_url)')
+    .select('id, body, image_url, like_count, dislike_count, created_at, user_id, profiles(username)')
     .eq('market_id', marketId)
     .order('created_at', { ascending: false })
     .range(from, to) as {
       data: Array<{
         id: string; body: string; image_url: string | null; like_count: number;
         dislike_count: number; created_at: string; user_id: string;
-        profiles: { username: string; avatar_url: string | null } | null
+        profiles: { username: string } | null
       }> | null
       error: { message: string } | null
     }
@@ -51,12 +51,12 @@ export async function GET(request: Request) {
   }
 
   const result = (comments ?? []).map((c) => {
-    const profile = c.profiles as { username: string; avatar_url: string | null } | null
+    const profile = c.profiles as { username: string } | null
     return {
       id:            c.id,
       user_id:       c.user_id,
       username:      profile?.username ?? 'unknown',
-      avatar_url:    profile?.avatar_url ?? null,
+      avatar_url:    null,
       body:          c.body,
       image_url:     c.image_url,
       like_count:    c.like_count,

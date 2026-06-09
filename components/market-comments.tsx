@@ -170,8 +170,6 @@ export function MarketComments({
     fetchComments(next, false)
   }
 
-  if (error) return null
-
   return (
     <div className="flex flex-col gap-3">
       {/* Section header */}
@@ -254,6 +252,10 @@ export function MarketComments({
           {[1, 2].map((i) => (
             <div key={i} className="h-14 bg-surface border border-border animate-pulse" style={{ borderRadius: "var(--radius-card)" }} />
           ))}
+        </div>
+      ) : error ? (
+        <div className="px-4 py-5 text-center bg-surface border border-border" style={{ borderRadius: "var(--radius-card)" }}>
+          <p className="text-xs text-muted-foreground">Couldn&apos;t load comments.</p>
         </div>
       ) : comments.length === 0 ? (
         <div
