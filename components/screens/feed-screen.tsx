@@ -421,7 +421,7 @@ export function FeedScreen({
   // ── Feed column (shared by mobile full-width + desktop left column) ──────────
   const feedColumn = (
     <div className="flex flex-col h-full w-full overflow-hidden relative">
-      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full pb-24 lg:pb-20">
         {/* Screener stats bar */}
         <div className="bg-surface border-b border-border px-4 py-2 flex items-center gap-4 overflow-x-auto scrollbar-none">
           {isFirstSession ? (
