@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { X, Zap } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { X, Zap, UserPlus, UserCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { AchievementsGrid } from "@/components/achievements-grid"
@@ -11,23 +11,27 @@ import type { Achievement } from "@/lib/achievements"
 import type { Persona } from "@/lib/game-engine"
 
 interface PublicProfile {
-  username:    string
-  avatar_url:  string | null
-  rank:        RankKey
-  xp:          number
-  streak:      number
-  is_plus:     boolean
-  win_rate:    number
-  total_bets:  number
-  best_streak: number
-  persona:     Persona
-  achievements: Achievement[]
+  username:        string
+  avatar_url:      string | null
+  rank:            RankKey
+  xp:              number
+  streak:          number
+  is_plus:         boolean
+  win_rate:        number
+  total_bets:      number
+  best_streak:     number
+  persona:         Persona
+  achievements:    Achievement[]
   recent_bets: Array<{
     market_title: string
     side:         string
     won:          boolean | null
     created_at:   string
   }>
+  followers_count: number
+  following_count: number
+  is_following:    boolean
+  is_self:         boolean
 }
 
 interface PublicProfileSheetProps {
@@ -36,9 +40,12 @@ interface PublicProfileSheetProps {
 }
 
 export function PublicProfileSheet({ username, onClose }: PublicProfileSheetProps) {
-  const [profile, setProfile] = useState<PublicProfile | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [profile,        setProfile]        = useState<PublicProfile | null>(null)
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
+  const [followLoading,  setFollowLoading]  = useState(false)
+  const [isFollowing,    setIsFollowing]    = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
 
   useEffect(() => {
     if (!username) { setProfile(null); setError(null); return }
@@ -50,10 +57,34 @@ export function PublicProfileSheet({ username, onClose }: PublicProfileSheetProp
       .then((data: PublicProfile & { error?: string }) => {
         if (data.error) { setError(data.error); return }
         setProfile(data)
+        setIsFollowing(data.is_following)
+        setFollowersCount(data.followers_count)
       })
       .catch(() => setError("Failed to load profile"))
       .finally(() => setLoading(false))
   }, [username])
+
+  const handleFollow = useCallback(async () => {
+    if (!username || followLoading) return
+    setFollowLoading(true)
+    // Optimistic update
+    const wasFollowing = isFollowing
+    setIsFollowing(!wasFollowing)
+    setFollowersCount((c) => wasFollowing ? c - 1 : c + 1)
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(username)}/follow`, { method: 'POST' })
+      if (!res.ok) {
+        // Revert on error
+        setIsFollowing(wasFollowing)
+        setFollowersCount((c) => wasFollowing ? c + 1 : c - 1)
+      }
+    } catch {
+      setIsFollowing(wasFollowing)
+      setFollowersCount((c) => wasFollowing ? c + 1 : c - 1)
+    } finally {
+      setFollowLoading(false)
+    }
+  }, [username, followLoading, isFollowing])
 
   if (!username) return null
 
@@ -137,7 +168,36 @@ export function PublicProfileSheet({ username, onClose }: PublicProfileSheetProp
                       {progress.current}/{progress.required}
                     </span>
                   </div>
+                  {/* Follower counts */}
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <span className="text-[11px] text-muted-foreground">
+                      <span className="text-foreground font-semibold">{followersCount}</span> followers
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      <span className="text-foreground font-semibold">{profile.following_count}</span> following
+                    </span>
+                  </div>
                 </div>
+
+                {/* Follow button — hidden for own profile */}
+                {!profile.is_self && (
+                  <button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={cn(
+                      "shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border transition-all duration-[80ms]",
+                      isFollowing
+                        ? "bg-surface border-border text-muted-foreground hover:border-danger/50 hover:text-danger"
+                        : "bg-accent text-accent-foreground border-accent"
+                    )}
+                    style={{ borderRadius: "var(--radius-badge)" }}
+                  >
+                    {isFollowing
+                      ? <><UserCheck className="w-3 h-3" /> Following</>
+                      : <><UserPlus  className="w-3 h-3" /> Follow</>
+                    }
+                  </button>
+                )}
               </div>
 
               {/* Stats row */}

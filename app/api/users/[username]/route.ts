@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeAchievements } from '@/lib/achievements'
 import { calculatePersona, rankFromXP } from '@/lib/game-engine'
@@ -8,6 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params
+  const supabase = await createClient()
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
   const admin = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,19 +75,34 @@ export async function GET(
 
   const rank = rankFromXP(profile.xp)
 
+  // Follow counts + is_following for current user
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [{ count: followersCount }, { count: followingCount }, followRow] = await Promise.all([
+    (admin as any).from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
+    (admin as any).from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
+    currentUser
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (admin as any).from('user_follows').select('follower_id').eq('follower_id', currentUser.id).eq('following_id', profile.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]) as [{ count: number | null }, { count: number | null }, { data: unknown }]
+
   return NextResponse.json({
-    username:    profile.username,
-    avatar_url:  profile.avatar_url,
+    username:        profile.username,
+    avatar_url:      profile.avatar_url,
     rank,
-    xp:          profile.xp,
-    streak:      profile.streak,
-    is_plus:     profile.is_plus,
-    created_at:  profile.created_at,
-    win_rate:    winRate,
-    total_bets:  bets.length,
-    best_streak: bestStreak,
+    xp:              profile.xp,
+    streak:          profile.streak,
+    is_plus:         profile.is_plus,
+    created_at:      profile.created_at,
+    win_rate:        winRate,
+    total_bets:      bets.length,
+    best_streak:     bestStreak,
     persona,
     achievements,
-    recent_bets: recentBets,
+    recent_bets:     recentBets,
+    followers_count: followersCount ?? 0,
+    following_count: followingCount ?? 0,
+    is_following:    !!followRow.data,
+    is_self:         currentUser?.id === profile.id,
   })
 }
