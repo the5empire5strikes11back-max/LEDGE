@@ -17,7 +17,7 @@
  *   yes_percent   = effective_yes / (effective_yes + effective_no) × 100
  */
 
-export type MarketCategory = 'Sports' | 'Politics' | 'Culture' | 'Circle'
+export type MarketCategory = 'Sports' | 'Politics' | 'Culture' | 'Tech' | 'Viral' | 'Wild' | 'Circle'
 
 // ── Base virtual liquidity by category ───────────────────────────────────────
 // These are the YES and NO seed amounts added to every new market.
@@ -27,6 +27,9 @@ export const BASE_LIQUIDITY: Record<MarketCategory, number> = {
   Sports:   18_000,  // High depth — sports outcomes are well-researched
   Culture:  12_000,  // Medium — pop culture is debatable
   Politics:  8_000,  // Lower — political markets should be sensitive
+  Tech:     10_000,  // Medium-high — tech moves fast but is data-driven
+  Viral:     8_000,  // Lower — internet moments are unpredictable
+  Wild:      6_000,  // Low — fun/absurd markets should move easily
   Circle:    4_000,  // Minimum — personal circles, very reactive
 }
 

@@ -10,7 +10,7 @@ import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
 import type { MarketSocialData } from "@/lib/social-signals"
 import type { CompoundState } from "@/lib/feed-signals"
 
-type MarketCategory = "Sports" | "Politics" | "Culture" | "Circle"
+type MarketCategory = "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
 
 interface MarketFeedCardProps {
   id: string
@@ -47,10 +47,13 @@ interface MarketFeedCardProps {
 }
 
 const categoryLabel: Record<MarketCategory, string> = {
-  Sports: "Sports",
+  Sports:   "Sports",
   Politics: "Politics",
-  Culture: "Culture",
-  Circle: "Circle",
+  Culture:  "Culture",
+  Tech:     "Tech",
+  Viral:    "Viral",
+  Wild:     "Wild",
+  Circle:   "Circle",
 }
 
 function formatCredits(value: number): string {

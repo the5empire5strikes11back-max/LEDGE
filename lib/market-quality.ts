@@ -30,7 +30,7 @@ export interface QualityResult {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const ALLOWED_CATEGORIES = ['Sports', 'Politics', 'Culture'] as const
+export const ALLOWED_CATEGORIES = ['Sports', 'Politics', 'Culture', 'Tech', 'Viral', 'Wild'] as const
 export type AllowedCategory = typeof ALLOWED_CATEGORIES[number]
 
 /** Min/max title length for user-created markets */

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { X, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type MarketCategory = "Sports" | "Politics" | "Culture"
+type MarketCategory = "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild"
 
 interface CreateMarketSheetProps {
   open: boolean
@@ -13,12 +13,24 @@ interface CreateMarketSheetProps {
   onCreated: (isReview: boolean) => void
 }
 
-const CATEGORIES: MarketCategory[] = ["Sports", "Politics", "Culture"]
+const CATEGORIES: MarketCategory[] = ["Sports", "Politics", "Culture", "Tech", "Viral", "Wild"]
 
 const CATEGORY_EXAMPLES: Record<MarketCategory, string> = {
-  Sports: "e.g. Will Real Madrid win the Champions League?",
+  Sports:   "e.g. Will Real Madrid win the Champions League?",
   Politics: "e.g. Will the UK hold a general election before 2027?",
-  Culture: "e.g. Will Beyoncé release a new album this year?",
+  Culture:  "e.g. Will Beyoncé release a new album this year?",
+  Tech:     "e.g. Will OpenAI release GPT-5 before July?",
+  Viral:    "e.g. Will this TikTok sound hit 1B uses this month?",
+  Wild:     "e.g. Will it snow in LA before the end of the year?",
+}
+
+const CATEGORY_ICONS: Record<MarketCategory, string> = {
+  Sports:   "🏆",
+  Politics: "🗳️",
+  Culture:  "🎬",
+  Tech:     "⚡",
+  Viral:    "🔥",
+  Wild:     "🎲",
 }
 
 const MIN_TITLE_LENGTH = 15
@@ -181,13 +193,13 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
               Category
             </label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
                   className={cn(
-                    "flex-1 py-2 text-xs font-semibold uppercase tracking-wider border",
+                    "py-2.5 text-xs font-semibold uppercase tracking-wider border flex flex-col items-center gap-1",
                     "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.96]",
                     category === cat
                       ? "bg-accent text-accent-foreground border-accent"
@@ -195,7 +207,8 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                   )}
                   style={{ borderRadius: "var(--radius-badge)" }}
                 >
-                  {cat}
+                  <span className="text-base leading-none">{CATEGORY_ICONS[cat]}</span>
+                  <span>{cat}</span>
                 </button>
               ))}
             </div>

@@ -216,13 +216,13 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           <span
             className={cn(
               "shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 border",
-              market.category === "Sports"
-                ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                : market.category === "Politics"
-                ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
-                : market.category === "Culture"
-                ? "bg-pink-500/10 text-pink-400 border-pink-500/20"
-                : "bg-accent/10 text-accent border-accent/20"
+              market.category === "Sports"   ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+              : market.category === "Politics" ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
+              : market.category === "Culture"  ? "bg-pink-500/10 text-pink-400 border-pink-500/20"
+              : market.category === "Tech"     ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+              : market.category === "Viral"    ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
+              : market.category === "Wild"     ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+              : "bg-accent/10 text-accent border-accent/20"
             )}
             style={{ borderRadius: "var(--radius-badge)" }}
           >

@@ -22,18 +22,52 @@ import type { ReturnHook } from "@/app/api/return-hooks/route"
 import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
 import type { Persona } from "@/lib/game-engine"
 
-type Category = "All" | "Sports" | "Politics" | "Culture" | "Circle"
+type Category = "All" | "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
 
-const ALL_TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Circle"]
+const ALL_TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild", "Circle"]
 // Circle is hidden on first session — undefined concept for new users
-const FIRST_SESSION_TABS: Category[] = ["All", "Sports", "Politics", "Culture"]
+const FIRST_SESSION_TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild"]
+
+// Subcategory chips shown below the active tab (client-side filter on title keywords)
+const SUBCATEGORIES: Partial<Record<Category, string[]>> = {
+  Sports:   ["NBA", "NFL", "Soccer", "UFC", "Esports"],
+  Culture:  ["Music", "Movies", "TV", "Gaming", "Celebrity"],
+  Tech:     ["AI", "Big Tech", "Crypto", "Science"],
+  Viral:    ["TikTok", "Twitter", "Memes", "YouTube"],
+  Politics: ["US", "World", "Elections"],
+}
+
+// Keywords used to match markets to subcategories
+const SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
+  NBA:       ["nba", "lakers", "celtics", "warriors", "lebron", "curry", "basketball"],
+  NFL:       ["nfl", "super bowl", "touchdown", "quarterback", "chiefs", "patriots", "football"],
+  Soccer:    ["soccer", "premier league", "mls", "champions league", "world cup", "fifa", "messi", "ronaldo"],
+  UFC:       ["ufc", "mma", "conor", "fight", "knockout", "boxing"],
+  Esports:   ["esports", "valorant", "league of legends", "fortnite", "twitch", "gaming"],
+  Music:     ["music", "album", "tour", "grammy", "spotify", "drake", "taylor", "beyonce", "rapper", "artist"],
+  Movies:    ["movie", "film", "oscar", "box office", "sequel", "marvel", "disney", "netflix"],
+  TV:        ["show", "season", "episode", "hbo", "netflix", "streaming", "series", "reality"],
+  Gaming:    ["game", "playstation", "xbox", "nintendo", "steam", "gta", "call of duty"],
+  Celebrity: ["celebrity", "kardashian", "beef", "drama", "dating", "breakup", "scandal"],
+  AI:        ["ai", "gpt", "openai", "anthropic", "claude", "gemini", "llm", "model", "robot"],
+  "Big Tech":["apple", "google", "meta", "microsoft", "amazon", "zuckerberg", "musk", "tesla"],
+  Crypto:    ["bitcoin", "crypto", "ethereum", "btc", "eth", "coin", "blockchain", "nft"],
+  Science:   ["nasa", "space", "climate", "science", "research", "study", "discovery"],
+  TikTok:    ["tiktok", "tik tok", "fyp", "creator", "viral"],
+  Twitter:   ["twitter", "x.com", "tweet", "elon", "trending"],
+  Memes:     ["meme", "memes", "trend", "challenge", "ratio"],
+  YouTube:   ["youtube", "youtuber", "subscriber", "views", "channel"],
+  US:        ["biden", "trump", "congress", "senate", "house", "democrat", "republican", "white house"],
+  World:     ["china", "russia", "uk", "europe", "nato", "president", "prime minister", "election"],
+  Elections: ["election", "vote", "ballot", "candidate", "poll", "primary"],
+}
 
 import type { MarketSocialData } from "@/lib/social-signals"
 
 interface Market {
   id: string
   title: string
-  category: "Sports" | "Politics" | "Culture" | "Circle"
+  category: "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
   endTime: string
   yesPercent: number
   yesPool: number
@@ -126,6 +160,7 @@ export function FeedScreen({
   currentAvatarUrl,
 }: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
+  const [activeSubcat, setActiveSubcat] = useState<string | null>(null)
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
   const [detailMarket, setDetailMarket] = useState<Market | null>(null)
@@ -250,10 +285,19 @@ export function FeedScreen({
     ? unbetMarkets
     : unbetMarkets.filter((m) => m.category === activeTab)
 
+  // Apply subcategory filter using keyword matching on market title
+  const subcatFiltered = activeSubcat
+    ? rawFiltered.filter((m) => {
+        const keywords = SUBCATEGORY_KEYWORDS[activeSubcat] ?? []
+        const title = m.title.toLowerCase()
+        return keywords.some((kw) => title.includes(kw))
+      })
+    : rawFiltered
+
   // Apply first-session ranking to All tab when user hasn't bet yet
   const filtered = (isFirstSession && activeTab === "All")
     ? rankFeedFirstSession(
-        rawFiltered.map((m) => ({
+        subcatFiltered.map((m) => ({
           ...m,
           // Map Market fields to RankableMarket fields
           created_at: new Date(0).toISOString(), // approximation; not stored on Market
@@ -266,8 +310,8 @@ export function FeedScreen({
           total_credits: m.totalCredits,
           circle_id: null,
         }))
-      ).map((ranked) => rawFiltered.find((m) => m.id === ranked.id)!)
-    : rawFiltered
+      ).map((ranked) => subcatFiltered.find((m) => m.id === ranked.id)!)
+    : subcatFiltered
 
   // Spotlight: first hot/featured open market for first-session users
   const spotlightId = (isFirstSession && activeTab === "All")
@@ -456,13 +500,14 @@ export function FeedScreen({
           <DailyChallenges />
         )}
 
-        {/* Filter tabs */}
-        <div className="sticky top-0 z-10 bg-background border-b border-border px-4 py-2">
-          <div className="flex gap-1 overflow-x-auto scrollbar-none">
+        {/* Filter tabs + subcategory chips */}
+        <div className="sticky top-0 z-10 bg-background border-b border-border">
+          {/* Primary category tabs */}
+          <div className="flex gap-1 overflow-x-auto scrollbar-none px-4 pt-2 pb-2">
             {TABS.map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => { setActiveTab(tab); setActiveSubcat(null) }}
                 className={cn(
                   "shrink-0 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider",
                   "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.94]",
@@ -476,6 +521,28 @@ export function FeedScreen({
               </button>
             ))}
           </div>
+
+          {/* Subcategory chips — only shown when a category with subs is active */}
+          {SUBCATEGORIES[activeTab] && (
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none px-4 pb-2">
+              {SUBCATEGORIES[activeTab]!.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setActiveSubcat(activeSubcat === sub ? null : sub)}
+                  className={cn(
+                    "shrink-0 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border",
+                    "transition-all duration-[80ms] active:scale-[0.93]",
+                    activeSubcat === sub
+                      ? "bg-accent/15 text-accent border-accent/40"
+                      : "text-muted-foreground/70 border-border hover:text-foreground hover:border-border/80"
+                  )}
+                  style={{ borderRadius: "var(--radius-badge)" }}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Streak urgency — for returning users with an active streak at risk */}
@@ -568,11 +635,21 @@ export function FeedScreen({
               <span className="text-3xl" aria-hidden>🔭</span>
               <p className="text-sm font-medium text-foreground">Nothing here yet</p>
               <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-                {activeTab === "All"
+                {activeSubcat
+                  ? `No ${activeSubcat} markets right now.`
+                  : activeTab === "All"
                   ? "New markets are added daily. Check back soon."
                   : `No ${activeTab} markets right now. Try another category or check back later.`}
               </p>
-              {activeTab !== "All" && (
+              {activeSubcat ? (
+                <button
+                  onClick={() => setActiveSubcat(null)}
+                  className="mt-1 px-4 py-2 text-xs font-semibold bg-accent text-accent-foreground active:scale-[0.96] active:opacity-80 transition-all duration-[80ms]"
+                  style={{ borderRadius: "var(--radius-button)" }}
+                >
+                  Clear filter
+                </button>
+              ) : activeTab !== "All" && (
                 <button
                   onClick={() => setActiveTab("All")}
                   className="mt-1 px-4 py-2 text-xs font-semibold bg-accent text-accent-foreground active:scale-[0.96] active:opacity-80 transition-all duration-[80ms]"
@@ -582,6 +659,7 @@ export function FeedScreen({
                 </button>
               )}
             </div>
+
           ) : (
             filtered.map((market, idx) => {
               const isSpotlight = market.id === spotlightId
