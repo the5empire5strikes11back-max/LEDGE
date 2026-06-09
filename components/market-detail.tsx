@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useOnboarding } from "@/lib/onboarding"
@@ -161,6 +161,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const [disputeText, setDisputeText] = useState("")
   const [disputeSubmitting, setDisputeSubmitting] = useState(false)
   const [disputeSubmitted, setDisputeSubmitted] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   const isResolved  = !!market.resolved
@@ -207,6 +208,19 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
     const hoursAgo = (Date.now() - new Date(market.resolved.resolvedAt).getTime()) / 3_600_000
     return hoursAgo <= 24
   })()
+
+  const handleShare = useCallback(async () => {
+    const url = `${window.location.origin}/?m=${market.id}`
+    const shareData = { title: market.title, url }
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try { await navigator.share(shareData); return } catch { /* cancelled */ }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch { /* ignore */ }
+  }, [market.id, market.title])
 
   useEffect(() => { load() }, [load])
 
@@ -277,12 +291,21 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             </span>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="shrink-0 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleShare}
+            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+            title="Share market"
+          >
+            {shareCopied ? <Check className="w-4 h-4 text-success" /> : <Share2 className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Body */}

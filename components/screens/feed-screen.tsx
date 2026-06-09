@@ -224,6 +224,22 @@ export function FeedScreen({
     loadMarkets()
   }, [loadMarkets])
 
+  // Deep link: ?m=<marketId> auto-opens the market detail on load
+  useEffect(() => {
+    if (loading || markets.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const marketId = params.get("m")
+    if (!marketId) return
+    const found = markets.find((m) => m.id === marketId)
+    if (found) {
+      setDetailMarket(found)
+      // Clean up the URL without a full navigation
+      const url = new URL(window.location.href)
+      url.searchParams.delete("m")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [loading, markets])
+
   // Fetch return hooks for returning users (has placed a bet before)
   useEffect(() => {
     if (!ob.firstBetAchievementDone) return
