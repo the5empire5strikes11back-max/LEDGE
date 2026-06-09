@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle } from "lucide-react"
+import { TrendingUp, Users, User, Trophy, Zap, Flame, Star, AlertTriangle } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -15,6 +15,7 @@ import { NotificationCenter } from "@/components/notification-center"
 import { FeedScreen } from "@/components/screens/feed-screen"
 import { CirclesScreen } from "@/components/screens/circles-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
+import { LeaderboardScreen } from "@/components/screens/leaderboard-screen"
 import { Ticker } from "@/components/ui/ticker"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { FirstBetAchievement } from "@/components/onboarding/achievement-toast"
@@ -32,12 +33,13 @@ import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { BetRecord } from "@/lib/game-engine"
 import type { Database } from "@/types/database"
 
-type Screen = "feed" | "circles" | "profile"
+type Screen = "feed" | "circles" | "leaderboard" | "profile"
 
 const NAV_ITEMS: { id: Screen; label: string; icon: React.ElementType }[] = [
-  { id: "feed",    label: "Feed",    icon: TrendingUp },
-  { id: "circles", label: "Circles", icon: Users },
-  { id: "profile", label: "Profile", icon: User },
+  { id: "feed",        label: "Feed",        icon: TrendingUp },
+  { id: "circles",     label: "Circles",     icon: Users },
+  { id: "leaderboard", label: "Leaderboard", icon: Trophy },
+  { id: "profile",     label: "Profile",     icon: User },
 ]
 
 // LocalStorage keys for activity tracking
@@ -387,6 +389,9 @@ export default function App() {
       )}
       {screen === "circles" && (
         <CirclesScreen availableCredits={credits} onBet={handleBet} />
+      )}
+      {screen === "leaderboard" && (
+        <LeaderboardScreen onUsernameClick={(username) => setPublicProfileUsername(username)} />
       )}
       {screen === "profile" && (
         <ProfileScreen
