@@ -17,8 +17,8 @@ function getAnthropicKey(): string | undefined {
   return process.env.ANTHROPIC_API_KEY
 }
 
-// Target live market count — must match TARGET_LIVE in release-markets (15/cat × 3 = 45)
-const TARGET_LIVE_COUNT = 45
+// Target live market count — must match TARGET_LIVE in release-markets (15/cat × 6 = 90)
+const TARGET_LIVE_COUNT = 90
 // How many markets to immediately publish from the queue to prime the feed
 const PRIME_BATCH_SIZE = 15
 // If Sports (live + queued) is below this threshold, bias generation toward Sports

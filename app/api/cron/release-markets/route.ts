@@ -10,10 +10,10 @@ export const maxDuration = 30
 const CLIENT_RATE_LIMIT_HOURS = 2
 
 // ── Feed count targets ────────────────────────────────────────────────────────
-// 15 markets per category × 3 categories = 45 total target
+// 15 markets per category × 6 categories = 90 total target
 
-const TARGET_LIVE = 45
-const MIN_LIVE = 30
+const TARGET_LIVE = 90
+const MIN_LIVE = 60
 const RELEASE_BATCH_NORMAL = 6
 const RELEASE_BATCH_EMERGENCY = 12
 /** Always release at least this many even when feed is at target (freshness signal) */
@@ -26,9 +26,12 @@ const ARCHIVE_STALE_QUEUED_AFTER_DAYS = 4
 // Fill these before any variety/freshness selection.
 
 export const CATEGORY_FLOORS: Record<string, number> = {
-  Sports: 15,
-  Culture: 15,
+  Sports:   15,
+  Culture:  15,
   Politics: 15,
+  Tech:     15,
+  Viral:    15,
+  Wild:     15,
 }
 
 // ── Category health types (also exported for the debug endpoint) ──────────────

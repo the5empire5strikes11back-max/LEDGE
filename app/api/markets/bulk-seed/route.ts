@@ -334,6 +334,282 @@ const SEED_MARKETS: SeedMarket[] = [
     days: 90,
     resolution_criteria: 'Resolves YES if Kendrick Lamar releases a new studio album after GNX by December 31, 2026.',
   },
+
+  // ── TECH ─────────────────────────────────────────────────────────────────────
+  {
+    title: 'Will OpenAI release GPT-5 before October 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if OpenAI publicly releases a model officially named GPT-5 before October 1, 2026.',
+  },
+  {
+    title: 'Will Apple ship Apple Intelligence to all iPhones before July 2026?',
+    category: 'Tech',
+    days: 30,
+    resolution_criteria: 'Resolves YES if Apple rolls out its Apple Intelligence AI features to all eligible iPhone models globally before July 1, 2026.',
+  },
+  {
+    title: 'Will Google\'s Gemini Ultra outperform GPT-4o on the MMLU benchmark by August 2026?',
+    category: 'Tech',
+    days: 60,
+    resolution_criteria: 'Resolves YES if an independently verified benchmark report shows Google Gemini Ultra scoring higher than GPT-4o on the MMLU dataset by August 1, 2026.',
+  },
+  {
+    title: 'Will Tesla\'s Full Self-Driving reach Level 4 autonomy approval in the US in 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a US federal or state regulator officially certifies Tesla FSD at SAE Level 4 autonomy for any road conditions by December 31, 2026.',
+  },
+  {
+    title: 'Will Meta release a standalone AI assistant device in 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Meta announces and begins shipping a dedicated AI hardware assistant product (not glasses, not phone) by December 31, 2026.',
+  },
+  {
+    title: 'Will Anthropic raise another funding round over $1 billion in 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Anthropic closes a publicly announced funding round of $1 billion or more during 2026.',
+  },
+  {
+    title: 'Will Bitcoin hit $150,000 before the end of 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Bitcoin (BTC) reaches a spot price of $150,000 USD on any major exchange before December 31, 2026.',
+  },
+  {
+    title: 'Will Elon Musk\'s xAI surpass OpenAI in total funding raised by 2027?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if publicly reported total funding for xAI exceeds total publicly reported funding for OpenAI before January 1, 2027.',
+  },
+  {
+    title: 'Will a self-driving robotaxi service launch in New York City before 2027?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a commercial driverless robotaxi service (Waymo, Tesla, or competitor) launches paid rides to the public in NYC before January 1, 2027.',
+  },
+  {
+    title: 'Will Apple\'s Vision Pro 2 ship in 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Apple announces and begins shipping a second-generation Vision Pro headset before December 31, 2026.',
+  },
+  {
+    title: 'Will Nvidia\'s market cap surpass $4 trillion in 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Nvidia\'s stock market capitalization officially crosses $4 trillion USD at any point during 2026.',
+  },
+  {
+    title: 'Will a major AI lab announce AGI by the end of 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if OpenAI, Google DeepMind, Anthropic, or xAI publicly declares they have achieved Artificial General Intelligence (AGI) by December 31, 2026.',
+  },
+  {
+    title: 'Will TikTok\'s US ban be permanently enforced before September 2026?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if TikTok is permanently blocked from US app stores and existing installations without a sale or legal resolution before September 1, 2026.',
+  },
+  {
+    title: 'Will Ethereum flip Bitcoin in market cap before 2027?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Ethereum\'s total market cap exceeds Bitcoin\'s total market cap on any major crypto tracker before January 1, 2027.',
+  },
+  {
+    title: 'Will Microsoft Copilot replace standard Office features in the free tier by 2027?',
+    category: 'Tech',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Microsoft integrates Copilot AI features into its free Microsoft 365 tier (no paid subscription required) before January 1, 2027.',
+  },
+
+  // ── VIRAL ────────────────────────────────────────────────────────────────────
+  {
+    title: 'Will a TikTok trend cause a brand to go viral for the wrong reasons in July 2026?',
+    category: 'Viral',
+    days: 30,
+    resolution_criteria: 'Resolves YES if a Fortune 500 brand faces a viral TikTok backlash or boycott trend that trends on the platform for 3+ consecutive days in July 2026.',
+  },
+  {
+    title: 'Will the most-liked TikTok of 2026 be from a creator with under 1M followers?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if the single most-liked TikTok video of 2026 was posted by an account with under 1 million followers at the time of posting.',
+  },
+  {
+    title: 'Will a meme format from 2026 still be used unironically in 2027?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a meme format that originated in 2026 is still in widespread unironic use on social media platforms in January 2027.',
+  },
+  {
+    title: 'Will MrBeast hit 400 million YouTube subscribers before 2027?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if MrBeast\'s main YouTube channel reaches 400 million subscribers before January 1, 2027.',
+  },
+  {
+    title: 'Will a celebrity Twitter/X post cause a stock to move more than 5% in 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a single tweet or X post by a verified celebrity causes a publicly traded company\'s stock to move more than 5% in the same trading session in 2026.',
+  },
+  {
+    title: 'Will a reality TV contestant go viral enough to trend globally in 2026?',
+    category: 'Viral',
+    days: 60,
+    resolution_criteria: 'Resolves YES if a reality TV contestant from a 2026 season trends on X/Twitter globally for 24+ consecutive hours during or after their season.',
+  },
+  {
+    title: 'Will a YouTube video from 2026 surpass 500 million views within 30 days of posting?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if any YouTube video uploaded in 2026 reaches 500 million views within 30 days of its upload date.',
+  },
+  {
+    title: 'Will "demure" still be in mainstream internet vocabulary by September 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if the word "very demure" is still used in new viral social media content (not ironically referencing the original trend) in September 2026.',
+  },
+  {
+    title: 'Will a brand go viral for actually good reasons in Q3 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a major brand\'s social media campaign trends globally for positive reasons during Q3 2026 (July–September).',
+  },
+  {
+    title: 'Will a TikTok sound hit 10 million uses in under 48 hours in 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if TikTok\'s official trending data or a credible report confirms a sound reached 10 million video uses within 48 hours of going viral in 2026.',
+  },
+  {
+    title: 'Will an AI-generated influencer reach 10 million social followers in 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a publicly disclosed AI-generated or AI-operated social media persona reaches 10 million followers on any single platform before December 31, 2026.',
+  },
+  {
+    title: 'Will a Twitch stream in 2026 break the all-time concurrent viewers record?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if any Twitch live stream in 2026 surpasses the current all-time peak concurrent viewer record of approximately 3.4 million.',
+  },
+  {
+    title: 'Will the most viral video of 2026 come from X/Twitter rather than TikTok?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if the single video judged most viral of 2026 by major media outlets originated on X/Twitter rather than TikTok, Instagram Reels, or YouTube Shorts.',
+  },
+  {
+    title: 'Will a political debate moment go more viral than any sports clip in 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if the most-shared political debate clip of 2026 receives more total cross-platform shares than the most-shared sports moment clip of 2026.',
+  },
+  {
+    title: 'Will a viral challenge cause a major brand to pull an ad campaign in 2026?',
+    category: 'Viral',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a brand with over $1 billion in annual revenue publicly pulls an advertising campaign in response to a viral social media challenge or backlash in 2026.',
+  },
+
+  // ── WILD ─────────────────────────────────────────────────────────────────────
+  {
+    title: 'Will it snow in Los Angeles before the end of 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if the National Weather Service reports measurable snowfall (0.1 inches or more) anywhere within the Los Angeles city limits before December 31, 2026.',
+  },
+  {
+    title: 'Will a major fast food chain release a completely AI-designed menu item in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if McDonald\'s, Burger King, Wendy\'s, Taco Bell, or Chick-fil-A publicly launches a menu item it claims was designed primarily by AI before December 31, 2026.',
+  },
+  {
+    title: 'Will any country ban social media for users under 18 in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if any country with a population over 5 million passes and enforces a law banning social media access for users under 18 years old in 2026.',
+  },
+  {
+    title: 'Will a sitting US senator post something that goes viral on TikTok in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a currently serving US senator posts a video on TikTok that reaches 5 million views before December 31, 2026.',
+  },
+  {
+    title: 'Will anyone break the world record for the longest continuous video game session in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a Guinness World Records-certified attempt breaks the current longest continuous gaming session record in 2026.',
+  },
+  {
+    title: 'Will a major airline announce fully electric short-haul flights for passengers by 2027?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a commercially operating airline announces scheduled fully electric passenger flights (not hybrid) on routes under 500 miles before January 1, 2027.',
+  },
+  {
+    title: 'Will anyone publicly bet $1 million or more on a prediction market in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a verifiable report confirms a single user placed a bet of $1 million USD or equivalent on any prediction market platform in 2026.',
+  },
+  {
+    title: 'Will a US city officially rename a street after a TikTok star in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if any US municipality officially renames or dedicates a street, park, or public space in honor of a social media creator primarily known for TikTok before December 31, 2026.',
+  },
+  {
+    title: 'Will a human beat an AI at chess in a rated tournament game in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a human player defeats a top-rated AI chess engine (Stockfish, AlphaZero, or equivalent) in a formally rated tournament game in 2026.',
+  },
+  {
+    title: 'Will a robot complete a full marathon before the end of 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a legged robot completes a full 26.2-mile marathon course without human assistance before December 31, 2026.',
+  },
+  {
+    title: 'Will a country legalize recreational use of a currently Schedule I substance in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if any country with a population over 10 million fully legalizes recreational use of a drug currently classified as Schedule I (or equivalent) before December 31, 2026.',
+  },
+  {
+    title: 'Will a college student\'s AI-written thesis get them expelled in 2026?',
+    category: 'Wild',
+    days: 60,
+    resolution_criteria: 'Resolves YES if a major university publicly confirms expelling a student specifically for submitting an AI-generated thesis before December 31, 2026.',
+  },
+  {
+    title: 'Will any language go extinct in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if UNESCO or a credible linguistic organization declares any language officially extinct (last native speaker deceased) during 2026.',
+  },
+  {
+    title: 'Will Elon Musk officially run for US political office in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if Elon Musk files official candidacy paperwork to run for any elected US political office before December 31, 2026.',
+  },
+  {
+    title: 'Will a professional sports team be purchased by an AI company in 2026?',
+    category: 'Wild',
+    days: 90,
+    resolution_criteria: 'Resolves YES if a majority stake in any professional sports franchise in a major league (NFL, NBA, MLB, NHL, Premier League) is acquired by a company whose primary business is AI before December 31, 2026.',
+  },
 ]
 
 export async function POST(request: Request) {
@@ -385,9 +661,9 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const counts = { Sports: 0, Politics: 0, Culture: 0 }
+  const counts: Record<string, number> = { Sports: 0, Politics: 0, Culture: 0, Tech: 0, Viral: 0, Wild: 0 }
   for (const m of inserted ?? []) {
-    if (m.category in counts) counts[m.category as keyof typeof counts]++
+    if (m.category in counts) counts[m.category]++
   }
 
   return NextResponse.json({
