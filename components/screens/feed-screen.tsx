@@ -89,6 +89,9 @@ interface FeedScreenProps {
   ) => void
   /** Open the credit shop modal */
   onOpenShop?: () => void
+  onUsernameClick?: (username: string) => void
+  currentUsername?: string | null
+  currentAvatarUrl?: string | null
 }
 
 function formatCredits(value: number): string {
@@ -118,6 +121,9 @@ export function FeedScreen({
   onBet,
   onWin,
   onOpenShop,
+  onUsernameClick,
+  currentUsername,
+  currentAvatarUrl,
 }: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
   const [markets, setMarkets] = useState<Market[]>([])
@@ -662,6 +668,9 @@ export function FeedScreen({
               onClose={() => setDetailMarket(null)}
               onBuyYes={() => openTradeFromDetail("yes")}
               onBuyNo={() => openTradeFromDetail("no")}
+              onUsernameClick={onUsernameClick}
+              currentUsername={currentUsername}
+              currentAvatarUrl={currentAvatarUrl}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground select-none">
@@ -687,6 +696,9 @@ export function FeedScreen({
             onClose={() => setDetailMarket(null)}
             onBuyYes={() => openTradeFromDetail("yes")}
             onBuyNo={() => openTradeFromDetail("no")}
+            onUsernameClick={onUsernameClick}
+            currentUsername={currentUsername}
+            currentAvatarUrl={currentAvatarUrl}
           />
         )}
       </div>

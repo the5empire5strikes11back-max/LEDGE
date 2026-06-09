@@ -10,6 +10,7 @@ import { RankUpModal } from "@/components/rank-up-modal"
 import { WinReceiptModal } from "@/components/win-receipt-modal"
 import { MysteryChestModal } from "@/components/mystery-chest-modal"
 import { CreditShopModal } from "@/components/credit-shop-modal"
+import { PublicProfileSheet } from "@/components/public-profile-sheet"
 import { FeedScreen } from "@/components/screens/feed-screen"
 import { CirclesScreen } from "@/components/screens/circles-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
@@ -94,6 +95,7 @@ export default function App() {
   const [rankUpFrom, setRankUpFrom] = useState<RankKey | null>(null)
   const [chestOpen, setChestOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
+  const [publicProfileUsername, setPublicProfileUsername] = useState<string | null>(null)
   const supabase = createClient()
 
   const credits  = profile?.credits ?? 0
@@ -377,6 +379,9 @@ export default function App() {
           onBet={handleBet}
           onWin={handleWin}
           onOpenShop={() => setShopOpen(true)}
+          onUsernameClick={(username) => setPublicProfileUsername(username)}
+          currentUsername={profile.username}
+          currentAvatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
         />
       )}
       {screen === "circles" && (
@@ -648,6 +653,10 @@ export default function App() {
         open={shopOpen}
         onClose={() => setShopOpen(false)}
         isPlus={isPlus}
+      />
+      <PublicProfileSheet
+        username={publicProfileUsername}
+        onClose={() => setPublicProfileUsername(null)}
       />
 
       <Toaster position="top-center" toastOptions={{ style: { borderRadius: "var(--radius-button)" } }} />

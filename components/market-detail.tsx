@@ -8,6 +8,7 @@ import { useOnboarding } from "@/lib/onboarding"
 import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { Countdown } from "@/components/ui/countdown"
 import { computeDetailSignals } from "@/lib/social-signals"
+import { MarketComments } from "@/components/market-comments"
 import {
   ResponsiveContainer,
   AreaChart,
@@ -40,6 +41,9 @@ interface MarketDetailProps {
   /** "overlay" = full-screen fixed modal (mobile default).
    *  "panel"   = fills its container, no fixed positioning (desktop side panel). */
   mode?: "overlay" | "panel"
+  onUsernameClick?: (username: string) => void
+  currentUsername?: string | null
+  currentAvatarUrl?: string | null
 }
 
 interface BetActivity {
@@ -142,7 +146,7 @@ function TraderDistribution({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overlay" }: MarketDetailProps) {
+export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overlay", onUsernameClick, currentUsername, currentAvatarUrl }: MarketDetailProps) {
   const isPanel = mode === "panel"
   const [bets, setBets]       = useState<BetActivity[]>([])
   const [history, setHistory] = useState<HistoryPoint[]>([])
@@ -466,7 +470,12 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
                         ? <TrendingUp className="w-3 h-3 text-success shrink-0" />
                         : <TrendingDown className="w-3 h-3 text-danger shrink-0" />
                       }
-                      <span className="text-xs text-foreground font-medium truncate">@{bet.username}</span>
+                      <button
+                        onClick={() => onUsernameClick?.(bet.username)}
+                        className="text-xs text-foreground font-medium truncate hover:text-accent transition-colors"
+                      >
+                        @{bet.username}
+                      </button>
                       <span
                         className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5", bet.side === "yes" ? "text-success bg-success/10" : "text-danger bg-danger/10")}
                         style={{ borderRadius: "var(--radius-badge)" }}
@@ -483,6 +492,14 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               </div>
             )}
           </div>
+
+          {/* Comments */}
+          <MarketComments
+            marketId={market.id}
+            currentUsername={currentUsername ?? null}
+            currentAvatarUrl={currentAvatarUrl ?? null}
+            onUsernameClick={onUsernameClick}
+          />
 
         </div>
         )} {/* end loading ternary */}
