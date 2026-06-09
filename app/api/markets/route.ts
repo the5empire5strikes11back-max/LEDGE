@@ -188,7 +188,13 @@ export async function GET(request: Request) {
       isNearMiss,
       /** AI-set opening odds — used to seed the sparkline history anchor */
       openingYesPercent,
-      resolved: market.resolved ? { winner: market.winner } : undefined,
+      resolved: market.resolved ? {
+        winner: market.winner,
+        note: market.resolution_note ?? null,
+        sourceUrl: market.resolution_source_display ?? market.resolution_source_url ?? null,
+        resolvedAt: market.resolved_at ?? null,
+      } : undefined,
+      resolutionCriteria: market.resolution_criteria ?? null,
       userBet: userBet ? { side: userBet.side, amount: userBet.amount } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */

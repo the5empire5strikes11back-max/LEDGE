@@ -35,6 +35,7 @@ const CATEGORY_ICONS: Record<MarketCategory, string> = {
 
 const MIN_TITLE_LENGTH = 15
 const MAX_TITLE_LENGTH = 200
+const MAX_CRITERIA_LENGTH = 400
 
 function endTimeOptions(): Array<{ label: string; value: string }> {
   const now = new Date()
@@ -58,18 +59,21 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState<MarketCategory>("Sports")
   const [endTime, setEndTime] = useState(endTimeOptions()[0].value)
+  const [criteria, setCriteria] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const titleTrimmed = title.trim()
+  const criteriaText = criteria.trim()
   const isQuestion = titleTrimmed.endsWith("?")
   // Compound question: more than one '?' (e.g. "Will X? And will Y?")
   const isCompound = (titleTrimmed.match(/\?/g) ?? []).length > 1
   const isTooShort = titleTrimmed.length < MIN_TITLE_LENGTH
   const isTooLong = titleTrimmed.length > MAX_TITLE_LENGTH
+  const isCriteriaTooLong = criteriaText.length > MAX_CRITERIA_LENGTH
   const endDate = new Date(endTime)
   const isEndInFuture = endDate > new Date()
-  const canSubmit = isQuestion && !isCompound && !isTooShort && !isTooLong && isEndInFuture && !submitting
+  const canSubmit = isQuestion && !isCompound && !isTooShort && !isTooLong && !isCriteriaTooLong && isEndInFuture && !submitting
 
   // Inline hint shown below the textarea
   const inputHint: string | null =
@@ -83,6 +87,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
     setTitle("")
     setCategory("Sports")
     setEndTime(endTimeOptions()[0].value)
+    setCriteria("")
     setError(null)
     onClose()
   }
@@ -100,6 +105,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
           title: titleTrimmed,
           category,
           end_time: new Date(endTime).toISOString(),
+          ...(criteriaText ? { resolution_criteria: criteriaText } : {}),
         }),
       })
 
@@ -186,6 +192,37 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                 {charCount}/{MAX_TITLE_LENGTH}
               </span>
             </div>
+          </div>
+
+          {/* Resolution criteria */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                How will this resolve? <span className="text-muted-foreground/50">(optional)</span>
+              </label>
+              <span className={cn(
+                "text-[10px] font-mono tabular-nums",
+                isCriteriaTooLong ? "text-danger" : "text-muted-foreground/40"
+              )}>
+                {criteriaText.length}/{MAX_CRITERIA_LENGTH}
+              </span>
+            </div>
+            <textarea
+              value={criteria}
+              onChange={(e) => setCriteria(e.target.value)}
+              placeholder={`e.g. Resolves YES if an official announcement is made by ${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}.`}
+              rows={2}
+              maxLength={MAX_CRITERIA_LENGTH + 10}
+              className={cn(
+                "w-full bg-surface border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40",
+                "resize-none focus:outline-none focus:ring-1 transition-colors",
+                isCriteriaTooLong ? "border-danger focus:ring-danger" : "border-border focus:ring-accent/50"
+              )}
+              style={{ borderRadius: "var(--radius-card)" }}
+            />
+            <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
+              Helps bettors understand exactly when YES or NO wins. Makes your market more trustworthy.
+            </p>
           </div>
 
           {/* Category */}

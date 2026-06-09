@@ -180,6 +180,46 @@ export async function POST(request: Request) {
     })()
   }
 
+  // Odds shift alert — notify other bettors when odds move 10%+ (but not for whale bets, handled below)
+  const ODDS_SHIFT_THRESHOLD = 10
+  if (momentumShift >= ODDS_SHIFT_THRESHOLD && cappedAmount < WHALE_BET_THRESHOLD) {
+    const direction = newYesPercent > oldYesPercent ? '⬆️' : '⬇️'
+    const shortTitle = market.title.length > 45 ? market.title.slice(0, 42) + '…' : market.title
+    void pushToMarketBettors(
+      market_id,
+      {
+        title: `${direction} Odds shifted ${momentumShift.toFixed(0)}%`,
+        body: `"${shortTitle}" — YES now at ${newYesPercent.toFixed(0)}%`,
+        url: '/',
+      },
+      user.id
+    )
+    // In-app notifications for all existing bettors (fire-and-forget)
+    void (async () => {
+      try {
+        const { data: existingBets } = await admin
+          .from('bets')
+          .select('user_id')
+          .eq('market_id', market_id)
+          .neq('user_id', user.id)
+        const uniqueUserIds = [...new Set((existingBets ?? []).map((b: { user_id: string }) => b.user_id))]
+        if (uniqueUserIds.length > 0) {
+          const notifs = uniqueUserIds.map((uid) => ({
+            user_id: uid,
+            type: 'odds_shift',
+            title: `${direction} Odds shifted ${momentumShift.toFixed(0)}%`,
+            body: `"${shortTitle}" — YES now at ${newYesPercent.toFixed(0)}%`,
+            url: '/',
+          }))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (admin as any).from('notifications').insert(notifs)
+        }
+      } catch {
+        // Non-critical — notification is best-effort
+      }
+    })()
+  }
+
   // Whale alert — fire-and-forget, never block the response
   if (cappedAmount >= WHALE_BET_THRESHOLD) {
     const sideLabel = side === 'yes' ? '✅ YES' : '❌ NO'

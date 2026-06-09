@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useOnboarding } from "@/lib/onboarding"
@@ -32,7 +32,13 @@ interface MarketDetailProps {
     momentumShift?: number
     isFeatured?: boolean
     endTime: string
-    resolved?: { winner: "yes" | "no" }
+    resolved?: {
+      winner: "yes" | "no"
+      note?: string | null
+      sourceUrl?: string | null
+      resolvedAt?: string | null
+    }
+    resolutionCriteria?: string | null
     userBet?: { side: "yes" | "no"; amount: number }
   }
   onClose: () => void
@@ -151,6 +157,10 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const [bets, setBets]       = useState<BetActivity[]>([])
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const [disputeText, setDisputeText] = useState("")
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false)
+  const [disputeSubmitted, setDisputeSubmitted] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   const isResolved  = !!market.resolved
@@ -169,6 +179,34 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
     }
     setLoading(false)
   }, [market.id])
+
+  const submitDispute = useCallback(async () => {
+    if (!disputeText.trim() || disputeSubmitting) return
+    setDisputeSubmitting(true)
+    try {
+      const res = await fetch(`/api/markets/${market.id}/dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: disputeText.trim() }),
+      })
+      if (res.ok) {
+        setDisputeSubmitted(true)
+        setDisputeOpen(false)
+        setDisputeText("")
+      }
+    } finally {
+      setDisputeSubmitting(false)
+    }
+  }, [market.id, disputeText, disputeSubmitting])
+
+  // Dispute window: 24h after resolution, only if user has bet
+  const isResolutionDisputeable = (() => {
+    if (!market.resolved?.resolvedAt) return false
+    if (!market.userBet) return false
+    if (disputeSubmitted) return false
+    const hoursAgo = (Date.now() - new Date(market.resolved.resolvedAt).getTime()) / 3_600_000
+    return hoursAgo <= 24
+  })()
 
   useEffect(() => { load() }, [load])
 
@@ -279,6 +317,103 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
         <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-32")}>
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
+
+          {/* Resolution criteria — shown when set and market is not yet resolved */}
+          {!isResolved && market.resolutionCriteria && (
+            <div className="bg-surface border border-border px-3 py-2.5 text-xs text-muted-foreground leading-relaxed" style={{ borderRadius: "var(--radius-card)" }}>
+              <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/60 block mb-1">Resolution Criteria</span>
+              {market.resolutionCriteria}
+            </div>
+          )}
+
+          {/* Resolution info banner — shows when market is resolved */}
+          {isResolved && (
+            <div
+              className={cn(
+                "border px-3 py-3 flex flex-col gap-2",
+                market.resolved?.winner === "yes"
+                  ? "bg-success/5 border-success/20"
+                  : "bg-danger/5 border-danger/20"
+              )}
+              style={{ borderRadius: "var(--radius-card)" }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <span className={cn(
+                    "text-[9px] uppercase tracking-wider font-semibold block mb-0.5",
+                    market.resolved?.winner === "yes" ? "text-success/70" : "text-danger/70"
+                  )}>
+                    Resolved {market.resolved?.winner === "yes" ? "YES" : "NO"}
+                  </span>
+                  {market.resolved?.note && (
+                    <p className="text-xs text-foreground/80 leading-snug">{market.resolved.note}</p>
+                  )}
+                  {!market.resolved?.note && market.resolutionCriteria && (
+                    <p className="text-xs text-muted-foreground leading-snug">{market.resolutionCriteria}</p>
+                  )}
+                </div>
+              </div>
+              {market.resolved?.sourceUrl && (
+                <a
+                  href={market.resolved.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-accent hover:underline w-fit"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View source
+                </a>
+              )}
+              {/* Dispute button */}
+              {isResolutionDisputeable && !disputeOpen && (
+                <button
+                  onClick={() => setDisputeOpen(true)}
+                  className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors w-fit"
+                >
+                  <Flag className="w-3 h-3" />
+                  Dispute resolution
+                </button>
+              )}
+              {disputeOpen && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <textarea
+                    value={disputeText}
+                    onChange={(e) => setDisputeText(e.target.value)}
+                    placeholder="Explain why this resolution is incorrect (10–500 chars)…"
+                    rows={2}
+                    maxLength={510}
+                    className="w-full bg-background border border-border px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-accent/50"
+                    style={{ borderRadius: "var(--radius-card)" }}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={submitDispute}
+                      disabled={disputeText.trim().length < 10 || disputeSubmitting}
+                      className={cn(
+                        "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all",
+                        disputeText.trim().length >= 10 && !disputeSubmitting
+                          ? "bg-danger/10 border-danger/30 text-danger hover:bg-danger/20"
+                          : "bg-muted/30 border-border text-muted-foreground cursor-not-allowed"
+                      )}
+                      style={{ borderRadius: "var(--radius-badge)" }}
+                    >
+                      {disputeSubmitting ? "Submitting…" : "Submit dispute"}
+                    </button>
+                    <button
+                      onClick={() => { setDisputeOpen(false); setDisputeText("") }}
+                      className="px-3 py-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {disputeSubmitted && (
+                <p className="text-[10px] text-success">Dispute submitted. We'll review it shortly.</p>
+              )}
+            </div>
+          )}
 
           {/* Probability tiles */}
           <div className="flex items-stretch gap-3">

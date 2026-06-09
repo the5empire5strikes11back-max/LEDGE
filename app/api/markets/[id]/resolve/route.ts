@@ -26,7 +26,11 @@ export async function POST(
   const { id } = await params
 
   const body = await request.json()
-  const { winner } = body as { winner: 'yes' | 'no' }
+  const { winner, resolution_note, resolution_source_display } = body as {
+    winner: 'yes' | 'no'
+    resolution_note?: string
+    resolution_source_display?: string
+  }
 
   if (winner !== 'yes' && winner !== 'no') {
     return NextResponse.json({ error: 'winner must be yes or no' }, { status: 400 })
@@ -49,10 +53,19 @@ export async function POST(
 
   logMessage(`Manual resolution: market ${id} → ${winner}`, { context: 'admin:resolve', marketId: id, winner })
 
-  // Mark market resolved
-  await supabase
+  // Mark market resolved (+ resolution metadata)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
     .from('markets')
-    .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0 })
+    .update({
+      resolved: true,
+      winner,
+      hot_score: 0,
+      momentum_shift: 0,
+      resolved_at: new Date().toISOString(),
+      ...(resolution_note ? { resolution_note } : {}),
+      ...(resolution_source_display ? { resolution_source_display } : {}),
+    })
     .eq('id', id)
 
   // Get all bets on this market
@@ -65,6 +78,9 @@ export async function POST(
     return NextResponse.json({ resolved: true, payouts: 0 })
   }
 
+  const shortTitle = market.title.length > 50 ? market.title.slice(0, 47) + '…' : market.title
+  const shortTitle40 = market.title.length > 40 ? market.title.slice(0, 37) + '…' : market.title
+
   // Fixed-odds: payout was locked at bet time and stored on the bet record
   const payoutPromises = bets.map(async (bet) => {
     const won = bet.side === winner
@@ -76,11 +92,19 @@ export async function POST(
       .update({ won, payout })
       .eq('id', bet.id)
 
-    // Credit the winner; notify all bettors
     if (!won) {
+      // Push + in-app notification for losers
       void pushToUser(bet.user_id, {
         title: '📉 Market Settled',
-        body: `"${market.title.length > 50 ? market.title.slice(0, 47) + '…' : market.title}" didn't go your way. Jump back in.`,
+        body: `"${shortTitle}" didn't go your way. Jump back in.`,
+        url: '/',
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      void (supabase as any).from('notifications').insert({
+        user_id: bet.user_id,
+        type: 'market_resolved',
+        title: '📉 Market Settled',
+        body: `"${shortTitle}" resolved ${winner?.toUpperCase()} — you bet ${bet.side?.toUpperCase()}.`,
         url: '/',
       })
     }
@@ -106,7 +130,15 @@ export async function POST(
 
         void pushToUser(bet.user_id, {
           title: '💰 Market Settled — You Won!',
-          body: `${profitStr} CR profit on "${market.title.length > 40 ? market.title.slice(0, 37) + '…' : market.title}"`,
+          body: `${profitStr} CR profit on "${shortTitle40}"`,
+          url: '/',
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        void (supabase as any).from('notifications').insert({
+          user_id: bet.user_id,
+          type: 'market_resolved',
+          title: '💰 You Won!',
+          body: `${profitStr} CR profit on "${shortTitle40}"`,
           url: '/',
         })
       }

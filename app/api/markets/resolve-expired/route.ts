@@ -247,9 +247,10 @@ export async function POST(request: Request) {
       }
 
       // 4. Persist resolution — clear engagement signals on close
-      await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
         .from('markets')
-        .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0 })
+        .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0, resolved_at: new Date().toISOString() })
         .eq('id', market.id)
 
       const payoutCount = await settleBets(supabase, market, winner)

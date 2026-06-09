@@ -79,7 +79,13 @@ interface Market {
   isNearMiss?: boolean
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
-  resolved?: { winner: "yes" | "no" }
+  resolved?: {
+    winner: "yes" | "no"
+    note?: string | null
+    sourceUrl?: string | null
+    resolvedAt?: string | null
+  }
+  resolutionCriteria?: string | null
   creatorUsername?: string | null
 }
 

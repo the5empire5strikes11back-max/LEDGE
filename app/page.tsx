@@ -11,6 +11,7 @@ import { WinReceiptModal } from "@/components/win-receipt-modal"
 import { MysteryChestModal } from "@/components/mystery-chest-modal"
 import { CreditShopModal } from "@/components/credit-shop-modal"
 import { PublicProfileSheet } from "@/components/public-profile-sheet"
+import { NotificationCenter } from "@/components/notification-center"
 import { FeedScreen } from "@/components/screens/feed-screen"
 import { CirclesScreen } from "@/components/screens/circles-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
@@ -508,26 +509,33 @@ export default function App() {
             </div>
           </button>
 
-          {/* Credits — tap to open shop */}
-          <button
-            onClick={() => setShopOpen(true)}
-            className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-sm font-bold text-accent tabular-nums">
-                <Ticker value={credits} decimals={0} />
-              </span>
-              <span className="text-[10px] text-muted-foreground">CR</span>
-              <span
-                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-                style={{ borderRadius: "var(--radius-badge)" }}
+          {/* Notifications + Credits row */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <button
+                onClick={() => setShopOpen(true)}
+                className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
+                style={{ borderRadius: "var(--radius-button)" }}
               >
-                + Buy
-              </span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-sm font-bold text-accent tabular-nums">
+                    <Ticker value={credits} decimals={0} />
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">CR</span>
+                  <span
+                    className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                    style={{ borderRadius: "var(--radius-badge)" }}
+                  >
+                    + Buy
+                  </span>
+                </div>
+              </button>
             </div>
-          </button>
+            <div className="bg-surface border border-border flex items-center justify-center w-9 h-9 hover:border-accent/40 transition-colors" style={{ borderRadius: "var(--radius-button)" }}>
+              <NotificationCenter username={profile?.username ?? null} />
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -547,22 +555,25 @@ export default function App() {
           </div>
         )}
 
-        <button
-          onClick={() => setShopOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
-          style={{ borderRadius: "var(--radius-button)" }}
-        >
-          <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-            <Ticker value={credits} decimals={0} />
-          </span>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
-          <span
-            className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-            style={{ borderRadius: "var(--radius-badge)" }}
+        <div className="flex items-center gap-2">
+          <NotificationCenter username={profile?.username ?? null} />
+          <button
+            onClick={() => setShopOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
+            style={{ borderRadius: "var(--radius-button)" }}
           >
-            +
-          </span>
-        </button>
+            <span className="font-mono text-sm font-semibold tabular-nums text-accent">
+              <Ticker value={credits} decimals={0} />
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
+            <span
+              className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              +
+            </span>
+          </button>
+        </div>
       </header>
 
       {/* ── Main content area ─────────────────────────────────────────────── */}
