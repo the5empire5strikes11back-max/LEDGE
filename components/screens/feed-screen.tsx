@@ -716,12 +716,14 @@ export function FeedScreen({
         onClick={() => setCreateSheetOpen(true)}
         aria-label="Create a prediction market"
         className={cn(
-          "fixed right-4 z-30 lg:absolute lg:bottom-5 lg:right-4",
+          "fixed z-30 right-4 lg:right-6",
           "w-11 h-11 rounded-full bg-accent text-accent-foreground",
           "flex items-center justify-center shadow-lg",
-          "hover:opacity-90 active:scale-95 transition-all duration-150"
+          "hover:opacity-90 active:scale-95 transition-all duration-150",
+          // Mobile: float above bottom nav bar; Desktop: stick to bottom of viewport
+          "lg:bottom-6"
         )}
-        style={{ bottom: "calc(65px + env(safe-area-inset-bottom) + 16px)" }}
+        style={{ bottom: "calc(65px + env(safe-area-inset-bottom) + 12px)" }}
       >
         <Plus className="w-5 h-5" strokeWidth={2.5} />
       </button>
