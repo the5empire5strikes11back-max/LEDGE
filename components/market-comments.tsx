@@ -44,6 +44,7 @@ export function MarketComments({
 }: MarketCommentsProps) {
   const [comments, setComments]         = useState<Comment[]>([])
   const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState(false)
   const [page, setPage]                 = useState(1)
   const [hasMore, setHasMore]           = useState(false)
   const [body, setBody]                 = useState("")
@@ -57,10 +58,14 @@ export function MarketComments({
   const fetchComments = useCallback(async (p: number, replace: boolean) => {
     if (replace) setLoading(true)
     try {
-      const res  = await fetch(`/api/comments?marketId=${marketId}&page=${p}`)
+      const res = await fetch(`/api/comments?marketId=${marketId}&page=${p}`)
+      if (!res.ok) { setError(true); return }
       const data = await res.json() as { comments: Comment[]; hasMore: boolean }
+      setError(false)
       setComments((prev) => replace ? data.comments : [...prev, ...data.comments])
       setHasMore(data.hasMore)
+    } catch {
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -164,6 +169,8 @@ export function MarketComments({
     setPage(next)
     fetchComments(next, false)
   }
+
+  if (error) return null
 
   return (
     <div className="flex flex-col gap-3">
