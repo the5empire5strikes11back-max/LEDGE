@@ -232,7 +232,7 @@ export function ProfileScreen({
 
   useEffect(() => {
     fetch('/api/stats').then((r) => r.ok ? r.json() : null).then((d) => d && setStats(d))
-    fetch('/api/leaderboard').then((r) => r.ok ? r.json() : null).then((d) => d && setLeaderboard(d))
+    fetch('/api/leaderboard').then((r) => r.ok ? r.json() : null).then((d) => d && setLeaderboard(Array.isArray(d) ? d : (d.leaderboard ?? [])))
     fetch('/api/pnl-history').then((r) => r.ok ? r.json() : null).then((d) => d && setPnlHistory(d))
     fetch('/api/bets').then((r) => r.ok ? r.json() : null).then((d) => Array.isArray(d) && setBets(d))
     fetch('/api/creator/markets').then((r) => r.ok ? r.json() : []).then((d) => Array.isArray(d) && setCreatorMarkets(d))
