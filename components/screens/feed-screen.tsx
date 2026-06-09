@@ -711,17 +711,19 @@ export function FeedScreen({
         </div>
       </div>
 
-      {/* "+" FAB — create a market, pinned above the tab bar */}
+      {/* "+" FAB — create a market */}
       <button
         onClick={() => setCreateSheetOpen(true)}
         aria-label="Create a prediction market"
         className={cn(
-          "fixed z-30 right-4 lg:right-6",
-          "w-11 h-11 rounded-full bg-accent text-accent-foreground",
+          "fixed z-30 w-11 h-11 rounded-full bg-accent text-accent-foreground",
           "flex items-center justify-center shadow-lg",
           "hover:opacity-90 active:scale-95 transition-all duration-150",
-          // Mobile: float above bottom nav bar; Desktop: stick to bottom of viewport
-          "lg:bottom-6"
+          // Mobile: above bottom nav bar, right edge
+          "right-4",
+          // Desktop: bottom-right of the feed column
+          // sidebar=220px + feed=380px − button=44px − padding=16px = 540px from left
+          "lg:right-auto lg:left-[540px] lg:bottom-6"
         )}
         style={{ bottom: "calc(65px + env(safe-area-inset-bottom) + 12px)" }}
       >
