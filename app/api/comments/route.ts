@@ -20,19 +20,32 @@ export async function GET(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: comments, error } = await (supabase as any)
     .from('market_comments')
-    .select('id, body, image_url, like_count, dislike_count, created_at, user_id, profiles(username)')
+    .select('id, body, image_url, like_count, dislike_count, created_at, user_id')
     .eq('market_id', marketId)
     .order('created_at', { ascending: false })
     .range(from, to) as {
       data: Array<{
         id: string; body: string; image_url: string | null; like_count: number;
         dislike_count: number; created_at: string; user_id: string;
-        profiles: { username: string } | null
       }> | null
       error: { message: string } | null
     }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fetch usernames for comment authors
+  const userIds = [...new Set((comments ?? []).map((c) => c.user_id))]
+  let usernameMap: Record<string, string> = {}
+  if (userIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: profiles } = await (supabase as any)
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds) as { data: Array<{ id: string; username: string }> | null }
+    if (profiles) {
+      usernameMap = Object.fromEntries(profiles.map((p) => [p.id, p.username]))
+    }
+  }
 
   // Fetch current user's reactions for these comments
   let userReactions: Record<string, string> = {}
@@ -50,22 +63,19 @@ export async function GET(request: Request) {
     }
   }
 
-  const result = (comments ?? []).map((c) => {
-    const profile = c.profiles as { username: string } | null
-    return {
-      id:            c.id,
-      user_id:       c.user_id,
-      username:      profile?.username ?? 'unknown',
-      avatar_url:    null,
-      body:          c.body,
-      image_url:     c.image_url,
-      like_count:    c.like_count,
-      dislike_count: c.dislike_count,
-      created_at:    c.created_at,
-      user_reaction: (userReactions[c.id] ?? null) as 'like' | 'dislike' | null,
-      is_own:        user ? c.user_id === user.id : false,
-    }
-  })
+  const result = (comments ?? []).map((c) => ({
+    id:            c.id,
+    user_id:       c.user_id,
+    username:      usernameMap[c.user_id] ?? 'unknown',
+    avatar_url:    null,
+    body:          c.body,
+    image_url:     c.image_url,
+    like_count:    c.like_count,
+    dislike_count: c.dislike_count,
+    created_at:    c.created_at,
+    user_reaction: (userReactions[c.id] ?? null) as 'like' | 'dislike' | null,
+    is_own:        user ? c.user_id === user.id : false,
+  }))
 
   return NextResponse.json({ comments: result, page, hasMore: result.length === PAGE_SIZE })
 }
