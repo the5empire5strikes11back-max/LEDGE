@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo, useTransition } from "react"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
@@ -11,7 +11,7 @@ import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Plus, Flame, Star, BarChart2 } from "lucide-react"
+import { Plus, Flame, Star, BarChart2, Search, X as XIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
@@ -167,6 +167,7 @@ export function FeedScreen({
 }: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
   const [activeSubcat, setActiveSubcat] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
   const [detailMarket, setDetailMarket] = useState<Market | null>(null)
@@ -300,10 +301,16 @@ export function FeedScreen({
       })
     : rawFiltered
 
+  // Apply search filter
+  const searchTrimmed = searchQuery.trim().toLowerCase()
+  const searchFiltered = searchTrimmed
+    ? subcatFiltered.filter((m) => m.title.toLowerCase().includes(searchTrimmed))
+    : subcatFiltered
+
   // Apply first-session ranking to All tab when user hasn't bet yet
-  const filtered = (isFirstSession && activeTab === "All")
+  const filtered = (isFirstSession && activeTab === "All" && !searchTrimmed)
     ? rankFeedFirstSession(
-        subcatFiltered.map((m) => ({
+        searchFiltered.map((m) => ({
           ...m,
           // Map Market fields to RankableMarket fields
           created_at: new Date(0).toISOString(), // approximation; not stored on Market
@@ -316,8 +323,8 @@ export function FeedScreen({
           total_credits: m.totalCredits,
           circle_id: null,
         }))
-      ).map((ranked) => subcatFiltered.find((m) => m.id === ranked.id)!)
-    : subcatFiltered
+      ).map((ranked) => searchFiltered.find((m) => m.id === ranked.id)!)
+    : searchFiltered
 
   // Spotlight: first hot/featured open market for first-session users
   const spotlightId = (isFirstSession && activeTab === "All")
@@ -508,6 +515,30 @@ export function FeedScreen({
 
         {/* Filter tabs + subcategory chips */}
         <div className="sticky top-0 z-10 bg-background border-b border-border">
+
+          {/* Search bar */}
+          <div className="px-4 pt-2 pb-1">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search markets…"
+                className="w-full bg-surface border border-border text-sm text-foreground placeholder:text-muted-foreground/40 pl-9 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent/40 transition-colors"
+                style={{ borderRadius: "var(--radius-button)" }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Primary category tabs */}
           <div className="flex gap-1 overflow-x-auto scrollbar-none px-4 pt-2 pb-2">
             {TABS.map((tab) => (
@@ -638,16 +669,28 @@ export function FeedScreen({
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-3 text-center">
-              <span className="text-3xl" aria-hidden>🔭</span>
-              <p className="text-sm font-medium text-foreground">Nothing here yet</p>
+              <span className="text-3xl" aria-hidden>{searchTrimmed ? "🔍" : "🔭"}</span>
+              <p className="text-sm font-medium text-foreground">
+                {searchTrimmed ? "No results" : "Nothing here yet"}
+              </p>
               <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-                {activeSubcat
+                {searchTrimmed
+                  ? `No markets matching "${searchQuery}". Try different keywords.`
+                  : activeSubcat
                   ? `No ${activeSubcat} markets right now.`
                   : activeTab === "All"
                   ? "New markets are added daily. Check back soon."
                   : `No ${activeTab} markets right now. Try another category or check back later.`}
               </p>
-              {activeSubcat ? (
+              {searchTrimmed ? (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="mt-1 px-4 py-2 text-xs font-semibold bg-accent text-accent-foreground active:scale-[0.96] active:opacity-80 transition-all duration-[80ms]"
+                  style={{ borderRadius: "var(--radius-button)" }}
+                >
+                  Clear search
+                </button>
+              ) : activeSubcat ? (
                 <button
                   onClick={() => setActiveSubcat(null)}
                   className="mt-1 px-4 py-2 text-xs font-semibold bg-accent text-accent-foreground active:scale-[0.96] active:opacity-80 transition-all duration-[80ms]"
