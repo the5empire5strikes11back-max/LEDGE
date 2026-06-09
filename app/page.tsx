@@ -653,6 +653,8 @@ export default function App() {
         newXP={xp}
         xpGained={winReceipt?.xpGained ?? 0}
         username={profile.username}
+        rank={rank}
+        persona={persona}
       />
       <RankUpModal
         open={!!rankUpFrom}

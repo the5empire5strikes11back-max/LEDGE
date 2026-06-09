@@ -10,6 +10,10 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Share2, TrendingUp, Zap } from "lucide-react"
+import { PredictionCardOverlay } from "@/components/share-card/prediction-card-overlay"
+import type { PredictionResultData } from "@/components/share-card/prediction-result-card"
+import type { RankKey } from "@/components/user-profile-card"
+import type { Persona } from "@/lib/game-engine"
 
 // ── Confetti burst ────────────────────────────────────────────────────────────
 function ConfettiBurst({ active }: { active: boolean }) {
@@ -101,6 +105,8 @@ interface WinReceiptModalProps {
   newXP: number
   xpGained: number
   username: string
+  rank?: RankKey
+  persona?: Persona
 }
 
 function StatBox({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -124,10 +130,13 @@ export function WinReceiptModal({
   newXP,
   xpGained,
   username,
+  rank,
+  persona,
 }: WinReceiptModalProps) {
-  const [visible,  setVisible]  = useState(false)
-  const [burst,    setBurst]    = useState(false)
-  const [copied,   setCopied]   = useState(false)
+  const [visible,     setVisible]     = useState(false)
+  const [burst,       setBurst]       = useState(false)
+  const [copied,      setCopied]      = useState(false)
+  const [showCard,    setShowCard]    = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -140,18 +149,26 @@ export function WinReceiptModal({
     }
   }, [open])
 
-  const handleShare = async () => {
-    const text = `🏆 Just won ${profit.toLocaleString()} credits on Ledge!\n"${market.title}"\nBet ${bet.side.toUpperCase()} · Payout ${payout.toLocaleString()} CR\n\nledge.app`
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // silently fail
-    }
+  const handleShare = () => setShowCard(true)
+
+  const cardData: PredictionResultData = {
+    marketTitle:      market.title,
+    category:         market.category,
+    side:             bet.side,
+    won:              true,
+    amount:           bet.amount,
+    profit,
+    payoutMultiplier: bet.amount > 0 ? Math.round((payout / bet.amount) * 10) / 10 : 1,
+    rank,
+    persona,
+    username,
   }
 
   return (
+    <>
+    {showCard && (
+      <PredictionCardOverlay data={cardData} onClose={() => setShowCard(false)} />
+    )}
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
         showCloseButton={false}
@@ -265,7 +282,7 @@ export function WinReceiptModal({
               style={{ borderRadius: "var(--radius-button)" }}
             >
               <Share2 className="w-4 h-4" />
-              {copied ? "Copied!" : "Share W"}
+              Share W
             </Button>
             <Button
               onClick={onClose}
@@ -278,5 +295,6 @@ export function WinReceiptModal({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   )
 }

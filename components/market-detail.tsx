@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check, ImageIcon } from "lucide-react"
+import { PredictionCardOverlay } from "@/components/share-card/prediction-card-overlay"
+import type { PredictionResultData } from "@/components/share-card/prediction-result-card"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useOnboarding } from "@/lib/onboarding"
@@ -162,6 +164,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const [disputeSubmitting, setDisputeSubmitting] = useState(false)
   const [disputeSubmitted, setDisputeSubmitted] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [showResultCard, setShowResultCard] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   const isResolved  = !!market.resolved
@@ -435,7 +438,34 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               {disputeSubmitted && (
                 <p className="text-[10px] text-success">Dispute submitted. We'll review it shortly.</p>
               )}
+
+              {/* Share result card — shown when user has a bet on this market */}
+              {market.userBet && !disputeOpen && (
+                <button
+                  onClick={() => setShowResultCard(true)}
+                  className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors w-fit"
+                >
+                  <ImageIcon className="w-3 h-3" />
+                  {market.userBet.side === market.resolved?.winner ? "Share your W" : "Share your call"}
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Prediction result card overlay */}
+          {showResultCard && market.userBet && isResolved && (
+            <PredictionCardOverlay
+              data={{
+                marketTitle:  market.title,
+                category:     market.category,
+                side:         market.userBet.side,
+                entryOdds:    market.yesPercent,
+                won:          market.userBet.side === market.resolved?.winner,
+                amount:       market.userBet.amount,
+                username:     currentUsername ?? "anon",
+              } satisfies PredictionResultData}
+              onClose={() => setShowResultCard(false)}
+            />
           )}
 
           {/* Probability tiles */}
