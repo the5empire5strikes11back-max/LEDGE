@@ -509,32 +509,33 @@ export default function App() {
             </div>
           </button>
 
-          {/* Notifications + Credits row */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <button
-                onClick={() => setShopOpen(true)}
-                className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
-                style={{ borderRadius: "var(--radius-button)" }}
+          {/* Credits + bell in one row */}
+          <button
+            onClick={() => setShopOpen(true)}
+            className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
+            style={{ borderRadius: "var(--radius-button)" }}
+          >
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-sm font-bold text-accent tabular-nums">
+                <Ticker value={credits} decimals={0} />
+              </span>
+              <span className="text-[10px] text-muted-foreground">CR</span>
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                style={{ borderRadius: "var(--radius-badge)" }}
               >
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-sm font-bold text-accent tabular-nums">
-                    <Ticker value={credits} decimals={0} />
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">CR</span>
-                  <span
-                    className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-                    style={{ borderRadius: "var(--radius-badge)" }}
-                  >
-                    + Buy
-                  </span>
-                </div>
-              </button>
+                + Buy
+              </span>
             </div>
-            <div className="bg-surface border border-border flex items-center justify-center w-9 h-9 hover:border-accent/40 transition-colors" style={{ borderRadius: "var(--radius-button)" }}>
-              <NotificationCenter username={profile?.username ?? null} />
-            </div>
+          </button>
+          {/* Bell — sits below credits, full width */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border hover:border-accent/40 transition-colors cursor-pointer"
+            style={{ borderRadius: "var(--radius-button)" }}
+          >
+            <NotificationCenter username={profile?.username ?? null} />
+            <span className="text-[10px] text-muted-foreground">Notifications</span>
           </div>
         </div>
       </aside>
