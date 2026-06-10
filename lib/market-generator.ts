@@ -7,7 +7,7 @@ import { verifySportsMarkets } from '@/lib/espn-verify'
 // viral culture. Business/finance feed REMOVED — it produced corporate garbage.
 
 const RSS_FEEDS = [
-  // Sports — two major sources for game outcomes + drama
+  // Sports — major sources for game outcomes + drama
   { url: 'https://www.espn.com/espn/rss/news',               category: 'Sports'   },
   { url: 'https://feeds.bbci.co.uk/sport/rss.xml',           category: 'Sports'   },
   { url: 'https://feeds.bbci.co.uk/sport/football/rss.xml',  category: 'Sports'   },
@@ -20,17 +20,29 @@ const RSS_FEEDS = [
   // Music — artist drama, chart battles, drops
   { url: 'https://www.billboard.com/feed/',                  category: 'Culture'  },
 
-  // Gaming + tech culture — viral moments, releases
-  { url: 'https://www.theverge.com/rss/index.xml',           category: 'Culture'  },
-  { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', category: 'Culture'  },
+  // Tech — AI, gadgets, gaming, big-tech moves (own category now, not "Culture")
+  { url: 'https://www.theverge.com/rss/index.xml',           category: 'Tech'     },
+  { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', category: 'Tech'     },
+  { url: 'https://techcrunch.com/feed/',                     category: 'Tech'     },
+  { url: 'https://www.engadget.com/rss.xml',                 category: 'Tech'     },
+
+  // Viral — internet culture, memes, trending social moments
+  { url: 'https://mashable.com/feeds/rss/all',               category: 'Viral'    },
 
   // Politics — only breaking / emotionally charged stories
   { url: 'https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml', category: 'Politics' },
 ]
 
+/** Every category the generator can emit — must mirror ALLOWED_CATEGORIES. */
+export type GeneratedCategory = 'Sports' | 'Politics' | 'Culture' | 'Tech' | 'Viral' | 'Wild'
+
+const GENERATED_CATEGORIES: readonly GeneratedCategory[] = [
+  'Sports', 'Politics', 'Culture', 'Tech', 'Viral', 'Wild',
+]
+
 export interface GeneratedMarket {
   title: string
-  category: 'Sports' | 'Politics' | 'Culture'
+  category: GeneratedCategory
   end_time: string
   jackpot_pool: number
   resolution_criteria: string
@@ -42,10 +54,19 @@ export interface GeneratedMarket {
 
 export interface GenerationOptions {
   /**
-   * When true, bias generation toward ~48% Sports / 27% Culture / 25% Politics.
-   * Triggered automatically when Sports inventory (live + queued) falls below threshold.
+   * When true, bias generation toward Sports. Legacy flag — still honored, but
+   * categoryTargets takes precedence when provided.
    */
   sportsHeavy?: boolean
+  /**
+   * Per-category counts the feed currently NEEDS (its deficit below floor).
+   * When provided, generation focuses on these categories in these proportions
+   * so every category is driven toward its 15-market floor — including Tech,
+   * Viral, and Wild, which have no dedicated news feed.
+   */
+  categoryTargets?: Partial<Record<GeneratedCategory, number>>
+  /** Total questions to ask the model for. Defaults to 40. */
+  totalTarget?: number
 }
 
 function extractTitlesFromRSS(xml: string): string[] {
@@ -98,18 +119,44 @@ export async function generateMarkets(
 
   const client = new Anthropic({ apiKey: key })
   const now = new Date()
+  const totalTarget = options.totalTarget ?? 40
 
-  const distributionInstruction = options.sportsHeavy
-    ? `CATEGORY DISTRIBUTION (Sports inventory critically low — boost Sports now):
-- Sports: ~20 markets (50%) — game winners, series outcomes, player moments, tournament runs
-- Culture: ~12 markets (30%) — celebrity drama, music drops, movie box office, viral events
-- Politics: ~8 markets (20%) — only genuinely polarising, high-stakes, emotionally charged stories
-All Sports markets MUST use hours_until_close of 12–48 to match real game timelines.`
-    : `CATEGORY DISTRIBUTION (balanced — 15 per category target):
-- Sports: ~14 markets (35%) — game outcomes, player performance, match results
-- Culture: ~15 markets (37%) — entertainment, awards, celebrity beef, music, viral moments
-- Politics: ~11 markets (28%) — only hot-button, viral, emotionally charged political events
-Sports markets should strongly prefer hours_until_close of 12–48.`
+  // Per-category creative briefs — reused whether targeting deficits or balanced.
+  const CATEGORY_BRIEFS: Record<GeneratedCategory, string> = {
+    Sports:   'game outcomes, player performance, match results, tournament runs (prefer hours_until_close 12–48)',
+    Culture:  'entertainment, awards, celebrity beef, music drops, movie box office, TV finales',
+    Politics: 'ONLY hot-button, viral, emotionally charged political events — never procedure or policy wonkery',
+    Tech:     'AI/gadget/game releases or announcements expected in the NEXT FEW DAYS, big-tech drama unfolding now (not "by end of year")',
+    Viral:    'a trend/meme/creator beef happening NOW that will blow up or fizzle within 48–72h (resolve via whether it dominates the feed this week)',
+    Wild:     'fun wildcard predictions that resolve within 7 days from a public source — a surprise drop, a viral moment, an upset THIS week (never open-ended "will it ever happen")',
+  }
+
+  // Build the distribution block. When categoryTargets is supplied (the feed is
+  // short in specific categories), focus generation there so every category is
+  // driven toward its floor. Otherwise fall back to balanced / sports-heavy.
+  let distributionInstruction: string
+  const targets = options.categoryTargets
+  if (targets && Object.values(targets).some((n) => (n ?? 0) > 0)) {
+    const lines = GENERATED_CATEGORIES
+      .map((c) => ({ c, n: targets[c] ?? 0 }))
+      .filter(({ n }) => n > 0)
+      .sort((a, b) => b.n - a.n)
+      .map(({ c, n }) => `- ${c}: ~${n} markets — ${CATEGORY_BRIEFS[c]}`)
+    distributionInstruction =
+      `CATEGORY DISTRIBUTION (fill the feed's current gaps — generate the counts below):\n${lines.join('\n')}\n` +
+      `Hit these category counts as closely as you can; these categories are below their live-market floor.`
+  } else if (options.sportsHeavy) {
+    distributionInstruction = `CATEGORY DISTRIBUTION (Sports inventory critically low — boost Sports now):
+- Sports: ~16 markets — ${CATEGORY_BRIEFS.Sports}
+- Culture: ~8 markets — ${CATEGORY_BRIEFS.Culture}
+- Tech: ~6 markets — ${CATEGORY_BRIEFS.Tech}
+- Viral: ~4 markets — ${CATEGORY_BRIEFS.Viral}
+- Politics: ~3 markets — ${CATEGORY_BRIEFS.Politics}
+- Wild: ~3 markets — ${CATEGORY_BRIEFS.Wild}`
+  } else {
+    distributionInstruction = `CATEGORY DISTRIBUTION (balanced — ~equal across all six categories):
+${GENERATED_CATEGORIES.map((c) => `- ${c}: ~7 markets — ${CATEGORY_BRIEFS[c]}`).join('\n')}`
+  }
 
   const prompt = `You are generating prediction markets for Ledge — a Gen Z social betting app (fake credits, no real money).
 
@@ -139,11 +186,17 @@ EXAMPLES OF BAD MARKETS — NEVER GENERATE THESE:
 Here are today's news headlines:
 ${headlines.map((h, i) => `${i + 1}. [${h.category}] ${h.headline}`).join('\n')}
 
-Generate exactly 40 yes/no prediction market questions based on these headlines. Requirements:
-- Must be decidable within 1–7 days from today
+Generate exactly ${totalTarget} yes/no prediction market questions based on these headlines AND your knowledge of what's happening this week (use this especially for Tech, Viral, and Wild, which have fewer headlines). Requirements:
+- HARD RULE: the outcome MUST resolve within the next 7 days (168 hours). event_date must be 7 days from now or sooner. If your idea only resolves later, DON'T generate it — pick a nearer milestone instead.
 - Exciting and personally relevant to Gen Z
 - Natural, conversational language — like a bet you'd make with your friend
 - Be PRECISE about timing — a game tonight closes in hours, not days
+
+REJECT YOUR OWN LONG-HORIZON IDEAS — these resolve too far out and will be thrown away:
+❌ "before the end of [month]"  ❌ "this season"  ❌ "by [year]" / "before 2027"
+❌ "next Christmas"  ❌ "at the Oscars" (unless within 7 days)  ❌ "eventually"
+Instead anchor to the next 1–7 days: a release THIS week, a game tonight, a trend that
+either blows up or fizzles in 48–72h, an announcement expected in the next few days.
 
 CRITICAL — FRESHNESS GATE (read carefully, this is the #1 quality problem):
 - ONLY generate markets whose outcome is genuinely STILL UNDECIDED and resolves in the FUTURE.
@@ -178,7 +231,7 @@ Return ONLY a JSON array, no other text:
 ]
 
 Rules:
-- category must be "Sports", "Politics", or "Culture"
+- category must be exactly one of: "Sports", "Politics", "Culture", "Tech", "Viral", "Wild"
 - event_status: "upcoming" or "live" only (drop "past"/"unknown" entirely — do not output them)
 - event_date: ISO 8601 datetime of when the outcome becomes known; must be in the future
 - hours_until_close: use 4–12 for events today, 24–48 for tomorrow, up to 168 (7 days) max; must land shortly AFTER event_date
@@ -213,9 +266,13 @@ KEYWORD RULES — violations cause false resolutions:
 resolution_source_url — pick the most topically relevant feed:
   - US politics: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml"
   - World events: "https://feeds.bbci.co.uk/news/world/rss.xml"
-  - Entertainment: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
-  - Tech/gaming: "https://feeds.bbci.co.uk/news/technology/rss.xml"
-target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no_terms":["<phrase3>","<phrase4>"]}`
+  - Entertainment / Culture / Viral: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+  - Tech / gaming / AI: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no_terms":["<phrase3>","<phrase4>"]}
+
+For Tech, Viral, and Wild markets you will almost always use TIER 3 (rss_keyword) with the
+Tech or Entertainment feed above. Keep yes_terms specific multi-word phrases naming the exact
+event so only a headline about THIS market can resolve it.`
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5',
@@ -250,6 +307,13 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
     const status = (m.event_status ?? '').toLowerCase()
     if (status === 'past' || status === 'unknown') {
       dropped.push(`event_status=${status || 'missing'}: "${m.title}"`)
+      continue
+    }
+
+    // Category gate — the model must emit one of the six allowed categories.
+    // Drop anything off-list rather than letting a bad label reach the DB.
+    if (!GENERATED_CATEGORIES.includes(m.category as GeneratedCategory)) {
+      dropped.push(`invalid_category=${m.category}: "${m.title}"`)
       continue
     }
 

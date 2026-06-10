@@ -23,11 +23,9 @@ function getAnthropicKey(): string | undefined {
 const TARGET_LIVE_COUNT = 90
 // How many markets to immediately publish from the queue to prime the feed
 const PRIME_BATCH_SIZE = 15
-// If Sports (live + queued) is below this threshold, bias generation toward Sports
-const SPORTS_LOW_THRESHOLD = CATEGORY_FLOORS['Sports'] + 5  // floor(15) + buffer(5) = 20
 
-// Vercel Cron calls this twice daily (06:00 + 18:00 UTC).
-// Also callable manually from admin for ad-hoc generation.
+// Vercel Cron calls this once daily (12:00 UTC); release-markets self-heals
+// floor deficits between runs. Also callable manually for ad-hoc generation.
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -45,27 +43,55 @@ export async function POST(request: Request) {
   const supabase = createAdminClient()
   const now = new Date().toISOString()
 
-  // ── 1. Check Sports inventory — bias generation if running low ──────────────
-  const { data: sportsInventory } = await supabase
+  // ── 1. Per-category inventory — target generation at the floor deficits ──────
+  // Count live + queued (non-resolved) per category. A category's "deficit" is
+  // how far its inventory sits below the 15-market floor; we ask the generator
+  // to produce that many (×over-gen buffer to survive pipeline rejection), so
+  // every category — Sports, Culture, Politics, Tech, Viral, Wild — is driven
+  // toward 15. Queued markets count, since release-markets will promote them.
+  const { data: inventory } = await supabase
     .from('markets')
-    .select('id')
-    .eq('category', 'Sports')
+    .select('category')
     .in('status', ['live', 'queued'])
     .eq('resolved', false)
 
-  const sportsTotal = sportsInventory?.length ?? 0
-  const sportsHeavy = sportsTotal < SPORTS_LOW_THRESHOLD
-
-  if (sportsHeavy) {
-    console.warn(`[refresh-markets] Sports inventory low (${sportsTotal} < ${SPORTS_LOW_THRESHOLD}) — using sports-heavy generation`)
+  const invCounts = new Map<string, number>()
+  for (const r of inventory ?? []) {
+    invCounts.set(r.category, (invCounts.get(r.category) ?? 0) + 1)
   }
 
-  // ── 2. Generate markets from today's news ────────────────────────────────────
+  // Over-generate vs raw deficit because the editorial pipeline rejects a large
+  // share (stale, dup, overflow). Generating ~1.7× the gap keeps floors filling.
+  const OVER_GEN = 1.7
+  const categoryTargets: Record<string, number> = {}
+  let totalDeficit = 0
+  for (const [cat, floor] of Object.entries(CATEGORY_FLOORS)) {
+    const deficit = Math.max(0, floor - (invCounts.get(cat) ?? 0))
+    totalDeficit += deficit
+    if (deficit > 0) categoryTargets[cat] = Math.ceil(deficit * OVER_GEN)
+  }
+
+  // When every category is already stocked, still rotate in a light fresh batch.
+  const useTargets = totalDeficit > 0
+  const totalTarget = useTargets
+    ? Math.max(20, Math.min(60, Object.values(categoryTargets).reduce((a, b) => a + b, 0)))
+    : 12
+
+  logMessage(
+    `[refresh-markets] inventory ${JSON.stringify(Object.fromEntries(invCounts))} — ` +
+      `deficits ${JSON.stringify(categoryTargets)} — requesting ${totalTarget}`,
+    { context: 'cron:refresh-markets:targeting' }
+  )
+
+  // ── 2. Generate markets, focused on the categories below floor ───────────────
   const anthropicKey = getAnthropicKey()
   let newMarkets: Awaited<ReturnType<typeof generateMarkets>> = []
 
   try {
-    newMarkets = await generateMarkets(anthropicKey, { sportsHeavy })
+    newMarkets = await generateMarkets(anthropicKey, {
+      categoryTargets: useTargets ? categoryTargets : undefined,
+      totalTarget,
+    })
   } catch (err) {
     logError(err, { context: 'cron:refresh-markets:generate' })
     return NextResponse.json(
@@ -249,9 +275,9 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     generation: {
-      sports_heavy: sportsHeavy,
-      sports_total_before: sportsTotal,
-      sports_low_threshold: SPORTS_LOW_THRESHOLD,
+      inventory: Object.fromEntries(invCounts),
+      category_targets: categoryTargets,
+      total_requested: totalTarget,
     },
     generated: newMarkets.length,
     quality_filter: {

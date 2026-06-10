@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { CATEGORY_FLOORS } from '@/lib/category-balance'
 
 export const maxDuration = 30
@@ -21,6 +21,25 @@ const RELEASE_BATCH_EMERGENCY = 12
 const RELEASE_MIN_ROLLING = 2
 const ARCHIVE_RESOLVED_AFTER_DAYS = 5
 const ARCHIVE_STALE_QUEUED_AFTER_DAYS = 4
+/** Don't re-trigger self-heal generation more often than this. */
+const SELF_HEAL_COOLDOWN_MIN = 25
+
+/** True if any market was generated within the last `minutes`. */
+async function wasGeneratedRecently(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  minutes: number
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('markets')
+    .select('generated_at')
+    .not('generated_at', 'is', null)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!data?.generated_at) return false
+  return (Date.now() - new Date(data.generated_at).getTime()) / 60_000 < minutes
+}
 
 // ── Category floor targets ─────────────────────────────────────────────────
 // Single source of truth lives in lib/category-balance.ts (floors + ceilings).
@@ -239,6 +258,29 @@ export async function POST(request: Request) {
   // ── 2. Build category health report ──────────────────────────────────────────
   const health = buildHealthReport(liveCounts, queuedCounts)
 
+  // ── 2b. Self-heal: regenerate when a category is below floor AND the queue
+  //        can't cover it (emergency starvation). Without this, a starved
+  //        category with an empty queue would stay under 15 until the next daily
+  //        generation cron. Cooldown-guarded and fired post-response so it never
+  //        blocks the user's feed load. The daily cron remains the reliable run;
+  //        this keeps floors filling continuously between runs. ──
+  let selfHealTriggered = false
+  if (health.emergency_warnings.length > 0) {
+    const secret = process.env.CRON_SECRET
+    const origin = (() => { try { return new URL(request.url).origin } catch { return null } })()
+    if (secret && origin && !(await wasGeneratedRecently(supabase, SELF_HEAL_COOLDOWN_MIN))) {
+      selfHealTriggered = true
+      // Fire-and-forget after the response is sent — kicks the separate
+      // refresh-markets generation function without awaiting its ~60s run.
+      after(() => {
+        void fetch(`${origin}/api/cron/refresh-markets`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${secret}` },
+        }).catch(() => {})
+      })
+    }
+  }
+
   // ── 3. Determine release batch size ──────────────────────────────────────────
   // Emergency top-up overrides if any category is below floor and lacks queue coverage
   const hasEmergencyStarvation = health.emergency_warnings.length > 0
@@ -365,6 +407,7 @@ export async function POST(request: Request) {
     category_health: health.by_category,
     starvation_warnings: health.starvation_warnings,
     emergency_warnings: health.emergency_warnings,
+    self_heal_triggered: selfHealTriggered,
     archived: {
       resolved: archivedResolved,
       stale_queued: archivedStale,
