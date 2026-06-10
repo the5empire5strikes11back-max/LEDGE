@@ -13,17 +13,25 @@
  *   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
  */
 
-import type { createAdminClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 
-type AdminClient = ReturnType<typeof createAdminClient>
+type AdminClient = SupabaseClient<Database>
 
 interface RateLimitOptions {
-  /** Unique key for this bucket — typically "{userId}:{endpoint}" */
+  /** Unique key for this bucket — typically "{userId}:{endpoint}" or "ip:{ip}" */
   key: string
   /** Maximum requests allowed within the window */
   limit: number
   /** Window size in milliseconds */
   windowMs: number
+  /**
+   * Await the write that records this request before returning.
+   * Required in the Edge runtime (middleware), where un-awaited promises
+   * after the response may be terminated and the count would be lost.
+   * Defaults to false (fire-and-forget) for low-latency route handlers.
+   */
+  waitForWrite?: boolean
 }
 
 interface RateLimitResult {
@@ -36,7 +44,7 @@ interface RateLimitResult {
 
 export async function rateLimit(
   supabase: AdminClient,
-  { key, limit, windowMs }: RateLimitOptions
+  { key, limit, windowMs, waitForWrite = false }: RateLimitOptions
 ): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - windowMs).toISOString()
 
@@ -64,14 +72,18 @@ export async function rateLimit(
     }
   }
 
-  // Record this request (fire-and-forget — don't block the response)
+  // Record this request. Awaited in Edge (middleware) for correctness,
+  // fire-and-forget in route handlers to avoid blocking the response.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(supabase as any)
-    .from('rate_limits')
-    .insert({ key })
-    .then(({ error }: { error: { message: string } | null }) => {
+  const insert = (supabase as any).from('rate_limits').insert({ key })
+  if (waitForWrite) {
+    const { error: insertError } = await insert
+    if (insertError) console.error('[rate-limit] insert error:', insertError.message)
+  } else {
+    insert.then(({ error }: { error: { message: string } | null }) => {
       if (error) console.error('[rate-limit] insert error:', error.message)
     })
+  }
 
   return { allowed: true, remaining: limit - current - 1 }
 }

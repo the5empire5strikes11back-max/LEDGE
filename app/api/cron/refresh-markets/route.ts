@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMarkets } from '@/lib/market-generator'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
+import { validateMarket } from '@/lib/market-validation'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { CATEGORY_FLOORS } from '@/app/api/cron/release-markets/route'
 import { logError, logMessage } from '@/lib/logger'
@@ -95,18 +96,24 @@ export async function POST(request: Request) {
 
   const { accepted: qualityMarkets, rejected: rejectedMarkets, scoring_stats } = scoringResult
 
-  // ── 4a. End-time guard — defense in depth after scoring ─────────────────────
-  // Discard any market whose end_time is already past or within 2 hours.
-  // The scorer catches this too, but this is a hard server-side gate before DB write.
+  // ── 4a. Temporal validation guard — defense in depth after scoring ──────────
+  // The generator already self-validates, but this is a hard server-side gate
+  // (freshness, duration sanity, anchor, resolution) before any DB write.
   const NOW_MS = Date.now()
-  const MIN_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours
   const freshMarkets = qualityMarkets.filter((m) => {
-    const end = new Date(m.end_time).getTime()
-    const hoursLeft = (end - NOW_MS) / 3_600_000
-    if (hoursLeft < 2) {
+    const verdict = validateMarket({
+      title: m.title,
+      endTimeIso: m.end_time,
+      resolutionCriteria: m.resolution_criteria,
+      resolutionSourceUrl: m.resolution_source_url,
+      targetDataKey: m.target_data_key,
+      requireResolution: true,
+      nowMs: NOW_MS,
+    })
+    if (!verdict.valid) {
       logMessage(
-        `Discarded market with stale end_time: "${m.title}" (${hoursLeft.toFixed(1)}h remaining)`,
-        { context: 'cron:refresh-markets:end_time_guard' }
+        `Discarded market at validation gate — ${verdict.code}: ${verdict.reason} — "${m.title}"`,
+        { context: 'cron:refresh-markets:validation_gate' }
       )
       return false
     }

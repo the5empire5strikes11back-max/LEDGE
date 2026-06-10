@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { validateMarket, MARKET_DURATION, describeValidation } from '@/lib/market-validation'
+import { verifySportsMarkets } from '@/lib/espn-verify'
 
 // ── RSS Feeds ────────────────────────────────────────────────────────────────
 // Curated for Gen Z relevance: sports drama, entertainment, celebrity, gaming,
@@ -111,7 +113,8 @@ Sports markets should strongly prefer hours_until_close of 12–48.`
 
   const prompt = `You are generating prediction markets for Ledge — a Gen Z social betting app (fake credits, no real money).
 
-Today is ${now.toDateString()}.
+Today is ${now.toDateString()}. The exact current time is ${now.toISOString()} (UTC).
+Anchor every event_date relative to this instant — never use a date in the past.
 
 TARGET AUDIENCE: Gen Z (ages 16–26). Deeply online. They care about: sports drama, celebrity beef, viral TikTok moments, music drops, gaming, TV finales, relationship gossip, award show upsets. They are BORED by: corporate earnings, monetary policy, legislative procedure, geopolitical acronyms, anything requiring expert knowledge.
 
@@ -140,8 +143,21 @@ Generate exactly 40 yes/no prediction market questions based on these headlines.
 - Must be decidable within 1–7 days from today
 - Exciting and personally relevant to Gen Z
 - Natural, conversational language — like a bet you'd make with your friend
-- Do NOT ask about things that already happened
 - Be PRECISE about timing — a game tonight closes in hours, not days
+
+CRITICAL — FRESHNESS GATE (read carefully, this is the #1 quality problem):
+- ONLY generate markets whose outcome is genuinely STILL UNDECIDED and resolves in the FUTURE.
+- A headline reports something that ALREADY HAPPENED. Do NOT turn "Lakers beat Celtics" into
+  "Will the Lakers beat the Celtics?" — that game is over. Instead anchor to the NEXT undecided
+  event (their next game, the series, a player's next performance).
+- For every market set "event_status":
+    "upcoming" — the event has not happened yet (e.g., a game tonight/tomorrow)
+    "live"     — happening right now, outcome not yet final
+    "past"     — already concluded/decided  → DO NOT INCLUDE IT
+    "unknown"  — you cannot tell when it resolves  → DO NOT INCLUDE IT
+- Only include markets with event_status "upcoming" or "live". Omit "past" and "unknown" entirely.
+- Set "event_date" to the event's scheduled date-time in ISO 8601 (your best anchor; the moment the
+  outcome becomes known). "hours_until_close" must land shortly AFTER that, never before.
 
 ${distributionInstruction}
 
@@ -150,6 +166,8 @@ Return ONLY a JSON array, no other text:
   {
     "title": "Will the Lakers beat the Celtics tonight?",
     "category": "Sports",
+    "event_status": "upcoming",
+    "event_date": "2025-06-10T23:30:00Z",
     "hours_until_close": 8,
     "jackpot_pool": 50000,
     "starter_probability": 45,
@@ -161,7 +179,9 @@ Return ONLY a JSON array, no other text:
 
 Rules:
 - category must be "Sports", "Politics", or "Culture"
-- hours_until_close: use 4–12 for events today, 24–48 for tomorrow, up to 168 (7 days) max
+- event_status: "upcoming" or "live" only (drop "past"/"unknown" entirely — do not output them)
+- event_date: ISO 8601 datetime of when the outcome becomes known; must be in the future
+- hours_until_close: use 4–12 for events today, 24–48 for tomorrow, up to 168 (7 days) max; must land shortly AFTER event_date
 - jackpot_pool must be 10000–500000
 - resolution_criteria: one precise sentence defining exactly what makes this YES vs NO
 - starter_probability: your best estimate (30–70) of the YES likelihood based on context, base rates, and how the headline frames the outcome. Use 50 ONLY when genuinely uncertain. Examples: home-team favourite winning tonight → 58–65; underdog upset → 32–42; incumbent keeping a lead → 60–68; celebrity doing something dramatic → 35–45. Never go below 30 or above 70 — markets must stay debatable.
@@ -210,6 +230,8 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
   const raw = JSON.parse(jsonMatch[0]) as Array<{
     title: string
     category: string
+    event_status?: string
+    event_date?: string
     hours_until_close: number
     jackpot_pool: number
     starter_probability?: number
@@ -218,14 +240,27 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
     target_data_key?: string
   }>
 
-  return raw.map((m) => {
-    const endTime = new Date(now)
-    const hours = Math.max(4, Math.min(168, m.hours_until_close ?? 24))
-    endTime.setTime(endTime.getTime() + hours * 60 * 60 * 1000)
-    // Clamp starter_probability to 30–70; default to 50 if missing/invalid
+  const nowMs = now.getTime()
+  const built: GeneratedMarket[] = []
+  const dropped: string[] = []
+
+  for (const m of raw) {
+    // Freshness gate #1 — the model self-reported the event already happened or
+    // is unanchored. Trust it and drop before doing anything else.
+    const status = (m.event_status ?? '').toLowerCase()
+    if (status === 'past' || status === 'unknown') {
+      dropped.push(`event_status=${status || 'missing'}: "${m.title}"`)
+      continue
+    }
+
+    // Derive end_time from a clamped close window (relative offset is far more
+    // reliable than trusting an absolute LLM date for the *close* moment).
+    const hours = Math.max(4, Math.min(MARKET_DURATION.AI_PREFERRED_MAX_HOURS, m.hours_until_close ?? 24))
+    const endTime = new Date(nowMs + hours * 60 * 60 * 1000)
     const rawProb = m.starter_probability ?? 50
     const starterProbability = Math.max(30, Math.min(70, Math.round(rawProb)))
-    return {
+
+    const candidate: GeneratedMarket = {
       title: m.title,
       category: m.category as GeneratedMarket['category'],
       end_time: endTime.toISOString(),
@@ -235,5 +270,54 @@ target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no
       resolution_source_url: m.resolution_source_url ?? '',
       target_data_key: m.target_data_key ?? '',
     }
-  })
+
+    // Freshness gate #2 — the strict, deterministic temporal/anchor/resolution
+    // validator. Cross-checks the event_date the model committed to.
+    const verdict = validateMarket({
+      title: candidate.title,
+      endTimeIso: candidate.end_time,
+      eventDateIso: m.event_date ?? null,
+      resolutionCriteria: candidate.resolution_criteria,
+      resolutionSourceUrl: candidate.resolution_source_url,
+      targetDataKey: candidate.target_data_key,
+      requireResolution: true,
+      nowMs,
+    })
+
+    if (!verdict.valid) {
+      dropped.push(describeValidation(candidate.title, verdict))
+      continue
+    }
+    built.push(candidate)
+  }
+
+  // ── Freshness gate #3 — hard ESPN verification for sports markets ───────────
+  // The only gate that checks live real-world data: confirm the team actually
+  // has a scheduled (not-yet-final) game. Re-anchor close time to the real game.
+  const verifications = await verifySportsMarkets(built, nowMs)
+  const final: GeneratedMarket[] = []
+  for (const v of verifications) {
+    if (!v.verified) {
+      dropped.push(`espn: ${v.reason} — "${v.market.title}"`)
+      continue
+    }
+    // Re-anchor close to the verified game time (+3h buffer for the final score),
+    // clamped to the duration bounds. Makes the countdown reflect reality.
+    if (v.eventDateIso) {
+      const gameMs = Date.parse(v.eventDateIso)
+      if (!Number.isNaN(gameMs)) {
+        const closeMs = gameMs + 3 * 60 * 60 * 1000
+        const minMs = nowMs + MARKET_DURATION.MIN_HOURS * 60 * 60 * 1000
+        const maxMs = nowMs + MARKET_DURATION.MAX_HOURS * 60 * 60 * 1000
+        v.market.end_time = new Date(Math.min(maxMs, Math.max(minMs, closeMs))).toISOString()
+      }
+    }
+    final.push(v.market)
+  }
+
+  if (dropped.length > 0) {
+    console.info(`[market-generator] dropped ${dropped.length}/${raw.length} markets at the freshness gates:\n  ${dropped.join('\n  ')}`)
+  }
+
+  return final
 }

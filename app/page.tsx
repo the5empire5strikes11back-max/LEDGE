@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TrendingUp, Users, User, Trophy, Zap, Flame, Star, AlertTriangle, Heart } from "lucide-react"
+import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -15,8 +15,6 @@ import { NotificationCenter } from "@/components/notification-center"
 import { FeedScreen } from "@/components/screens/feed-screen"
 import { CirclesScreen } from "@/components/screens/circles-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
-import { LeaderboardScreen } from "@/components/screens/leaderboard-screen"
-import { FollowingScreen } from "@/components/screens/following-screen"
 import { Ticker } from "@/components/ui/ticker"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { FirstBetAchievement } from "@/components/onboarding/achievement-toast"
@@ -34,14 +32,12 @@ import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { BetRecord } from "@/lib/game-engine"
 import type { Database } from "@/types/database"
 
-type Screen = "feed" | "circles" | "leaderboard" | "following" | "profile"
+type Screen = "feed" | "circles" | "profile"
 
 const NAV_ITEMS: { id: Screen; label: string; icon: React.ElementType }[] = [
-  { id: "feed",        label: "Feed",        icon: TrendingUp },
-  { id: "circles",     label: "Circles",     icon: Users },
-  { id: "leaderboard", label: "Leaderboard", icon: Trophy },
-  { id: "following",   label: "Following",   icon: Heart },
-  { id: "profile",     label: "Profile",     icon: User },
+  { id: "feed",    label: "Feed",    icon: TrendingUp },
+  { id: "circles", label: "Circles", icon: Users },
+  { id: "profile", label: "Profile", icon: User },
 ]
 
 // LocalStorage keys for activity tracking
@@ -84,7 +80,6 @@ function LedgeLogo({ size = 28 }: { size?: number }) {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("feed")
-  const [returnHookCount, setReturnHookCount] = useState(0)
   const [circlesBadge, setCirclesBadge] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [betHistory, setBetHistory] = useState<BetRecord[]>([])
@@ -185,20 +180,18 @@ export default function App() {
     applyAccentTheme(getSavedAccent())
   }, [])
 
-  // Fetch return hooks count for nav badge + welcome-back toast
+  // Welcome-back toast when returning after >4h with bets in play
   useEffect(() => {
     if (!ob.firstBetAchievementDone) return
     fetch('/api/return-hooks')
       .then((r) => r.ok ? r.json() : [])
       .then((hooks: unknown[]) => {
-        setReturnHookCount(hooks.length)
-        // Welcome-back toast when returning after >4h with bets in play
         if (hooks.length > 0) {
           const last = Number(localStorage.getItem(LS_LAST_APP_OPEN) ?? 0)
           const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000
           if (last < fourHoursAgo) {
             toast(`${hooks.length} bet${hooks.length > 1 ? 's' : ''} still in play`, {
-              description: 'Welcome back — check your predictions',
+              description: 'Tap the bell to check your predictions',
               duration: 4000,
             })
           }
@@ -307,12 +300,16 @@ export default function App() {
         }
       } else {
         const resolveHint = marketEndTime ? formatResolveTime(marketEndTime) : null
-        toast(`+10 XP · ${side.toUpperCase()}`, {
-          description: resolveHint ?? "Bet placed — check back when it resolves",
-          duration: 3000,
+        const sideColor = side === "yes" ? "#22C55E" : "#EF4444"
+        toast(`⚡ +10 XP · ${side.toUpperCase()} locked in`, {
+          description: resolveHint ?? "Check back when it resolves",
+          duration: 2500,
           style: {
-            background: "var(--accent)", color: "var(--accent-foreground)",
-            border: "none", fontSize: "13px", fontWeight: "700",
+            background: "var(--card)",
+            border: `1px solid ${sideColor}33`,
+            borderLeft: `3px solid ${sideColor}`,
+            fontSize: "13px",
+            fontWeight: "700",
           },
         })
       }
@@ -353,10 +350,17 @@ export default function App() {
       if (prevRank !== newRank) setRankUpFrom(prevRank)
     }
     setWinReceipt({ market: { title: marketTitle, category: marketCategory }, bet, payout, profit, xpGained })
-    toast(`+${xpGained} XP 🎉`, {
-      description: `+${profit.toLocaleString()} CR profit`,
-      duration: 3500,
-      style: { background: "var(--color-success, #22c55e)", color: "#0A0A0B", border: "none", fontSize: "14px", fontWeight: "800" },
+    toast(`🎯 You called it! +${profit.toLocaleString()} CR`, {
+      description: `+${xpGained} XP earned`,
+      duration: 4000,
+      style: {
+        background: "#0D2010",
+        border: "1px solid #22C55E55",
+        borderLeft: "3px solid #22C55E",
+        color: "#22C55E",
+        fontSize: "14px",
+        fontWeight: "800",
+      },
     })
   }
 
@@ -392,12 +396,6 @@ export default function App() {
       {screen === "circles" && (
         <CirclesScreen availableCredits={credits} onBet={handleBet} />
       )}
-      {screen === "leaderboard" && (
-        <LeaderboardScreen onUsernameClick={(username) => setPublicProfileUsername(username)} />
-      )}
-      {screen === "following" && (
-        <FollowingScreen onUsernameClick={(username) => setPublicProfileUsername(username)} />
-      )}
       {screen === "profile" && (
         <ProfileScreen
           xp={xp} rank={rank} credits={credits} streak={streak}
@@ -406,6 +404,7 @@ export default function App() {
           avatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
           isPlus={isPlus}
           onOpenShop={() => setShopOpen(true)}
+          onUsernameClick={(u) => setPublicProfileUsername(u)}
         />
       )}
     </>
@@ -428,14 +427,13 @@ export default function App() {
                 decay === "critical" ? "bg-danger" : "bg-accent"
               )} />
             )}
-            <NotificationCenter username={profile?.username ?? null} />
+            <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
           </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-            const feedBadge = id === 'feed' && returnHookCount > 0
             const circlesBadgeShow = id === 'circles' && circlesBadge
             return (
             <button
@@ -457,11 +455,6 @@ export default function App() {
               <span className="ml-auto flex items-center gap-1">
                 {id === "feed" && screen === id && (
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                )}
-                {feedBadge && screen !== id && (
-                  <span className="min-w-[16px] h-4 px-1 bg-accent text-accent-foreground text-[9px] font-bold rounded-full flex items-center justify-center tabular-nums">
-                    {returnHookCount}
-                  </span>
                 )}
                 {circlesBadgeShow && (
                   <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
@@ -562,7 +555,7 @@ export default function App() {
         )}
 
         <div className="flex items-center gap-2">
-          <NotificationCenter username={profile?.username ?? null} />
+          <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
           <button
             onClick={() => setShopOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
@@ -603,7 +596,6 @@ export default function App() {
       >
         <div className="flex">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-            const feedBadge  = id === 'feed'    && returnHookCount > 0 && screen !== id
             const circBadge  = id === 'circles' && circlesBadge
             return (
             <button
@@ -616,11 +608,6 @@ export default function App() {
             >
               <div className="relative">
                 <Icon className={cn("w-5 h-5 transition-all duration-200", screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.6)]")} />
-                {feedBadge && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 px-0.5 bg-accent text-accent-foreground text-[8px] font-bold rounded-full flex items-center justify-center tabular-nums leading-none">
-                    {returnHookCount}
-                  </span>
-                )}
                 {circBadge && (
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-background" />
                 )}

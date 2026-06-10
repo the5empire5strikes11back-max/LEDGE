@@ -27,7 +27,7 @@ export function DailyChallenges({ onLoaded }: DailyChallengesProps) {
 
   if (loading) {
     return (
-      <div className="px-4 pt-2 pb-1">
+      <div className="px-4 pt-3 pb-2.5">
         <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {[0, 1, 2].map((i) => (
             <div
@@ -48,9 +48,9 @@ export function DailyChallenges({ onLoaded }: DailyChallengesProps) {
   const maxXp   = challenges.reduce((s, c) => s + c.xp, 0)
 
   return (
-    <div className="px-4 pt-2.5 pb-1">
+    <div className="px-4 pt-3 pb-2.5">
       {/* Section header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-3">
         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
           Today's Challenges
         </span>

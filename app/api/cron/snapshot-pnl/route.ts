@@ -34,5 +34,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
+  // Housekeeping: prune rate-limit rows older than 1h. The per-IP proxy limiter
+  // writes a row per /api request, so this keeps that table bounded. The longest
+  // rate-limit window is 15min, so anything past 1h is safe to delete.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('rate_limits')
+    .delete()
+    .lt('created_at', new Date(Date.now() - 60 * 60_000).toISOString())
+
   return NextResponse.json({ snapshotted: rows.length })
 }

@@ -2,11 +2,13 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 /**
- * GET /api/leaderboard?sort=credits|winrate|streak&limit=50
+ * GET /api/leaderboard?sort=credits|winrate|streak&limit=50&view=global|near-me&period=week|month|all
  *
  * sort=credits  — ranked by total credits (default)
  * sort=winrate  — ranked by win rate (min 3 bets to qualify)
  * sort=streak   — ranked by current streak
+ * view=near-me  — returns ±15 users around the current user + percentile
+ * period=week|month — filter bets to last 7 or 30 days (winrate sort only)
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -16,6 +18,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const sort = searchParams.get('sort') ?? 'credits'
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 100)
+  const view = searchParams.get('view') ?? 'global'
+  const period = searchParams.get('period') ?? 'all'
 
   const admin = createAdminClient()
 
@@ -47,13 +51,26 @@ export async function GET(request: Request) {
 
   const globalMarketIds = (globalMarkets ?? []).map((m) => m.id)
 
+  // Period cutoff for winrate filtering
+  let periodCutoff: string | null = null
+  if (period === 'week') {
+    const d = new Date(); d.setDate(d.getDate() - 7); periodCutoff = d.toISOString()
+  } else if (period === 'month') {
+    const d = new Date(); d.setDate(d.getDate() - 30); periodCutoff = d.toISOString()
+  }
+
   // Bet stats for all profiles
-  const { data: betStats } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let betQuery = (admin as any)
     .from('bets')
     .select('user_id, amount, payout, won')
     .in('user_id', profileIds)
     .in('market_id', globalMarketIds.length > 0 ? globalMarketIds : ['__none__'])
     .not('won', 'is', null)
+
+  if (periodCutoff) betQuery = betQuery.gte('created_at', periodCutoff)
+
+  const { data: betStats } = await betQuery
 
   const statsMap = new Map<string, {
     totalBets: number; wonBets: number; totalWagered: number; totalPayout: number
@@ -92,6 +109,22 @@ export async function GET(request: Request) {
     enriched.sort((a, b) => b.winRate - a.winRate || b.totalBets - a.totalBets)
   }
 
+  const totalUsers = enriched.length
+
+  // Percentile: how many users you're better than (credits basis)
+  const userGlobalIdx = enriched.findIndex((e) => e.isCurrentUser)
+  const percentile = userGlobalIdx !== -1 && totalUsers > 1
+    ? Math.round(((totalUsers - 1 - userGlobalIdx) / (totalUsers - 1)) * 100)
+    : null
+
+  if (view === 'near-me' && userGlobalIdx !== -1) {
+    const WINDOW = 15
+    const start = Math.max(0, userGlobalIdx - WINDOW)
+    const end   = Math.min(enriched.length, userGlobalIdx + WINDOW + 1)
+    const nearSlice = enriched.slice(start, end).map((e, i) => ({ ...e, rank: start + i + 1 }))
+    return NextResponse.json({ leaderboard: nearSlice, userEntry: null, percentile, totalUsers })
+  }
+
   const top = enriched.slice(0, limit).map((e, i) => ({ ...e, rank: i + 1 }))
 
   // Always include current user even if outside top N
@@ -102,5 +135,5 @@ export async function GET(request: Request) {
     if (idx !== -1) userEntry = { ...enriched[idx], rank: idx + 1 }
   }
 
-  return NextResponse.json({ leaderboard: top, userEntry })
+  return NextResponse.json({ leaderboard: top, userEntry, percentile, totalUsers })
 }

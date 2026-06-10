@@ -7,6 +7,8 @@
  * question easy to answer.
  */
 
+import { MARKET_DURATION } from '@/lib/market-validation'
+
 // ── Field length limits ───────────────────────────────────────────────────────
 export const LIMITS = {
   marketTitle:   { min: 10, max: 200 },
@@ -69,10 +71,12 @@ export function validateEndTime(raw: unknown): ValidationResult {
   const d = new Date(raw)
   if (isNaN(d.getTime()))      return { ok: false, error: 'Invalid end_time' }
   if (d <= new Date())         return { ok: false, error: 'end_time must be in the future' }
-  // Cap at 1 year from now
-  const oneYear = new Date()
-  oneYear.setFullYear(oneYear.getFullYear() + 1)
-  if (d > oneYear)             return { ok: false, error: 'end_time cannot be more than 1 year away' }
+  // Single source of truth for the ceiling (kills "89 days left"): markets may
+  // not close further out than MARKET_DURATION.MAX_HOURS (30 days).
+  const maxClose = new Date(Date.now() + MARKET_DURATION.MAX_HOURS * 3_600_000)
+  if (d > maxClose) {
+    return { ok: false, error: `Markets must close within ${MARKET_DURATION.MAX_HOURS / 24} days` }
+  }
   return { ok: true }
 }
 

@@ -8,7 +8,7 @@ import { isAdminRequest } from '@/lib/validate'
  * Also accepts ?run=1 to score a small set of sample titles (no DB write).
  */
 
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
 import type { GeneratedMarket } from '@/lib/market-generator'
@@ -70,6 +70,13 @@ const SAMPLE_MARKETS: GeneratedMarket[] = [
 ]
 
 export async function GET(request: Request) {
+  // Admin-only — uses the service-role client below, so gate before any work.
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user || !isAdminRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const supabase = createAdminClient()
   const url = new URL(request.url)
   const runSample = url.searchParams.get('run') === '1'

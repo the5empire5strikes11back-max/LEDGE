@@ -3,3 +3,18 @@ packages:
 
 allowedDeprecatedVersions:
   uuid: '*'
+
+minimumReleaseAgeExclude:
+  - lodash@4.17.24
+  - postcss@8.5.10
+  - ws@8.20.1
+
+overrides:
+  lodash@<=4.17.23: ^4.17.24
+  lodash@>=4.0.0 <=4.17.23: ^4.17.24
+  postcss@<8.5.10: ^8.5.10
+  ws@>=8.0.0 <8.20.1: ^8.20.1
+
+allowBuilds:
+  '@sentry/cli': true
+  sharp: true

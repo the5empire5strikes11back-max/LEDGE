@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
@@ -16,7 +15,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,17 +33,20 @@ export default function SignupPage() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { username },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, username }),
     })
+    const data = await res.json().catch(() => ({}))
 
-    if (error) {
-      setError(error.message)
+    if (!res.ok) {
+      setError(
+        data.error ??
+          (res.status === 429
+            ? "Too many attempts. Please wait a few minutes and try again."
+            : "Sign up failed. Please try again.")
+      )
       setLoading(false)
       return
     }

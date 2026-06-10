@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -21,7 +21,12 @@ export async function GET() {
       ?? user.email?.split('@')[0]
       ?? `user_${user.id.slice(0, 6)}`
 
-    const { data: newProfile, error: insertError } = await supabase
+    // Use the service-role client: direct profile writes are revoked for the
+    // authenticated role to prevent credit/xp self-grants. Identity is still
+    // pinned to the verified session (user.id), so this can only create the
+    // caller's own profile.
+    const admin = createAdminClient()
+    const { data: newProfile, error: insertError } = await admin
       .from('profiles')
       .insert({ id: user.id, username })
       .select()
@@ -38,31 +43,10 @@ export async function GET() {
   return NextResponse.json(profile)
 }
 
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const body = await request.json()
-  const allowed = ['xp', 'credits', 'streak', 'rank', 'last_active_at'] as const
-  type ProfileUpdate = import('@/types/database').Database['public']['Tables']['profiles']['Update']
-  const updates = Object.fromEntries(
-    Object.entries(body as Record<string, unknown>).filter(([key]) => (allowed as readonly string[]).includes(key))
-  ) as ProfileUpdate
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json(data)
-}
+// NOTE: A PATCH handler used to live here that accepted client-supplied
+// `credits`, `xp`, `streak`, and `rank` and wrote them to the caller's own
+// profile. That let any authenticated user mint unlimited credits and rank.
+// It was unused by the client and has been removed. All credit/XP/streak
+// changes are computed and written server-side (bets, daily-drop, resolve)
+// using the service-role client. Do not reintroduce client-writable economy
+// fields.
