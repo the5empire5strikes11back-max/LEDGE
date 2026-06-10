@@ -86,10 +86,15 @@ function formatCredits(value: number): string {
 function AnimatedNumber({
   value,
   className,
+  suffixClassName,
+  suffix,
   flashOnChange = false,
 }: {
   value: number
   className?: string
+  /** Optional suffix rendered inline after the number (e.g. "%") */
+  suffix?: string
+  suffixClassName?: string
   /** When true, briefly highlight the number green/red when it ticks up/down */
   flashOnChange?: boolean
 }) {
@@ -130,7 +135,7 @@ function AnimatedNumber({
         className
       )}
     >
-      {Math.round(displayValue)}
+      {Math.round(displayValue)}{suffix && <span className={cn("not-italic", suffixClassName)}>{suffix}</span>}
     </span>
   )
 }
@@ -391,19 +396,18 @@ export function MarketFeedCard({
 
           {/* Price column: dominant% + label + sparkline stacked */}
           <div className="shrink-0 flex flex-col items-center w-[68px] gap-0.5">
-            {/* Leading probability with % sign — shows the WINNING side's number */}
-            <div className="flex items-end gap-px leading-none">
-              <AnimatedNumber
-                value={dominantValue}
-                flashOnChange={isLiveNow}
-                className={cn(
-                  "font-black leading-none",
-                  dominantValue >= 100 || dominantValue <= 0 ? "text-3xl" : "text-4xl",
-                  dominantColor
-                )}
-              />
-              <span className={cn("font-black text-xl leading-none pb-[2px]", dominantColor)}>%</span>
-            </div>
+            {/* Leading probability — shows WINNING side's number + % inline */}
+            <AnimatedNumber
+              value={dominantValue}
+              flashOnChange={isLiveNow}
+              suffix="%"
+              suffixClassName="text-xl font-black"
+              className={cn(
+                "font-black leading-none",
+                dominantValue >= 100 || dominantValue <= 0 ? "text-3xl" : "text-4xl",
+                dominantColor
+              )}
+            />
             {/* Side label — YES / NO / 50/50 matching the number above */}
             <span className={cn(
               "text-[9px] font-medium uppercase tracking-widest",
