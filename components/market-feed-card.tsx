@@ -6,9 +6,18 @@ import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
 import { OddsSparkline } from "@/components/ui/odds-sparkline"
 import { MarketSocialBar } from "@/components/market-social-bar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { computeMovementSignals, type OddsPoint } from "@/lib/odds-history"
 import type { MarketSocialData } from "@/lib/social-signals"
 import type { CompoundState } from "@/lib/feed-signals"
+import { getResolutionMeta } from "@/lib/resolution-label"
+import { isLive, formatTimeLeft } from "@/lib/market-live"
+
+interface FriendBet {
+  username: string
+  avatarUrl: string | null
+  side: string
+}
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
 
@@ -40,6 +49,18 @@ interface MarketFeedCardProps {
   compoundState?: CompoundState
   /** Username of who created this market; null for AI-generated */
   creatorUsername?: string | null
+  /** Followed users who have bet on this market */
+  friendBets?: FriendBet[]
+  /**
+   * AI-set opening probability (derived from virtual pools at generation time).
+   * When yesPercent equals this and totalCredits === 0, we show "AI est." to
+   * signal the odds haven't been moved by real bets yet.
+   */
+  openingYesPercent?: number
+  /** Resolution source URL — drives the "Resolves via …" chip */
+  resolutionSourceUrl?: string | null
+  /** Raw JSON resolution key — used to derive source label & type */
+  targetDataKey?: string | null
   style?: React.CSSProperties
   onClick?: () => void
   onBuyYes?: () => void
@@ -62,12 +83,23 @@ function formatCredits(value: number): string {
   return value.toString()
 }
 
-function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+function AnimatedNumber({
+  value,
+  className,
+  flashOnChange = false,
+}: {
+  value: number
+  className?: string
+  /** When true, briefly highlight the number green/red when it ticks up/down */
+  flashOnChange?: boolean
+}) {
   const [displayValue, setDisplayValue] = useState(value)
+  const [flashDir, setFlashDir] = useState<"up" | "down" | null>(null)
   const prevValue = useRef(value)
 
   useEffect(() => {
     if (value === prevValue.current) return
+    const dir = value > prevValue.current ? "up" : "down"
     const start = prevValue.current
     const end = value
     const duration = 500
@@ -81,13 +113,34 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
     }
     requestAnimationFrame(animate)
     prevValue.current = value
-  }, [value])
+
+    if (flashOnChange) {
+      setFlashDir(dir)
+      const t = setTimeout(() => setFlashDir(null), 800)
+      return () => clearTimeout(t)
+    }
+  }, [value, flashOnChange])
 
   return (
-    <span className={cn("font-mono tabular-nums", className)}>
+    <span
+      className={cn(
+        "font-mono tabular-nums transition-colors duration-300",
+        flashOnChange && flashDir === "up"   && "text-success",
+        flashOnChange && flashDir === "down" && "text-danger",
+        className
+      )}
+    >
       {Math.round(displayValue)}
     </span>
   )
+}
+
+// ── Payout multiplier ─────────────────────────────────────────────────────────
+// Returns the implied payout as "X.XX×" — the amount you get back per 1cr wagered
+// if your side wins. Mirrors real-market share pricing: 100¢ / probability%.
+function payoutMultiplier(pct: number): string {
+  if (pct <= 0 || pct >= 100) return "—"
+  return `${(100 / pct).toFixed(2)}×`
 }
 
 // ── Volatility glow class ─────────────────────────────────────────────────────
@@ -174,6 +227,10 @@ export function MarketFeedCard({
   isSpotlight = false,
   compoundState = "normal",
   creatorUsername = null,
+  friendBets,
+  openingYesPercent,
+  resolutionSourceUrl,
+  targetDataKey,
   style,
   onClick,
   onBuyYes,
@@ -184,6 +241,21 @@ export function MarketFeedCard({
   const hasUserBet = !!userBet
   const isResolved = !!resolved
   const totalPool = yesPool + noPool
+  // "Crowd odds" once any real credits have been wagered; "AI est." before that.
+  const isCrowdOdds = totalCredits > 0
+  // Resolution source metadata — drives "Resolves via …" and "Auto-resolved ✓" chips
+  const resMeta = getResolutionMeta(resolutionSourceUrl, targetDataKey)
+  // Live / in-play: event is happening right now (end_time ≤ 4h away)
+  const isLiveNow = !isResolved && isLive(endTime)
+
+  // Dominant-side display: always show the LEADING probability.
+  // When YES leads (≥ 50%) → show yesPercent% with "YES" label (green)
+  // When NO leads (< 50%)  → flip to noPercent% with "NO"  label (red)
+  // At exactly 50%         → show 50% with "50/50" neutral
+  const dominantValue      = yesPercent >= 50 ? yesPercent : noPercent
+  const dominantLabel      = yesPercent > 50 ? "YES" : yesPercent < 50 ? "NO" : "50/50"
+  const dominantColor      = yesPercent > 50 ? "text-success" : yesPercent < 50 ? "text-danger" : "text-foreground"
+  const dominantLabelColor = yesPercent > 50 ? "text-success/40" : yesPercent < 50 ? "text-danger/40" : "text-muted-foreground/40"
 
   const isWin  = isResolved && userBet && resolved.winner === userBet.side
   const isLoss = isResolved && userBet && resolved.winner !== userBet.side
@@ -225,7 +297,7 @@ export function MarketFeedCard({
     >
       {/* Spotlight banner */}
       {isSpotlight && !isResolved && (
-        <div className="px-4 pt-3 pb-0">
+        <div className="px-5 pt-4 pb-0">
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-accent/10 border border-accent/25 text-[10px] font-bold text-accent uppercase tracking-wider"
             style={{ borderRadius: "var(--radius-badge)" }}
@@ -236,7 +308,7 @@ export function MarketFeedCard({
         </div>
       )}
 
-      <div className="p-4 flex flex-col gap-3">
+      <div className="p-5 flex flex-col gap-4">
 
         {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
@@ -245,8 +317,19 @@ export function MarketFeedCard({
               {categoryLabel[category]}
             </span>
 
-            {/* Live dot — shown during movement */}
-            {!isResolved && <LiveDot volatility={volatility} />}
+            {/* 🔴 LIVE chip — event happening right now */}
+            {isLiveNow && (
+              <span
+                className="inline-flex items-center gap-1 shrink-0 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-red-500/15 text-red-400 border border-red-500/25"
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                <span className="w-1 h-1 rounded-full bg-red-400 animate-pulse" />
+                LIVE
+              </span>
+            )}
+
+            {/* Live dot — shown during movement (non-live markets) */}
+            {!isResolved && !isLiveNow && <LiveDot volatility={volatility} />}
 
             {/* Compound state badge — excludes "hot" (already shown via live dot + glow) */}
             {!isResolved && compoundState !== "normal" && compoundState !== "moving" && compoundState !== "hot" && (
@@ -277,14 +360,26 @@ export function MarketFeedCard({
           </div>
 
           {isResolved ? (
-            <span
-              className={cn(
-                "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 shrink-0",
-                resolved.winner === "yes" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span
+                className={cn(
+                  "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5",
+                  resolved.winner === "yes" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                )}
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                {resolved.winner === "yes" ? "YES Won" : "NO Won"}
+              </span>
+              {resMeta.label && (
+                <span className="text-[9px] text-muted-foreground/50 font-mono">
+                  ✓ {resMeta.label}
+                </span>
               )}
-              style={{ borderRadius: "var(--radius-badge)" }}
-            >
-              {resolved.winner === "yes" ? "YES Won" : "NO Won"}
+            </div>
+          ) : isLiveNow ? (
+            /* Live markets: show red ticking time instead of generic countdown */
+            <span className="text-[10px] font-mono font-bold text-red-400 shrink-0 tabular-nums">
+              {formatTimeLeft(endTime)} left
             </span>
           ) : (
             <Countdown endTime={endTime} />
@@ -294,23 +389,27 @@ export function MarketFeedCard({
         {/* Row 2: [Price column] [Title] */}
         <button onClick={onClick} className="flex items-start gap-4 text-left w-full group">
 
-          {/* Price column: big % + sparkline stacked */}
-          <div className="shrink-0 flex flex-col items-center w-[56px] gap-0.5">
-            <AnimatedNumber
-              value={yesPercent}
-              className={cn(
-                "font-black leading-none",
-                yesPercent >= 100 || yesPercent <= 0 ? "text-3xl" : "text-4xl",
-                yesPercent > 50 ? "text-success" :
-                yesPercent < 50 ? "text-danger"  : "text-foreground"
-              )}
-            />
+          {/* Price column: dominant% + label + sparkline stacked */}
+          <div className="shrink-0 flex flex-col items-center w-[68px] gap-0.5">
+            {/* Leading probability with % sign — shows the WINNING side's number */}
+            <div className="flex items-end gap-px leading-none">
+              <AnimatedNumber
+                value={dominantValue}
+                flashOnChange={isLiveNow}
+                className={cn(
+                  "font-black leading-none",
+                  dominantValue >= 100 || dominantValue <= 0 ? "text-3xl" : "text-4xl",
+                  dominantColor
+                )}
+              />
+              <span className={cn("font-black text-xl leading-none pb-[2px]", dominantColor)}>%</span>
+            </div>
+            {/* Side label — YES / NO / 50/50 matching the number above */}
             <span className={cn(
               "text-[9px] font-medium uppercase tracking-widest",
-              yesPercent > 50 ? "text-success/40" :
-              yesPercent < 50 ? "text-danger/40"  : "text-muted-foreground/40"
+              dominantLabelColor
             )}>
-              YES
+              {dominantLabel}
             </span>
 
             {/* Sparkline — lives directly below the percentage */}
@@ -322,11 +421,22 @@ export function MarketFeedCard({
                 height={22}
               />
             )}
+
+            {/* Source confidence label — flips from "AI est." to "Crowd" once
+                real bets arrive, giving users a Polymarket-style trust signal */}
+            {!isResolved && (
+              <span className={cn(
+                "text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5",
+                isCrowdOdds ? "text-accent/50" : "text-amber-500/50"
+              )}>
+                {isCrowdOdds ? "Crowd" : "AI est."}
+              </span>
+            )}
           </div>
 
           {/* Question + creator attribution */}
           <div className="flex-1 min-w-0 pt-0.5">
-            <h3 className="text-[14px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
+            <h3 className="text-[15px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
             </h3>
             {creatorUsername && (
@@ -362,13 +472,35 @@ export function MarketFeedCard({
           />
         )}
 
+        {/* Row 3d: Friend bets — "Your friends called YES" avatar strip */}
+        {!isResolved && friendBets && friendBets.length > 0 && (
+          <div className="flex items-center gap-2 -mt-1">
+            {/* Avatar stack */}
+            <div className="flex -space-x-1.5">
+              {friendBets.slice(0, 3).map((fb) => (
+                <div key={fb.username} className="relative ring-1 ring-background rounded-full">
+                  <UserAvatar username={fb.username} avatarUrl={fb.avatarUrl} size={18} />
+                </div>
+              ))}
+            </div>
+            <span className="text-[10px] text-muted-foreground leading-none">
+              {friendBets.length === 1
+                ? <><span className="text-foreground font-medium">@{friendBets[0].username}</span> bet {friendBets[0].side.toUpperCase()}</>
+                : friendBets.every((fb) => fb.side === friendBets[0].side)
+                  ? <><span className="text-foreground font-medium">{friendBets.length} friends</span> all bet {friendBets[0].side.toUpperCase()}</>
+                  : <><span className="text-foreground font-medium">{friendBets.length} friends</span> already in</>
+              }
+            </span>
+          </div>
+        )}
+
         {/* Row 4: Trade buttons */}
         {!isResolved && !hasUserBet && (
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={onBuyYes}
               className={cn(
-                "flex items-center justify-between py-2.5 px-3 border",
+                "flex items-center justify-between py-3 px-4 border",
                 "bg-success/8 border-success/20 hover:bg-success/14 hover:border-success/30",
                 "active:scale-[0.96] active:bg-success/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-success/50 animate-pulse"
@@ -379,15 +511,20 @@ export function MarketFeedCard({
                 <TrendingUp className="w-3 h-3 text-success" />
                 <span className="text-[11px] font-bold text-success uppercase tracking-wide">Yes</span>
               </div>
-              <span className="font-mono text-sm font-black text-success">
-                <AnimatedNumber value={yesPercent} />¢
-              </span>
+              <div className="text-right">
+                <div className="font-mono text-sm font-black text-success leading-none">
+                  <AnimatedNumber value={yesPercent} />%
+                </div>
+                <div className="font-mono text-[9px] text-success/50 leading-none mt-0.5">
+                  {payoutMultiplier(yesPercent)}
+                </div>
+              </div>
             </button>
 
             <button
               onClick={onBuyNo}
               className={cn(
-                "flex items-center justify-between py-2.5 px-3 border",
+                "flex items-center justify-between py-3 px-4 border",
                 "bg-danger/8 border-danger/20 hover:bg-danger/14 hover:border-danger/30",
                 "active:scale-[0.96] active:bg-danger/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-danger/50 animate-pulse"
@@ -398,9 +535,14 @@ export function MarketFeedCard({
                 <TrendingDown className="w-3 h-3 text-danger" />
                 <span className="text-[11px] font-bold text-danger uppercase tracking-wide">No</span>
               </div>
-              <span className="font-mono text-sm font-black text-danger">
-                <AnimatedNumber value={noPercent} />¢
-              </span>
+              <div className="text-right">
+                <div className="font-mono text-sm font-black text-danger leading-none">
+                  <AnimatedNumber value={noPercent} />%
+                </div>
+                <div className="font-mono text-[9px] text-danger/50 leading-none mt-0.5">
+                  {payoutMultiplier(noPercent)}
+                </div>
+              </div>
             </button>
           </div>
         )}
@@ -430,20 +572,35 @@ export function MarketFeedCard({
         )}
 
         {/* Resolved position */}
-        {hasUserBet && isResolved && (
+        {hasUserBet && isResolved && isWin && (
           <div
-            className={cn(
-              "flex items-center justify-between px-3 py-2 border",
-              isWin ? "bg-success/8 border-success/20" : "bg-danger/8 border-danger/20"
-            )}
+            className="flex items-center justify-between px-3 py-2 border bg-success/8 border-success/20"
             style={{ borderRadius: "var(--radius-button)" }}
           >
-            <span className={cn("text-xs font-bold uppercase tracking-wide", isWin ? "text-success" : "text-danger")}>
-              {isWin ? "✓ Won" : "✕ Lost"}
+            <span className="text-xs font-bold uppercase tracking-wide text-success">✓ Called it</span>
+            <span className="text-xs font-mono font-bold text-success">
+              +{formatCredits(userBet!.amount)} CR
             </span>
-            <span className={cn("text-xs font-mono font-bold", isWin ? "text-success" : "text-danger")}>
-              {isWin ? `+${formatCredits(userBet.amount)}` : `-${formatCredits(userBet.amount)}`} CR
-            </span>
+          </div>
+        )}
+
+        {/* Loss reframe — softer, motivational */}
+        {hasUserBet && isResolved && isLoss && (
+          <div
+            className="flex flex-col gap-1.5 px-3 py-2.5 border bg-surface border-border/60"
+            style={{ borderRadius: "var(--radius-button)" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Market resolved {resolved!.winner.toUpperCase()}
+              </span>
+              <span className="text-[11px] font-mono text-muted-foreground">
+                −{formatCredits(userBet!.amount)} CR
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground/60 leading-snug">
+              You called {userBet!.side.toUpperCase()}. The market saw it differently. Back tomorrow →
+            </p>
           </div>
         )}
 
@@ -454,34 +611,34 @@ export function MarketFeedCard({
           </p>
         )}
 
-        {/* Footer: market data — only show when there's meaningful activity */}
-        {(totalCredits > 0 || hotScore > 0 || onClick) && (
-          <div className="flex items-center gap-3 pt-1 border-t border-border/50">
-            {totalCredits > 0 && (
-              <span className="text-[10px] font-mono text-muted-foreground/70">
-                {formatCredits(totalCredits)} vol
-              </span>
-            )}
-            {totalPool > 0 && (
-              <span className="text-[10px] font-mono text-muted-foreground/70">
-                {formatCredits(totalPool)} pool
-              </span>
-            )}
-            {hotScore > 0 && (
-              <span className="text-[10px] font-mono text-muted-foreground/70">
-                {hotScore} trades
-              </span>
-            )}
-            {onClick && (
-              <button
-                onClick={onClick}
-                className="ml-auto text-[10px] text-muted-foreground/40 hover:text-accent active:scale-[0.94] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
-              >
-                Details →
-              </button>
-            )}
-          </div>
-        )}
+        {/* Footer: source chip + volume + details link */}
+        <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+          {/* Resolution source — "Resolves via ESPN" pre-resolution, nothing post (badge is in header) */}
+          {!isResolved && resMeta.label && (
+            <span className="text-[9px] text-muted-foreground/40 font-mono shrink-0">
+              via {resMeta.label}
+            </span>
+          )}
+
+          {totalCredits > 0 && (
+            <span className="text-[10px] font-mono text-muted-foreground/50">
+              {formatCredits(totalCredits)} CR vol
+            </span>
+          )}
+          {hotScore >= 5 && (
+            <span className="text-[10px] font-mono text-muted-foreground/50">
+              {hotScore} trades
+            </span>
+          )}
+          {onClick && (
+            <button
+              onClick={onClick}
+              className="ml-auto text-[10px] text-muted-foreground/40 hover:text-accent active:scale-[0.94] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+            >
+              Details →
+            </button>
+          )}
+        </div>
 
       </div>
     </div>

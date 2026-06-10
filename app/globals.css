@@ -411,6 +411,7 @@
   75%        { transform: scale(1.1)  rotate(3deg);  opacity: 0.85; filter: drop-shadow(0 0 8px rgba(251,146,60,0.8)); }
 }
 .streak-flame { animation: flame-flicker 1.8s ease-in-out infinite; }
+.streak-flame-glow { animation: flame-flicker 1.8s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(245,166,35,0.5)); }
 
 .market-volatile-yes     { animation: card-border-breathe-yes     3.0s ease-in-out infinite; }
 .market-volatile-no      { animation: card-border-breathe-no      3.0s ease-in-out infinite; }
@@ -418,6 +419,23 @@
 .market-surging-yes      { animation: card-border-breathe-yes     1.6s ease-in-out infinite; }
 .market-surging-no       { animation: card-border-breathe-no      1.6s ease-in-out infinite; }
 .market-surging-neutral  { animation: card-border-breathe-neutral 1.6s ease-in-out infinite; }
+
+/* ══ Market Ticker ════════════════════════════════════════════════════════════ */
+/* Continuous left-scroll marquee for the live odds ticker strip */
+@keyframes ticker-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-marquee 45s linear infinite;
+  will-change: transform;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SCROLLBAR

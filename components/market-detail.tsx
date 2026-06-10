@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check, ImageIcon } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check, ImageIcon, ShieldCheck } from "lucide-react"
+import { getResolutionMeta, formatResolvedAt } from "@/lib/resolution-label"
 import { PredictionCardOverlay } from "@/components/share-card/prediction-card-overlay"
 import type { PredictionResultData } from "@/components/share-card/prediction-result-card"
 import { cn } from "@/lib/utils"
@@ -41,6 +42,8 @@ interface MarketDetailProps {
       resolvedAt?: string | null
     }
     resolutionCriteria?: string | null
+    resolutionSourceUrl?: string | null
+    targetDataKey?: string | null
     userBet?: { side: "yes" | "no"; amount: number }
   }
   onClose: () => void
@@ -173,6 +176,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const yesPercent  = market.yesPercent
   const noPercent   = 100 - yesPercent
   const totalPool   = market.yesPool + market.noPool
+  const resMeta     = getResolutionMeta(market.resolutionSourceUrl, market.targetDataKey)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/markets/${market.id}/bets`)
@@ -340,15 +344,30 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             </div>
           </div>
         ) : (
-        <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-32")}>
+        <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-40")}>
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
 
-          {/* Resolution criteria — shown when set and market is not yet resolved */}
-          {!isResolved && market.resolutionCriteria && (
-            <div className="bg-surface border border-border px-3 py-2.5 text-xs text-muted-foreground leading-relaxed" style={{ borderRadius: "var(--radius-card)" }}>
-              <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/60 block mb-1">Resolution Criteria</span>
-              {market.resolutionCriteria}
+          {/* Resolution criteria + source — shown when set and market is not yet resolved */}
+          {!isResolved && (market.resolutionCriteria || resMeta.label) && (
+            <div className="bg-surface border border-border px-3 py-2.5 flex flex-col gap-2" style={{ borderRadius: "var(--radius-card)" }}>
+              {market.resolutionCriteria && (
+                <>
+                  <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/60">Resolution Criteria</span>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{market.resolutionCriteria}</p>
+                </>
+              )}
+              {resMeta.label && (
+                <div className="flex items-center gap-1.5 pt-0.5 border-t border-border/50">
+                  <ShieldCheck className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+                  <span className="text-[10px] text-muted-foreground/60">
+                    Resolves via <span className="text-muted-foreground font-medium">{resMeta.label}</span>
+                    {resMeta.isAuto && (
+                      <span className="ml-1 text-accent/60">· auto</span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -379,17 +398,37 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
                   )}
                 </div>
               </div>
-              {market.resolved?.sourceUrl && (
-                <a
-                  href={market.resolved.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] text-accent hover:underline w-fit"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  View source
-                </a>
+
+              {/* Auto-resolved badge + source — the "Kalshi-style" trust signal */}
+              {resMeta.label && (
+                <div className="flex items-center gap-1.5 py-1.5 px-2 bg-background/60 border border-border/60" style={{ borderRadius: "var(--radius-badge)" }}>
+                  <ShieldCheck className="w-3 h-3 text-success/70 shrink-0" />
+                  <span className="text-[10px] text-muted-foreground leading-none">
+                    Auto-resolved ✓ from{" "}
+                    <span className="text-foreground font-medium">{resMeta.label}</span>
+                  </span>
+                </div>
               )}
+
+              {/* Resolution log: source link + timestamp */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                {market.resolved?.sourceUrl && (
+                  <a
+                    href={market.resolved.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-accent hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    View source
+                  </a>
+                )}
+                {market.resolved?.resolvedAt && (
+                  <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
+                    {formatResolvedAt(market.resolved.resolvedAt)}
+                  </span>
+                )}
+              </div>
               {/* Dispute button */}
               {isResolutionDisputeable && !disputeOpen && (
                 <button
@@ -473,10 +512,20 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             <div className="flex-1 flex flex-col items-center justify-center py-5 bg-success/5 border border-success/20" style={{ borderRadius: "var(--radius-card)" }}>
               <span className="font-mono text-5xl font-black text-success tabular-nums leading-none">{yesPercent.toFixed(1)}%</span>
               <span className="mt-1.5 text-[10px] text-success/60 uppercase tracking-widest font-semibold">YES</span>
+              {!isResolved && yesPercent > 0 && yesPercent < 100 && (
+                <span className="mt-1 text-[9px] text-success/40 font-mono">
+                  {(100 / yesPercent).toFixed(2)}× if correct
+                </span>
+              )}
             </div>
             <div className="flex-1 flex flex-col items-center justify-center py-5 bg-danger/5 border border-danger/20" style={{ borderRadius: "var(--radius-card)" }}>
               <span className="font-mono text-5xl font-black text-danger tabular-nums leading-none">{noPercent.toFixed(1)}%</span>
               <span className="mt-1.5 text-[10px] text-danger/60 uppercase tracking-widest font-semibold">NO</span>
+              {!isResolved && noPercent > 0 && noPercent < 100 && (
+                <span className="mt-1 text-[9px] text-danger/40 font-mono">
+                  {(100 / noPercent).toFixed(2)}× if correct
+                </span>
+              )}
             </div>
           </div>
 
@@ -696,27 +745,69 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
       {/* Bottom action bar */}
       {!isResolved && !market.userBet && (
         <div className={cn(
-          "shrink-0 bg-background border-t border-border px-4 py-3 flex gap-3",
+          "shrink-0 bg-background/95 backdrop-blur-sm border-t border-border",
           !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
-        )}>
-          <button onClick={onBuyYes} className="flex-1 flex items-center justify-center gap-2 py-3 bg-success text-success-foreground font-bold text-sm uppercase tracking-wide transition-all duration-[80ms] hover:bg-success/90 active:scale-[0.97] active:opacity-80" style={{ borderRadius: "var(--radius-button)" }}>
-            <TrendingUp className="w-4 h-4" />
-            YES · {yesPercent.toFixed(0)}¢
-          </button>
-          <button onClick={onBuyNo} className="flex-1 flex items-center justify-center gap-2 py-3 bg-danger text-danger-foreground font-bold text-sm uppercase tracking-wide transition-all duration-[80ms] hover:bg-danger/90 active:scale-[0.97] active:opacity-80" style={{ borderRadius: "var(--radius-button)" }}>
-            <TrendingDown className="w-4 h-4" />
-            NO · {noPercent.toFixed(0)}¢
-          </button>
+        )}
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        >
+          {/* Live probability split bar */}
+          <div className="px-4 pt-3 pb-2.5 flex items-center gap-3">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-xs font-mono font-bold text-success">{yesPercent.toFixed(0)}%</span>
+              <span className="text-[10px] text-muted-foreground">YES</span>
+            </div>
+            <div className="flex-1 h-1 overflow-hidden bg-muted" style={{ borderRadius: "9999px" }}>
+              <div
+                className="h-full bg-gradient-to-r from-success to-success/70 transition-all duration-700"
+                style={{ width: `${yesPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] text-muted-foreground">NO</span>
+              <span className="text-xs font-mono font-bold text-danger">{noPercent.toFixed(0)}%</span>
+            </div>
+          </div>
+
+          {/* YES / NO buttons — oversized for thumb comfort */}
+          <div className="px-4 pb-1 flex gap-3">
+            <button
+              onClick={onBuyYes}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-4 bg-success text-success-foreground font-black text-base uppercase tracking-wide transition-all duration-[80ms] hover:bg-success/90 active:scale-[0.96] active:opacity-80"
+              style={{ borderRadius: "var(--radius-button)" }}
+            >
+              <span className="flex items-center gap-1.5 text-sm font-black uppercase tracking-widest">
+                <TrendingUp className="w-4 h-4" /> YES
+              </span>
+              <span className="text-[11px] font-normal opacity-80 lowercase tracking-normal">
+                pays {(100 / yesPercent).toFixed(2)}×
+              </span>
+            </button>
+            <button
+              onClick={onBuyNo}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-4 bg-danger text-danger-foreground font-black text-base uppercase tracking-wide transition-all duration-[80ms] hover:bg-danger/90 active:scale-[0.96] active:opacity-80"
+              style={{ borderRadius: "var(--radius-button)" }}
+            >
+              <span className="flex items-center gap-1.5 text-sm font-black uppercase tracking-widest">
+                <TrendingDown className="w-4 h-4" /> NO
+              </span>
+              <span className="text-[11px] font-normal opacity-80 lowercase tracking-normal">
+                pays {(100 / noPercent).toFixed(2)}×
+              </span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Resolved banner */}
       {isResolved && (
-        <div className={cn(
-          "shrink-0 border-t px-4 py-3 text-center font-bold text-sm uppercase tracking-widest",
-          market.resolved?.winner === "yes" ? "bg-success/20 border-success/30 text-success" : "bg-danger/20 border-danger/30 text-danger",
-          !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
-        )}>
+        <div
+          className={cn(
+            "shrink-0 border-t px-4 py-3 text-center font-bold text-sm uppercase tracking-widest",
+            market.resolved?.winner === "yes" ? "bg-success/20 border-success/30 text-success" : "bg-danger/20 border-danger/30 text-danger",
+            !isPanel && "fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
+          )}
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        >
           {market.resolved?.winner === "yes" ? "YES Won" : "NO Won"} — Market Resolved
         </div>
       )}

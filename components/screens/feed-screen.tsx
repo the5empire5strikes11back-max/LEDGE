@@ -6,7 +6,6 @@ import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
-import { ReturnHooksBar } from "@/components/onboarding/return-hooks-bar"
 import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
@@ -18,14 +17,14 @@ import { useOnboarding } from "@/lib/onboarding"
 import { rankFeedFirstSession, buildAffinityMap } from "@/lib/feed-ranker"
 import { computeCompoundState } from "@/lib/feed-signals"
 import { useSessionArc, formatCloseTime } from "@/lib/session-arc"
-import type { ReturnHook } from "@/app/api/return-hooks/route"
+import { isLive, formatTimeLeft } from "@/lib/market-live"
 import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
 import type { Persona } from "@/lib/game-engine"
 
-type Category = "All" | "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
+type Category = "All" | "Live" | "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
 
-const ALL_TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild", "Circle"]
-// Circle is hidden on first session — undefined concept for new users
+const ALL_TABS: Category[] = ["All", "Live", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild", "Circle"]
+// Circle and Live are hidden on first session
 const FIRST_SESSION_TABS: Category[] = ["All", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild"]
 
 // Subcategory chips shown below the active tab (client-side filter on title keywords)
@@ -64,6 +63,12 @@ const SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
 
 import type { MarketSocialData } from "@/lib/social-signals"
 
+interface FriendBet {
+  username: string
+  avatarUrl: string | null
+  side: string
+}
+
 interface Market {
   id: string
   title: string
@@ -77,6 +82,12 @@ interface Market {
   momentumShift?: number
   isFeatured?: boolean
   isNearMiss?: boolean
+  /** AI-set opening probability from virtual pools — used for "AI est." vs "Crowd" label */
+  openingYesPercent?: number
+  /** Resolution source URL — used for "Resolves via …" chip */
+  resolutionSourceUrl?: string | null
+  /** Raw JSON resolution key — used to derive source label & type */
+  targetDataKey?: string | null
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: {
@@ -87,6 +98,7 @@ interface Market {
   }
   resolutionCriteria?: string | null
   creatorUsername?: string | null
+  friendBets?: FriendBet[]
 }
 
 interface PostBetInfo {
@@ -173,7 +185,6 @@ export function FeedScreen({
   const [detailMarket, setDetailMarket] = useState<Market | null>(null)
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
   const [postBetInfo, setPostBetInfo] = useState<PostBetInfo | null>(null)
-  const [returnHooks, setReturnHooks] = useState<ReturnHook[]>([])
   const [createSheetOpen, setCreateSheetOpen] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
@@ -216,6 +227,17 @@ export function FeedScreen({
           published_at: (m as any).published_at,
         }))
       )
+
+      // Fetch friend bets in background — fire-and-forget, updates cards when ready
+      const ids = data.map((m) => m.id).join(',')
+      fetch(`/api/markets/friend-bets?ids=${ids}`)
+        .then((r) => r.ok ? r.json() : {})
+        .then((fbMap: Record<string, FriendBet[]>) => {
+          setMarkets((prev) => prev.map((m) =>
+            fbMap[m.id] ? { ...m, friendBets: fbMap[m.id] } : m
+          ))
+        })
+        .catch(() => {})
     }
     setLoading(false)
   }, [])
@@ -239,15 +261,6 @@ export function FeedScreen({
       window.history.replaceState({}, "", url.toString())
     }
   }, [loading, markets])
-
-  // Fetch return hooks for returning users (has placed a bet before)
-  useEffect(() => {
-    if (!ob.firstBetAchievementDone) return
-    fetch('/api/return-hooks')
-      .then((r) => r.ok ? r.json() : [])
-      .then((hooks: ReturnHook[]) => setReturnHooks(hooks))
-      .catch(() => {})
-  }, [ob.firstBetAchievementDone])
 
   // ── Supabase Realtime — live odds + history accumulation
   useEffect(() => {
@@ -306,6 +319,8 @@ export function FeedScreen({
 
   const rawFiltered = activeTab === "All"
     ? unbetMarkets
+    : activeTab === "Live"
+    ? unbetMarkets.filter((m) => !m.resolved && isLive(m.endTime))
     : unbetMarkets.filter((m) => m.category === activeTab)
 
   // Apply subcategory filter using keyword matching on market title
@@ -353,6 +368,26 @@ export function FeedScreen({
   const openMarkets = markets.filter((m) => !m.resolved)
   const totalVolume = markets.reduce((sum, m) => sum + m.totalCredits, 0)
   const hotCount = openMarkets.filter((m) => (m.hotScore ?? 0) >= 8).length
+  // Live markets — event happening right now (close time ≤ 4h)
+  const liveMarkets = useMemo(
+    () => openMarkets.filter((m) => !m.userBet && isLive(m.endTime))
+                     .sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [openMarkets]
+  )
+  const liveCount = liveMarkets.length
+
+  // Ticker strip: top markets sorted by live-ness then hot score
+  const tickerItems = useMemo(
+    () => [...openMarkets]
+      .sort((a, b) => {
+        const aScore = (a.hotScore ?? 0) + (isLive(a.endTime) ? 20 : 0)
+        const bScore = (b.hotScore ?? 0) + (isLive(b.endTime) ? 20 : 0)
+        return bScore - aScore
+      })
+      .slice(0, 12),
+    [openMarkets]
+  )
 
   // Session arc derived — markets closing within 24h, top idle suggestion
   const closingTodayCount = useMemo(
@@ -405,7 +440,10 @@ export function FeedScreen({
       if (res.status === 400 && errMsg === 'Insufficient credits') {
         onOpenShop?.()
       } else {
-        console.error('Bet failed:', errMsg)
+        toast.error("Bet didn't go through", {
+          description: errMsg === `Server error (${res.status})` ? 'Please try again.' : errMsg,
+          duration: 4000,
+        })
       }
       return
     }
@@ -424,6 +462,21 @@ export function FeedScreen({
     // Record bet in session arc — drives peaked phase + arc strip copy
     arcRecordBet(market.title, market.endTime, side)
 
+    // Streak milestone celebration — when hitting 7 / 14 / 30-day streaks
+    const STREAK_MILESTONES = [7, 14, 30, 60, 100]
+    if (STREAK_MILESTONES.includes(streak + 1)) {
+      toast(`🔥 ${streak + 1}-day streak!`, {
+        description: `You've predicted ${streak + 1} days in a row. Keep it going.`,
+        duration: 4000,
+      })
+    } else if (streak === 0 && decay !== "none") {
+      // First bet after a streak break — gentle encouragement
+      toast("Streak restarted 🔥", {
+        description: "Day 1. Get to 7 days for a bonus reward.",
+        duration: 3000,
+      })
+    }
+
     // Show anticipation panel on first bet
     if (wasFirstBet) {
       setPostBetInfo({
@@ -433,12 +486,6 @@ export function FeedScreen({
         amount: placed,
         currentOdds: market.yesPercent,
       })
-    } else {
-      // Refresh return hooks after any subsequent bet
-      fetch('/api/return-hooks')
-        .then((r) => r.ok ? r.json() : [])
-        .then((hooks: ReturnHook[]) => setReturnHooks(hooks))
-        .catch(() => {})
     }
   }
 
@@ -452,7 +499,7 @@ export function FeedScreen({
     <div className="flex flex-col h-full w-full overflow-hidden relative">
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full pb-24 lg:pb-20">
         {/* Screener stats bar */}
-        <div className="bg-surface border-b border-border px-4 py-2 flex items-center gap-4 overflow-x-auto scrollbar-none">
+        <div className="bg-surface border-b border-border px-4 py-2.5 flex items-center gap-4 overflow-x-auto scrollbar-none">
           {isFirstSession ? (
             // New user: plain language, no jargon
             <div className="flex items-center gap-1.5 shrink-0">
@@ -486,13 +533,82 @@ export function FeedScreen({
                   </div>
                 </>
               )}
+              {streak >= 3 && decay === "none" && (
+                <>
+                  <span className="text-border shrink-0">·</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-accent uppercase tracking-wider font-bold streak-flame-glow">
+                      <Flame className="w-3 h-3 shrink-0 streak-flame" />
+                      <span className="font-mono">{streak}</span>
+                    </span>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
 
+        {/* Live odds ticker — slim scrolling strip, Bloomberg-style ambient data */}
+        {!isFirstSession && tickerItems.length >= 3 && (
+          <div className="overflow-hidden border-b border-border/40 bg-surface h-7 flex items-center select-none">
+            <div className="ticker-track">
+              {/* Duplicate list for seamless infinite loop */}
+              {[...tickerItems, ...tickerItems].map((m, i) => {
+                const dominantPct = m.yesPercent >= 50 ? m.yesPercent : 100 - m.yesPercent
+                const dominantSide = m.yesPercent > 50 ? "YES" : m.yesPercent < 50 ? "NO" : "—"
+                const shift = m.momentumShift ?? 0
+                const isLiveItem = isLive(m.endTime)
+                return (
+                  <React.Fragment key={`${m.id}-${i}`}>
+                    <span className="flex items-center gap-1.5 px-3 text-[10px] font-mono whitespace-nowrap">
+                      {/* Liveness dot */}
+                      <span className={cn(
+                        "w-1 h-1 rounded-full shrink-0",
+                        isLiveItem
+                          ? "bg-red-400 animate-pulse"
+                          : (m.hotScore ?? 0) >= 8
+                          ? "bg-accent"
+                          : "bg-muted-foreground/20"
+                      )} />
+                      {/* Short title */}
+                      <span className="text-muted-foreground/60">
+                        {m.title.length > 24 ? `${m.title.slice(0, 24)}…` : m.title}
+                      </span>
+                      {/* Dominant probability */}
+                      <span className={cn(
+                        "font-black tabular-nums",
+                        m.yesPercent > 50 ? "text-success" : m.yesPercent < 50 ? "text-danger" : "text-foreground"
+                      )}>
+                        {dominantPct}%
+                      </span>
+                      <span className={cn(
+                        "text-[9px] font-bold uppercase",
+                        m.yesPercent > 50 ? "text-success/50" : m.yesPercent < 50 ? "text-danger/50" : "text-muted-foreground/40"
+                      )}>
+                        {dominantSide}
+                      </span>
+                      {/* Momentum arrow — only when meaningful */}
+                      {Math.abs(shift) >= 3 && (
+                        <span className={cn(
+                          "text-[9px]",
+                          shift > 0 ? "text-success/70" : "text-danger/70"
+                        )}>
+                          {shift > 0 ? "↑" : "↓"}{Math.abs(shift).toFixed(1)}
+                        </span>
+                      )}
+                    </span>
+                    {/* Separator dot */}
+                    <span className="text-border/40 text-[8px] shrink-0">·</span>
+                  </React.Fragment>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Session Arc strip — context-aware copy that shifts with session phase */}
         {!isFirstSession && arc.phase === "peaked" && arc.lastBet && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-accent/5 border-b border-accent/10">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-accent/5 border-b border-accent/10">
             <span
               className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse"
               aria-hidden
@@ -509,9 +625,9 @@ export function FeedScreen({
             </span>
           </div>
         )}
-        {!isFirstSession && arc.phase === "idle" && idleSuggestion && returnHooks.length === 0 && (
+        {!isFirstSession && arc.phase === "idle" && idleSuggestion && (
           <div
-            className="flex items-center gap-2 px-4 py-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
             onClick={() => { recordInteraction(); setDetailMarket(idleSuggestion) }}
           >
             <Star className="w-3 h-3 text-muted-foreground/60 shrink-0" aria-hidden="true" />
@@ -529,11 +645,66 @@ export function FeedScreen({
           <DailyChallenges />
         )}
 
+        {/* ── Happening Now rail ───────────────────────────────────────────────
+            Horizontal strip of live markets shown only on the All tab.
+            Each chip is a compact tap-target that opens the market detail. */}
+        {activeTab === "All" && !searchTrimmed && liveCount > 0 && (
+          <div className="border-b border-border bg-red-500/3">
+            <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">
+                Happening Now
+              </span>
+              <span className="text-[10px] text-muted-foreground/50 font-mono">
+                {liveCount} live
+              </span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 pb-3 pt-1">
+              {liveMarkets.slice(0, 8).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => { recordInteraction(); setDetailMarket(m) }}
+                  className={cn(
+                    "shrink-0 flex flex-col gap-1.5 w-[148px] px-3 py-2.5 text-left",
+                    "bg-background border border-red-500/20 hover:border-red-500/40",
+                    "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+                  )}
+                  style={{ borderRadius: "var(--radius-card)" }}
+                >
+                  {/* Title */}
+                  <p className="text-[11px] font-semibold text-foreground leading-tight line-clamp-2 min-h-[2.4em]">
+                    {m.title}
+                  </p>
+                  {/* Stats row */}
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={cn(
+                      "font-mono text-sm font-black tabular-nums",
+                      m.yesPercent > 50 ? "text-success" : m.yesPercent < 50 ? "text-danger" : "text-foreground"
+                    )}>
+                      {m.yesPercent}%
+                    </span>
+                    <span className="text-[9px] font-mono text-red-400/80 tabular-nums">
+                      {formatTimeLeft(m.endTime)}
+                    </span>
+                  </div>
+                  {/* Slim odds bar */}
+                  <div className="h-0.5 bg-muted overflow-hidden w-full" style={{ borderRadius: "9999px" }}>
+                    <div
+                      className="h-full bg-success/60 transition-all duration-500"
+                      style={{ width: `${m.yesPercent}%` }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filter tabs + subcategory chips */}
         <div className="sticky top-0 z-10 bg-background border-b border-border">
 
           {/* Search bar */}
-          <div className="px-4 pt-2 pb-1">
+          <div className="px-4 pt-3 pb-2">
             <div className="relative flex items-center">
               <Search className="absolute left-3 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
               <input
@@ -556,21 +727,43 @@ export function FeedScreen({
           </div>
 
           {/* Primary category tabs */}
-          <div className="flex gap-1 overflow-x-auto scrollbar-none px-4 pt-2 pb-2">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none px-4 pt-2 pb-2.5">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => { setActiveTab(tab); setActiveSubcat(null) }}
                 className={cn(
-                  "shrink-0 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                  "relative shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-wider",
                   "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.94]",
                   activeTab === tab
-                    ? "bg-accent text-accent-foreground"
+                    ? tab === "Live"
+                      ? "bg-red-500 text-white"
+                      : "bg-accent text-accent-foreground"
+                    : tab === "Live" && liveCount > 0
+                    ? "text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary active:bg-muted"
                 )}
                 style={{ borderRadius: "var(--radius-badge)" }}
               >
-                {tab}
+                {tab === "Live" ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      liveCount > 0 ? "bg-red-400 animate-pulse" : "bg-muted-foreground/40"
+                    )} />
+                    Live
+                    {liveCount > 0 && (
+                      <span className={cn(
+                        "text-[9px] font-black px-1 py-0 leading-4",
+                        activeTab === "Live"
+                          ? "bg-white/20 text-white"
+                          : "bg-red-500/15 text-red-400"
+                      )} style={{ borderRadius: "3px" }}>
+                        {liveCount}
+                      </span>
+                    )}
+                  </span>
+                ) : tab}
               </button>
             ))}
           </div>
@@ -601,7 +794,7 @@ export function FeedScreen({
         {/* Streak urgency — for returning users with an active streak at risk */}
         {!isFirstSession && streak >= 2 && decay !== "none" && (
           <div className={cn(
-            "flex items-center gap-2 px-4 py-2 border-b",
+            "flex items-center gap-2 px-4 py-2.5 border-b",
             decay === "critical"
               ? "bg-danger/5 border-danger/15"
               : "bg-accent/5 border-accent/10"
@@ -619,27 +812,6 @@ export function FeedScreen({
           </div>
         )}
 
-        {/* Return hooks — shown to returning users with open bets */}
-        {returnHooks.length > 0 && (
-          <>
-            {/* "While you were away" summary — gives context before the chips */}
-            <div className="px-4 pt-2.5 pb-0.5">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-                {returnHooks.some((h) => h.urgent)
-                  ? `⚡ ${returnHooks.length} bet${returnHooks.length > 1 ? 's' : ''} need attention`
-                  : `${returnHooks.length} active bet${returnHooks.length > 1 ? 's' : ''} in play`}
-              </p>
-            </div>
-            <ReturnHooksBar
-              hooks={returnHooks}
-              onHookClick={(hook) => {
-                const market = markets.find((m) => m.id === hook.marketId)
-                if (market) setDetailMarket(market)
-              }}
-            />
-          </>
-        )}
-
         {/* Onboarding: feed tooltip — explains the core action to new users */}
         {!loading && filtered.length > 0 && !ob.feedTooltipDone && (
           <FeedTooltip
@@ -649,12 +821,12 @@ export function FeedScreen({
         )}
 
         {/* Markets */}
-        <div className="w-full px-4 py-3 space-y-3">
+        <div className="w-full px-4 py-4 space-y-4">
           {loading ? (
             /* Skeleton cards — match real card structure */
             <div className="space-y-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="skeleton-card p-4 space-y-3" style={{ animationDelay: `${i * 80}ms` }}>
+                <div key={i} className="skeleton-card p-5 space-y-4" style={{ animationDelay: `${i * 80}ms` }}>
                   {/* Row 1: category + time */}
                   <div className="flex items-center justify-between">
                     <div className="skeleton h-3 w-16" />
@@ -696,6 +868,8 @@ export function FeedScreen({
                   ? `No ${activeSubcat} markets right now.`
                   : activeTab === "All"
                   ? "New markets are added daily. Check back soon."
+                  : activeTab === "Live"
+                  ? "No events in-play right now. Check back when games kick off."
                   : `No ${activeTab} markets right now. Try another category or check back later.`}
               </p>
               {searchTrimmed ? (
@@ -766,6 +940,7 @@ export function FeedScreen({
                   pulseCTA={pulseCTA}
                   compoundState={compoundState}
                   creatorUsername={market.creatorUsername ?? null}
+                  friendBets={market.friendBets}
                   onClick={() => { recordInteraction(); setDetailMarket(market) }}
                   onBuyYes={() => { recordInteraction(); openTrade(market, "yes") }}
                   onBuyNo={() => { recordInteraction(); openTrade(market, "no") }}

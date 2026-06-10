@@ -8,6 +8,7 @@ import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateMarketTitle, validateEndTime } from '@/lib/validate'
 import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
 import { screenMarket, ALLOWED_CATEGORIES } from '@/lib/market-quality'
+import { validateMarket } from '@/lib/market-validation'
 import { computeCreatorTrust, batchCreatorTrust } from '@/lib/creator-trust'
 import { logMessage } from '@/lib/logger'
 
@@ -195,6 +196,10 @@ export async function GET(request: Request) {
         resolvedAt: market.resolved_at ?? null,
       } : undefined,
       resolutionCriteria: market.resolution_criteria ?? null,
+      /** Pre-resolution source URL — used for "Resolves via …" chip on cards */
+      resolutionSourceUrl: market.resolution_source_url ?? null,
+      /** Raw JSON resolution key — used to derive source label & type */
+      targetDataKey: market.target_data_key ?? null,
       userBet: userBet ? { side: userBet.side, amount: userBet.amount } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */
@@ -259,6 +264,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: endTimeValidation.error }, { status: 400 })
   }
 
+  // Strict temporal/anchor/staleness gate — same validator the AI path uses.
+  // (requireResolution is off: user markets get their resolution path downstream.)
+  const temporal = validateMarket({
+    title: trimmedTitle,
+    endTimeIso: new Date(end_time).toISOString(),
+  })
+  if (!temporal.valid) {
+    return NextResponse.json({ error: temporal.reason }, { status: 422 })
+  }
+
   // ── Category allowlist (server-side) ─────────────────────────────────────
   if (!(ALLOWED_CATEGORIES as readonly string[]).includes(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
@@ -297,8 +312,12 @@ export async function POST(request: Request) {
   const status = screen.verdict === 'review' ? 'review' : 'live'
   const liquiditySeed = seedLiquidity(category as MarketCategory, false)
 
+  // Insert via the service-role client. Direct market inserts are revoked for
+  // the authenticated role — otherwise a user could bypass all the validation
+  // above (quality screening, rate limit, category allowlist) by writing to the
+  // markets table directly. created_by is pinned to the verified session.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (admin as any)
     .from('markets')
     .insert({
       title: trimmedTitle,
