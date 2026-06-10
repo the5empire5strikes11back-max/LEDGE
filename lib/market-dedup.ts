@@ -22,18 +22,33 @@
 /** Coarse action buckets — first match wins. Order matters (specific first). */
 const ACTION_BUCKETS: { bucket: string; pattern: RegExp }[] = [
   { bucket: 'HOMER',      pattern: /\b(home\s?runs?|homers?|go(?:es)?\s+deep|went\s+deep|long\s?ball|hr)\b/i },
-  { bucket: 'DISCIPLINE', pattern: /\b(eject(?:ed)?|flagrant|technical\s+foul|red\s+card|sent\s+off|suspend(?:ed)?|foul\s+called)\b/i },
-  { bucket: 'STAT',       pattern: /\b(average|averages|ppg|points?|yards?|goals?|assists?|rebounds?|strikeouts?)\b/i },
+  { bucket: 'DISCIPLINE', pattern: /\b(eject(?:ed)?|flagrant|technical\s+foul|red\s+card|sent\s+off|suspend(?:ed)?|foul)\b/i },
+  // VIRAL must precede POST/STAT: "blow up on Twitter", "go viral", "spark
+  // backlash", "get memed", "picked up by" all describe the same online-reaction
+  // event regardless of phrasing.
+  { bucket: 'VIRAL',      pattern: /\b(go(?:es)?\s+viral|went\s+viral|viral|blow(?:s|n)?\s+up|blew\s+up|trend(?:ing|s)?|meme[ds]?|backlash|picked\s+up\s+by|break\s+the\s+internet|10m|million\s+views)\b/i },
   { bucket: 'QUALIFY',    pattern: /\b(qualify|qualifies|playoffs?|postseason|advance[sd]?|clinch(?:es)?|knockout\s+stage)\b/i },
+  { bucket: 'STAT',       pattern: /\b(average|averages|ppg|points?|yards?|goals?|assists?|rebounds?|strikeouts?)\b/i },
   { bucket: 'POST',       pattern: /\b(post|posts|respond|responds|reply|replies|announce[sd]?|tweet|tweets|drop|drops|release[sd]?|address(?:es)?)\b/i },
   { bucket: 'WIN',        pattern: /\b(win|wins|won|beat|beats|defeat|defeats|overcome|overcomes|tops?|upset|upsets|victory)\b/i },
 ]
 
-/** Capitalized words that are not real subjects (sentence scaffolding). */
+/**
+ * Capitalized words that are not real subjects. Beyond sentence scaffolding,
+ * this excludes social platforms and weekday/temporal words: in the VIRAL
+ * bucket especially, many distinct events mention "Twitter" or "Friday", and
+ * treating those as subjects causes false-positive collisions.
+ */
 const STOP_PROPER = new Set([
+  // Scaffolding
   'Will', 'The', 'A', 'An', 'This', 'That', 'These', 'Those', 'His', 'Her',
   'Their', 'Its', 'Next', 'Another', 'Again', 'Tonight', 'Today', 'Tomorrow',
   'Within', 'Of', 'In', 'On', 'At', 'To', 'By', 'For', 'And', 'Or', 'But',
+  // Platforms / channels (context, not subject)
+  'Twitter', 'Instagram', 'TikTok', 'Tiktok', 'YouTube', 'Youtube', 'Facebook',
+  'Twitch', 'Snapchat', 'Threads', 'Reddit', 'Spotify', 'Netflix',
+  // Weekdays (timeframe, not subject)
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
 ])
 
 export interface MarketSignature {
