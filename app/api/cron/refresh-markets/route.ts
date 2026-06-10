@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { generateMarkets } from '@/lib/market-generator'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
 import { validateMarket } from '@/lib/market-validation'
+import { screenMarket } from '@/lib/market-quality'
+import { marketSignature, isSemanticDuplicate, type MarketSignature } from '@/lib/market-dedup'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { CATEGORY_FLOORS } from '@/app/api/cron/release-markets/route'
 import { logError, logMessage } from '@/lib/logger'
@@ -120,21 +122,75 @@ export async function POST(request: Request) {
     return true
   })
 
-  // ── 4. Deduplicate against all existing markets (live + queued) ──────────────
+  // ── 4. Quality + near-duplicate gate (same gate as user-submitted markets) ───
+  // Run every AI-generated market through screenMarket() — the identical quality
+  // pipeline used by POST /api/markets. Unlike the old exact-title check, this
+  // catches SEMANTIC near-duplicates via Jaccard similarity (e.g. four "Yankees
+  // win tonight" variants), gibberish, rhetorical/unresolvable questions, and
+  // spam/safety patterns. existingTitles accumulates accepted titles as we go,
+  // so clones generated within the SAME batch dedup against each other too.
   const { data: existing } = await supabase
     .from('markets')
     .select('title')
     .or('status.eq.live,status.eq.queued,status.is.null')
 
-  const existingTitles = new Set((existing ?? []).map((m) => m.title.toLowerCase()))
-  const toQueue = freshMarkets.filter((m) => !existingTitles.has(m.title.toLowerCase()))
+  const seenTitles: string[] = (existing ?? []).map((m) => m.title)
+  const toQueue: typeof freshMarkets = []
+  const screenedOut: Array<{ title: string; flags: string[] }> = []
+
+  // Seed the semantic signature set from existing live/queued markets so the
+  // batch also dedups against what's already on the feed (not just itself).
+  const acceptedSignatures: MarketSignature[] = []
+  for (const t of seenTitles) {
+    const sig = marketSignature(t)
+    if (sig) acceptedSignatures.push(sig)
+  }
+
+  for (const m of freshMarkets) {
+    // ── Lexical + quality gate (Jaccard near-dup, gibberish, safety, spam) ──
+    const result = screenMarket({
+      title: m.title,
+      category: m.category,
+      endTimeIso: m.end_time,
+      existingTitles: seenTitles, // existing DB titles + batch titles accepted so far
+    })
+    // AI feed only keeps clean accepts. Both hard rejects (duplicate, gibberish,
+    // safety, spam, unresolvable) and soft 'review' flags are dropped — the
+    // generator can always produce more, so we bias toward a pristine feed.
+    if (result.verdict !== 'accept') {
+      screenedOut.push({ title: m.title, flags: result.flags })
+      continue
+    }
+
+    // ── Semantic gate (entity × action) — catches synonym clones that share an
+    //    event but few tokens, e.g. "Yankees beat the Red Sox" vs "Yankees win
+    //    tonight". Skipped (null) when no confident action bucket is found. ──
+    const sig = marketSignature(m.title)
+    if (sig && isSemanticDuplicate(sig, acceptedSignatures)) {
+      screenedOut.push({ title: m.title, flags: ['semantic-dup'] })
+      continue
+    }
+
+    toQueue.push(m)
+    seenTitles.push(m.title) // later batch markets dedup against this one (lexical)
+    if (sig) acceptedSignatures.push(sig) // …and semantically
+  }
+
+  if (screenedOut.length > 0) {
+    logMessage(
+      `[refresh-markets] quality gate dropped ${screenedOut.length}/${freshMarkets.length}: ` +
+        screenedOut.map((s) => `[${s.flags.join(',')}] ${s.title.slice(0, 50)}`).join(' · '),
+      { context: 'cron:refresh-markets:quality_gate' }
+    )
+  }
 
   if (toQueue.length === 0) {
     return NextResponse.json({
       success: true,
-      message: 'No new markets to queue — all generated markets are duplicates.',
+      message: 'No new markets to queue — all generated markets were duplicates or low quality.',
       generated: newMarkets.length,
       quality_filter: scoring_stats,
+      screened_out: screenedOut.length,
       queued: 0,
       primed: 0,
     })
