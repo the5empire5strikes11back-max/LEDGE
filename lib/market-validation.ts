@@ -85,6 +85,38 @@ const VAGUE_TIMEFRAME =
 const ALREADY_RESOLVED =
   /^\s*(did|has|have|had|was|were|who won|who is the (new|current)|when did|what happened)\b/i
 
+/** Month name → 0-indexed month, for parsing explicit "June 11" style dates. */
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+}
+
+/**
+ * Detect an explicit calendar date ("June 9", "Jun 9th") in the title that has
+ * already passed this year. Catches the common failure where the LLM sets a
+ * future end_time but the event date named in the title is yesterday.
+ * Returns the matched "Month DD" string when stale, else null.
+ *
+ * Guards against year-wrap: a "January" reference seen in December resolves to
+ * next year, so a date computed >300 days in the past is treated as a future
+ * wrap, not a stale reference.
+ */
+function pastCalendarDate(title: string, now: number): string | null {
+  const m = title.match(
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
+  )
+  if (!m) return null
+  const month = MONTH_INDEX[m[1].slice(0, 3).toLowerCase()]
+  const day = Number(m[2])
+  if (month === undefined || day < 1 || day > 31) return null
+  const year = new Date(now).getUTCFullYear()
+  // End of the named day in UTC — gives the event until day's end before stale.
+  const candidate = Date.UTC(year, month, day, 23, 59, 59)
+  const daysPast = (now - candidate) / DAY_MS
+  // Past this year, but not so far back that it's actually a next-year wrap.
+  return daysPast > 0 && daysPast < 300 ? `${m[1]} ${day}` : null
+}
+
 function reject(code: MarketRejectCode, reason: string): MarketValidation {
   return { valid: false, status: 'rejected', code, reason }
 }
@@ -157,6 +189,10 @@ export function validateMarket(input: MarketValidationInput): MarketValidation {
     if (referencedYear < currentYear) {
       return reject('stale_topic', `References a past year (${referencedYear})`)
     }
+  }
+  const staleDate = pastCalendarDate(title, now)
+  if (staleDate) {
+    return reject('stale_topic', `References a date that has passed (${staleDate})`)
   }
 
   // ── Step 5 — Specificity: one question per market (no compound questions) ───

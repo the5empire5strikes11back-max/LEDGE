@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { CATEGORY_FLOORS } from '@/lib/category-balance'
 
 export const maxDuration = 30
 
@@ -22,17 +23,9 @@ const ARCHIVE_RESOLVED_AFTER_DAYS = 5
 const ARCHIVE_STALE_QUEUED_AFTER_DAYS = 4
 
 // ── Category floor targets ─────────────────────────────────────────────────
-// 15 live non-resolved markets per category at all times.
-// Fill these before any variety/freshness selection.
-
-export const CATEGORY_FLOORS: Record<string, number> = {
-  Sports:   15,
-  Culture:  15,
-  Politics: 15,
-  Tech:     15,
-  Viral:    15,
-  Wild:     15,
-}
+// Single source of truth lives in lib/category-balance.ts (floors + ceilings).
+// Re-exported here for back-compat with importers of this route module.
+export { CATEGORY_FLOORS }
 
 // ── Category health types (also exported for the debug endpoint) ──────────────
 

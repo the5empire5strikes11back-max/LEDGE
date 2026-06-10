@@ -2,9 +2,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMarkets } from '@/lib/market-generator'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
-import { validateMarket } from '@/lib/market-validation'
-import { screenMarket } from '@/lib/market-quality'
-import { marketSignature, isSemanticDuplicate, type MarketSignature } from '@/lib/market-dedup'
+import { screenCandidate } from '@/lib/market-pipeline'
+import { marketSignature, type MarketSignature } from '@/lib/market-dedup'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
 import { CATEGORY_FLOORS } from '@/app/api/cron/release-markets/route'
 import { logError, logMessage } from '@/lib/logger'
@@ -98,96 +97,82 @@ export async function POST(request: Request) {
 
   const { accepted: qualityMarkets, rejected: rejectedMarkets, scoring_stats } = scoringResult
 
-  // ── 4a. Temporal validation guard — defense in depth after scoring ──────────
-  // The generator already self-validates, but this is a hard server-side gate
-  // (freshness, duration sanity, anchor, resolution) before any DB write.
+  // ── 4. Editorial pipeline gate (lib/market-pipeline) ─────────────────────────
+  // Every candidate passes ONE unified gate, in order: temporal freshness /
+  // exact-countdown / resolvability → content quality & safety → lexical +
+  // semantic de-duplication → per-category hard ceiling. Each rejection carries
+  // an explicit status (past_event, stale, countdown_mismatch, duplicate,
+  // category_overflow, …). Accumulators are fed back in so candidates are
+  // screened against the batch-so-far, not just the database.
   const NOW_MS = Date.now()
-  const freshMarkets = qualityMarkets.filter((m) => {
-    const verdict = validateMarket({
-      title: m.title,
-      endTimeIso: m.end_time,
-      resolutionCriteria: m.resolution_criteria,
-      resolutionSourceUrl: m.resolution_source_url,
-      targetDataKey: m.target_data_key,
-      requireResolution: true,
-      nowMs: NOW_MS,
-    })
-    if (!verdict.valid) {
-      logMessage(
-        `Discarded market at validation gate — ${verdict.code}: ${verdict.reason} — "${m.title}"`,
-        { context: 'cron:refresh-markets:validation_gate' }
-      )
-      return false
-    }
-    return true
-  })
 
-  // ── 4. Quality + near-duplicate gate (same gate as user-submitted markets) ───
-  // Run every AI-generated market through screenMarket() — the identical quality
-  // pipeline used by POST /api/markets. Unlike the old exact-title check, this
-  // catches SEMANTIC near-duplicates via Jaccard similarity (e.g. four "Yankees
-  // win tonight" variants), gibberish, rhetorical/unresolvable questions, and
-  // spam/safety patterns. existingTitles accumulates accepted titles as we go,
-  // so clones generated within the SAME batch dedup against each other too.
   const { data: existing } = await supabase
     .from('markets')
-    .select('title')
+    .select('title, category, status, resolved')
     .or('status.eq.live,status.eq.queued,status.is.null')
 
   const seenTitles: string[] = (existing ?? []).map((m) => m.title)
-  const toQueue: typeof freshMarkets = []
-  const screenedOut: Array<{ title: string; flags: string[] }> = []
 
-  // Seed the semantic signature set from existing live/queued markets so the
-  // batch also dedups against what's already on the feed (not just itself).
+  // Live (non-resolved) market count per category — drives the ceiling check.
+  const liveCounts = new Map<string, number>()
+  for (const m of existing ?? []) {
+    const live = (m.status === 'live' || m.status == null) && !m.resolved
+    if (live) liveCounts.set(m.category, (liveCounts.get(m.category) ?? 0) + 1)
+  }
+
+  // Seed semantic signatures from existing titles so the batch dedups against
+  // what's already on the feed, not just against itself.
   const acceptedSignatures: MarketSignature[] = []
   for (const t of seenTitles) {
     const sig = marketSignature(t)
     if (sig) acceptedSignatures.push(sig)
   }
 
-  for (const m of freshMarkets) {
-    // ── Lexical + quality gate (Jaccard near-dup, gibberish, safety, spam) ──
-    const result = screenMarket({
-      title: m.title,
-      category: m.category,
-      endTimeIso: m.end_time,
-      existingTitles: seenTitles, // existing DB titles + batch titles accepted so far
-    })
-    // AI feed only keeps clean accepts. Both hard rejects (duplicate, gibberish,
-    // safety, spam, unresolvable) and soft 'review' flags are dropped — the
-    // generator can always produce more, so we bias toward a pristine feed.
-    if (result.verdict !== 'accept') {
-      screenedOut.push({ title: m.title, flags: result.flags })
+  const toQueue: typeof qualityMarkets = []
+  const screenedOut: Array<{ title: string; status: string; reason: string | null }> = []
+
+  for (const m of qualityMarkets) {
+    const result = screenCandidate(
+      {
+        title: m.title,
+        category: m.category,
+        endTimeIso: m.end_time,
+        resolutionCriteria: m.resolution_criteria,
+        resolutionSourceUrl: m.resolution_source_url,
+        targetDataKey: m.target_data_key,
+      },
+      { existingTitles: seenTitles, acceptedSignatures, liveCounts, nowMs: NOW_MS }
+    )
+    if (!result.ok) {
+      screenedOut.push({ title: m.title, status: result.status, reason: result.reason })
       continue
     }
-
-    // ── Semantic gate (entity × action) — catches synonym clones that share an
-    //    event but few tokens, e.g. "Yankees beat the Red Sox" vs "Yankees win
-    //    tonight". Skipped (null) when no confident action bucket is found. ──
-    const sig = marketSignature(m.title)
-    if (sig && isSemanticDuplicate(sig, acceptedSignatures)) {
-      screenedOut.push({ title: m.title, flags: ['semantic-dup'] })
-      continue
-    }
-
     toQueue.push(m)
-    seenTitles.push(m.title) // later batch markets dedup against this one (lexical)
-    if (sig) acceptedSignatures.push(sig) // …and semantically
+    seenTitles.push(m.title)
+    if (result.signature) acceptedSignatures.push(result.signature)
+    // Count the about-to-publish market toward its category ceiling so a single
+    // batch can never blow past the cap.
+    liveCounts.set(m.category, (liveCounts.get(m.category) ?? 0) + 1)
   }
 
   if (screenedOut.length > 0) {
+    // Tally rejections by status for an at-a-glance editorial log.
+    const byStatus = screenedOut.reduce<Record<string, number>>((acc, s) => {
+      acc[s.status] = (acc[s.status] ?? 0) + 1
+      return acc
+    }, {})
     logMessage(
-      `[refresh-markets] quality gate dropped ${screenedOut.length}/${freshMarkets.length}: ` +
-        screenedOut.map((s) => `[${s.flags.join(',')}] ${s.title.slice(0, 50)}`).join(' · '),
-      { context: 'cron:refresh-markets:quality_gate' }
+      `[refresh-markets] pipeline dropped ${screenedOut.length}/${qualityMarkets.length} ` +
+        `(${Object.entries(byStatus).map(([k, v]) => `${k}:${v}`).join(' ')}): ` +
+        screenedOut.map((s) => `[${s.status}] ${s.title.slice(0, 48)}`).join(' · '),
+      { context: 'cron:refresh-markets:pipeline' }
     )
   }
 
   if (toQueue.length === 0) {
     return NextResponse.json({
       success: true,
-      message: 'No new markets to queue — all generated markets were duplicates or low quality.',
+      message: 'No new markets to queue — all candidates were stale, duplicate, low quality, or over category ceiling.',
       generated: newMarkets.length,
       quality_filter: scoring_stats,
       screened_out: screenedOut.length,
