@@ -1,0 +1,194 @@
+/**
+ * Market temporal validation — the strict, date-aware gate that prevents
+ * stale, impossible, or badly-timed markets from ever being created.
+ *
+ * Pure & deterministic (no AI, no network), so it runs on every path:
+ *   - AI generation  (lib/market-generator.ts)
+ *   - user creation  (app/api/markets POST)
+ *   - cron release   (app/api/cron/refresh-markets, release-markets)
+ *
+ * It is intentionally NARROW: it owns the *temporal & resolvability* contract
+ * (freshness, time anchor, duration sanity, resolution path, already-happened
+ * phrasing). Content/safety/clarity screening lives in market-quality.ts and
+ * the AI scorer — this does not duplicate them.
+ */
+
+// ── Single source of truth for market duration bounds ─────────────────────────
+// Every path clamps to these. Prevents the "89 days left" class of bug where
+// different creation paths used different ceilings (generator 7d, user 1yr).
+export const MARKET_DURATION = {
+  /** A market must have at least this much life left to be worth creating. */
+  MIN_HOURS: 2,
+  /** Hard system ceiling. Nothing may close further out than this (30 days). */
+  MAX_HOURS: 720,
+  /** AI generator's preferred ceiling — markets stay fresh and high-tension. */
+  AI_PREFERRED_MAX_HOURS: 168, // 7 days
+} as const
+
+export type MarketRejectCode =
+  | 'end_time_missing'
+  | 'end_time_invalid'
+  | 'event_already_happened'
+  | 'duration_too_short'
+  | 'duration_too_long'
+  | 'event_date_invalid'
+  | 'duration_inconsistent'
+  | 'no_time_anchor'
+  | 'already_resolved_phrasing'
+  | 'stale_topic'
+  | 'compound_question'
+  | 'resolution_unclear'
+
+export interface MarketValidationInput {
+  title: string
+  /** ISO timestamp at which the market closes / resolves. Required. */
+  endTimeIso: string
+  /**
+   * ISO timestamp of the underlying real-world event (when the generator knows
+   * it). When present, we cross-check that the event is in the future and that
+   * the market closes near it — not weeks before or after.
+   */
+  eventDateIso?: string | null
+  resolutionCriteria?: string | null
+  resolutionSourceUrl?: string | null
+  targetDataKey?: string | null
+  /**
+   * Require a concrete resolution path (criteria + a source/data key).
+   * On for AI-generated markets; off for user markets (the app supplies
+   * resolution downstream).
+   */
+  requireResolution?: boolean
+  /** Injectable clock for deterministic tests. Defaults to Date.now(). */
+  nowMs?: number
+}
+
+export interface MarketValidation {
+  valid: boolean
+  status: 'valid' | 'rejected'
+  code?: MarketRejectCode
+  /** Specific, human-readable reason when rejected. */
+  reason?: string
+  /** Hours from now until close — a sane countdown value for valid markets. */
+  countdownHours?: number
+}
+
+const HOUR_MS = 3_600_000
+const DAY_MS = 86_400_000
+
+// ── Language patterns (already-happened / vague / compound) ───────────────────
+
+/** Vague, unanchored timeframes — "no time anchor" rule. */
+const VAGUE_TIMEFRAME =
+  /\b(some\s?day|eventually|in the future|at some point|sooner or later|one day|soon enough|in the coming (weeks|months|years)|in the near future)\b/i
+
+/** Question phrased about something that already resolved. */
+const ALREADY_RESOLVED =
+  /^\s*(did|has|have|had|was|were|who won|who is the (new|current)|when did|what happened)\b/i
+
+function reject(code: MarketRejectCode, reason: string): MarketValidation {
+  return { valid: false, status: 'rejected', code, reason }
+}
+
+/**
+ * Validate a market's timing, anchoring, and resolvability.
+ * Returns { valid:true, countdownHours } or a specific rejection.
+ */
+export function validateMarket(input: MarketValidationInput): MarketValidation {
+  const now = input.nowMs ?? Date.now()
+  const title = (input.title ?? '').trim()
+
+  // ── Step 2 — Date check: end_time exists, parses, and is in the future ──────
+  if (!input.endTimeIso || typeof input.endTimeIso !== 'string') {
+    return reject('end_time_missing', 'Market has no close time')
+  }
+  const endMs = new Date(input.endTimeIso).getTime()
+  if (Number.isNaN(endMs)) {
+    return reject('end_time_invalid', `Unparseable close time: "${input.endTimeIso}"`)
+  }
+  const hoursToClose = (endMs - now) / HOUR_MS
+  if (hoursToClose <= 0) {
+    return reject('event_already_happened', `Close time is in the past (${hoursToClose.toFixed(1)}h)`)
+  }
+
+  // ── Step 4 — Duration sanity: never too short, never absurdly far out ───────
+  if (hoursToClose < MARKET_DURATION.MIN_HOURS) {
+    return reject('duration_too_short', `Only ${hoursToClose.toFixed(1)}h left (min ${MARKET_DURATION.MIN_HOURS}h)`)
+  }
+  if (hoursToClose > MARKET_DURATION.MAX_HOURS) {
+    return reject(
+      'duration_too_long',
+      `Closes ${(hoursToClose / 24).toFixed(0)} days out (max ${MARKET_DURATION.MAX_HOURS / 24} days)`,
+    )
+  }
+
+  // ── Event-date cross-check (when the generator anchored to a real event) ────
+  if (input.eventDateIso != null && input.eventDateIso !== '') {
+    const evMs = new Date(input.eventDateIso).getTime()
+    if (Number.isNaN(evMs)) {
+      return reject('event_date_invalid', `Unparseable event date: "${input.eventDateIso}"`)
+    }
+    // Event already happened (1h grace for in-progress live events).
+    if (evMs < now - HOUR_MS) {
+      return reject('event_already_happened', 'Underlying event is in the past')
+    }
+    // Market must not close before the event can resolve…
+    if (endMs < evMs - HOUR_MS) {
+      return reject('duration_inconsistent', 'Market closes before the event happens')
+    }
+    // …nor linger for weeks after a dated event (keeps the feed fresh).
+    if (endMs > evMs + 7 * DAY_MS) {
+      return reject('duration_inconsistent', 'Market closes too long after the event resolves')
+    }
+  }
+
+  // ── Step 2b — Time anchor: reject vague, unanchored timeframes ──────────────
+  if (VAGUE_TIMEFRAME.test(title)) {
+    return reject('no_time_anchor', 'No concrete time anchor — vague timeframe')
+  }
+
+  // ── Step 6 — Staleness: already-resolved phrasing or a past-year reference ──
+  if (ALREADY_RESOLVED.test(title)) {
+    return reject('already_resolved_phrasing', 'Phrased about a past or already-decided outcome')
+  }
+  const yearMatch = title.match(/\b(20\d{2})\b/)
+  if (yearMatch) {
+    const referencedYear = Number(yearMatch[1])
+    const currentYear = new Date(now).getUTCFullYear()
+    if (referencedYear < currentYear) {
+      return reject('stale_topic', `References a past year (${referencedYear})`)
+    }
+  }
+
+  // ── Step 5 — Specificity: one question per market (no compound questions) ───
+  const questionMarks = (title.match(/\?/g) ?? []).length
+  if (questionMarks >= 2) {
+    return reject('compound_question', 'Multiple questions in one market — ask a single yes/no question')
+  }
+  if (/\b(and|or)\s+will\b/i.test(title)) {
+    return reject('compound_question', 'Compound question — split into one prediction per market')
+  }
+
+  // ── Step 3 — Resolution path (AI-generated markets) ─────────────────────────
+  if (input.requireResolution) {
+    const hasCriteria = !!input.resolutionCriteria && input.resolutionCriteria.trim().length >= 10
+    const hasSource =
+      (!!input.resolutionSourceUrl && input.resolutionSourceUrl.trim() !== '') ||
+      (!!input.targetDataKey && input.targetDataKey.trim() !== '')
+    if (!hasCriteria || !hasSource) {
+      return reject('resolution_unclear', 'No clear resolution criteria or source')
+    }
+  }
+
+  return {
+    valid: true,
+    status: 'valid',
+    countdownHours: Math.round(hoursToClose * 10) / 10,
+  }
+}
+
+/** One-line summary for cron / debug logs. */
+export function describeValidation(title: string, v: MarketValidation): string {
+  return v.valid
+    ? `✅ valid (${v.countdownHours}h) "${title}"`
+    : `❌ ${v.code}: ${v.reason} — "${title}"`
+}
