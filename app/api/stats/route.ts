@@ -55,16 +55,24 @@ export async function GET() {
   }))
   const achievements = computeAchievements(achievementBets)
 
-  // Near-miss: leaderboard rank gap + creator trust (run in parallel)
+  // Near-miss: leaderboard rank gap + creator trust + follow counts (parallel)
   const admin = createAdminClient()
-  const [profilesResult, creatorTrust] = await Promise.all([
+  const [profilesResult, creatorTrust, followersResult, followingResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, credits, xp')
       .order('credits', { ascending: false })
       .limit(100),
     computeCreatorTrust(user.id, admin),
+    // followers = people who follow ME; following = people I follow.
+    // Tolerate the table not existing yet (counts default to 0).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id),
   ])
+  const followersCount = (followersResult as { count: number | null })?.count ?? 0
+  const followingCount = (followingResult as { count: number | null })?.count ?? 0
 
   const profiles = profilesResult.data ?? []
   const myRankIndex = profiles.findIndex((p) => p.id === user.id)
@@ -83,6 +91,8 @@ export async function GET() {
     achievements,
     leaderboardRank,
     top10Gap,
+    followersCount,
+    followingCount,
     creatorStats: {
       liveMarkets: creatorTrust.liveCount,
       reviewMarkets: creatorTrust.reviewCount,

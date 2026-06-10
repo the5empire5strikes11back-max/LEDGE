@@ -63,6 +63,7 @@ const TYPE_ICON: Record<string, string> = {
   streak_at_risk:  "🔥",
   comment_reply:   "💬",
   market_activity: "📈",
+  new_follower:    "👤",
 }
 
 // ── Following feed rows ───────────────────────────────────────────────────────

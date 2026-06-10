@@ -40,17 +40,48 @@ export async function POST(
   if (existing) {
     // Unfollow
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (admin as any)
+    const { error: delErr } = await (admin as any)
       .from('user_follows')
       .delete()
       .eq('follower_id', user.id)
       .eq('following_id', target.id)
+    if (delErr) {
+      return NextResponse.json({ error: `Unfollow failed: ${delErr.message}` }, { status: 500 })
+    }
   } else {
-    // Follow
+    // Follow — surface write failures instead of silently swallowing them.
+    // (A missing user_follows table previously made follows no-op silently.)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (admin as any)
+    const { error: insErr } = await (admin as any)
       .from('user_follows')
       .insert({ follower_id: user.id, following_id: target.id })
+    if (insErr) {
+      return NextResponse.json({ error: `Follow failed: ${insErr.message}` }, { status: 500 })
+    }
+
+    // Notify the followed user. Non-fatal: a notification failure must not
+    // roll back a successful follow. Look up the follower's username for the body.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: me } = await (admin as any)
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single() as { data: { username: string } | null }
+
+    const followerName = me?.username ?? 'Someone'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: notifErr } = await (admin as any)
+      .from('notifications')
+      .insert({
+        user_id: target.id,
+        type: 'new_follower',
+        title: 'New follower',
+        body: `@${followerName} started following you`,
+        url: `/u/${followerName}`,
+      })
+    if (notifErr) {
+      console.error('[follow] new_follower notification failed (non-fatal):', notifErr.message)
+    }
   }
 
   // Return updated followers count for target

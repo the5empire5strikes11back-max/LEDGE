@@ -74,6 +74,8 @@ interface UserStats {
   achievements: Achievement[]
   leaderboardRank: number | null
   top10Gap: number | null
+  followersCount?: number
+  followingCount?: number
   creatorStats?: {
     liveMarkets: number
     reviewMarkets: number
@@ -498,6 +500,18 @@ export function ProfileScreen({
                       ✦ Trusted Creator
                     </span>
                   )}
+                </div>
+
+                {/* Followers / Following counts */}
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    <span className="font-mono font-bold text-foreground tabular-nums">{stats?.followersCount ?? 0}</span>
+                    {" "}Followers
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    <span className="font-mono font-bold text-foreground tabular-nums">{stats?.followingCount ?? 0}</span>
+                    {" "}Following
+                  </span>
                 </div>
               </div>
 
