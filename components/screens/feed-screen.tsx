@@ -192,7 +192,19 @@ export function FeedScreen({
 
   // First-session: user hasn't placed a bet yet
   const isFirstSession = !ob.firstBetAchievementDone
-  const TABS = isFirstSession ? FIRST_SESSION_TABS : ALL_TABS
+  // The user belongs to ≥1 circle when any circle market is in their feed
+  // (the API only returns circle markets to members). When so, always surface
+  // the "Circle" tab — even in first session — so circle predictions are
+  // reachable from the dashboard the moment one exists.
+  const hasCircleMarkets = useMemo(
+    () => markets.some((m) => m.category === "Circle"),
+    [markets]
+  )
+  const TABS = useMemo(() => {
+    const base = [...(isFirstSession ? FIRST_SESSION_TABS : ALL_TABS)]
+    if (hasCircleMarkets && !base.includes("Circle")) base.push("Circle")
+    return base
+  }, [isFirstSession, hasCircleMarkets])
 
   // Session arc — tracks emotional phase of this session
   const { arc, recordBet: arcRecordBet, recordInteraction } = useSessionArc()
