@@ -69,6 +69,44 @@ export interface GenerationOptions {
   totalTarget?: number
 }
 
+/**
+ * Tolerantly extract complete top-level JSON objects from a (possibly truncated)
+ * array response. Brace-counts while respecting strings/escapes, so a response
+ * cut off mid-object — which happens when the model hits max_tokens — still
+ * yields every COMPLETE market before the cutoff instead of throwing on the
+ * unterminated tail and losing the entire batch.
+ */
+function extractJsonObjects(text: string): unknown[] {
+  const start = text.indexOf('[')
+  const body = start >= 0 ? text.slice(start + 1) : text
+  const objects: unknown[] = []
+  let depth = 0
+  let inStr = false
+  let esc = false
+  let objStart = -1
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (ch === '\\') esc = true
+      else if (ch === '"') inStr = false
+      continue
+    }
+    if (ch === '"') { inStr = true; continue }
+    if (ch === '{') { if (depth === 0) objStart = i; depth++ }
+    else if (ch === '}') {
+      depth--
+      if (depth === 0 && objStart >= 0) {
+        try { objects.push(JSON.parse(body.slice(objStart, i + 1))) } catch { /* skip malformed */ }
+        objStart = -1
+      }
+    } else if (ch === ']' && depth === 0) {
+      break
+    }
+  }
+  return objects
+}
+
 function extractTitlesFromRSS(xml: string): string[] {
   const titles: string[] = []
   const matches = xml.matchAll(/<item[^>]*>[\s\S]*?<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/gi)
@@ -276,15 +314,17 @@ event so only a headline about THIS market can resolve it.`
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 12000,
+    // Headroom for a full batch of richly-specified markets. Under-sizing this
+    // truncates the JSON mid-object; the salvage parser below tolerates that,
+    // but more room means fewer markets lost to the cutoff.
+    max_tokens: 20000,
     messages: [{ role: 'user', content: prompt }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  const jsonMatch = text.match(/\[[\s\S]*\]/)
-  if (!jsonMatch) throw new Error(`No JSON in response: ${text.slice(0, 200)}`)
-
-  const raw = JSON.parse(jsonMatch[0]) as Array<{
+  // Tolerant parse: salvage every complete object even if the array was
+  // truncated at max_tokens (a single unterminated tail no longer dumps the batch).
+  const raw = extractJsonObjects(text) as Array<{
     title: string
     category: string
     event_status?: string
@@ -296,6 +336,10 @@ event so only a headline about THIS market can resolve it.`
     resolution_source_url?: string
     target_data_key?: string
   }>
+
+  if (raw.length === 0) {
+    throw new Error(`No parseable markets in response: ${text.slice(0, 200)}`)
+  }
 
   const nowMs = now.getTime()
   const built: GeneratedMarket[] = []
