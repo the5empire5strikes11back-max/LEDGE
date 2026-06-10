@@ -61,6 +61,8 @@ interface MarketFeedCardProps {
   resolutionSourceUrl?: string | null
   /** Raw JSON resolution key — used to derive source label & type */
   targetDataKey?: string | null
+  /** User-coined category label shown in place of the system category */
+  subcategory?: string | null
   style?: React.CSSProperties
   onClick?: () => void
   onBuyYes?: () => void
@@ -236,6 +238,7 @@ export function MarketFeedCard({
   openingYesPercent,
   resolutionSourceUrl,
   targetDataKey,
+  subcategory,
   style,
   onClick,
   onBuyYes,
@@ -319,7 +322,7 @@ export function MarketFeedCard({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
-              {categoryLabel[category]}
+              {subcategory || categoryLabel[category]}
             </span>
 
             {/* 🔴 LIVE chip — event happening right now */}

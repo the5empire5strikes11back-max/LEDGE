@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { X, Loader2 } from "lucide-react"
+import { X, Loader2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type MarketCategory = "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild"
@@ -37,43 +37,68 @@ const MIN_TITLE_LENGTH = 15
 const MAX_TITLE_LENGTH = 200
 const MAX_CRITERIA_LENGTH = 400
 
-function endTimeOptions(): Array<{ label: string; value: string }> {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, "0")
-  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+// ── Duration slider bounds ────────────────────────────────────────────────────
+const MIN_HOURS = 2          // matches the server's minimum market lifetime
+const MAX_HOURS = 720        // 30 days — "under a month"
+const DEFAULT_HOURS = 72     // 3 days
 
-  const opts = [
-    { label: "24 hours", hours: 24 },
-    { label: "3 days", hours: 72 },
-    { label: "1 week", hours: 168 },
-    { label: "1 month", hours: 720 },
-  ]
+// ── Custom category bounds ────────────────────────────────────────────────────
+const CUSTOM_CAT_MIN = 2
+const CUSTOM_CAT_MAX = 20
 
-  return opts.map(({ label, hours }) => {
-    const d = new Date(now.getTime() + hours * 60 * 60_000)
-    return { label, value: fmt(d) }
+/** Snap a raw hour value to sensible increments so the slider lands on round
+ *  durations: 1h steps under a day, 6h up to a week, 1-day beyond. */
+function snapHours(h: number): number {
+  if (h <= 24) return Math.max(MIN_HOURS, Math.round(h))
+  if (h <= 168) return Math.round(h / 6) * 6
+  return Math.round(h / 24) * 24
+}
+
+/** Human-friendly duration label, e.g. "5 hours", "3 days", "2 weeks". */
+function formatDuration(hours: number): string {
+  if (hours < 24) {
+    const h = Math.round(hours)
+    return `${h} hour${h === 1 ? "" : "s"}`
+  }
+  const days = hours / 24
+  if (days < 14) {
+    const d = Math.round(days)
+    return `${d} day${d === 1 ? "" : "s"}`
+  }
+  const weeks = Math.round(days / 7)
+  return `${weeks} week${weeks === 1 ? "" : "s"}`
+}
+
+/** Absolute close date label for the chosen duration. */
+function formatCloseDate(hours: number): string {
+  const d = new Date(Date.now() + hours * 3_600_000)
+  return d.toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
   })
 }
 
 export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketSheetProps) {
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState<MarketCategory>("Sports")
-  const [endTime, setEndTime] = useState(endTimeOptions()[0].value)
+  const [useCustom, setUseCustom] = useState(false)
+  const [customCategory, setCustomCategory] = useState("")
+  const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [criteria, setCriteria] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const titleTrimmed = title.trim()
   const criteriaText = criteria.trim()
+  const customTrimmed = customCategory.trim()
   const isQuestion = titleTrimmed.endsWith("?")
   // Compound question: more than one '?' (e.g. "Will X? And will Y?")
   const isCompound = (titleTrimmed.match(/\?/g) ?? []).length > 1
   const isTooShort = titleTrimmed.length < MIN_TITLE_LENGTH
   const isTooLong = titleTrimmed.length > MAX_TITLE_LENGTH
   const isCriteriaTooLong = criteriaText.length > MAX_CRITERIA_LENGTH
-  const endDate = new Date(endTime)
-  const isEndInFuture = endDate > new Date()
-  const canSubmit = isQuestion && !isCompound && !isTooShort && !isTooLong && !isCriteriaTooLong && isEndInFuture && !submitting
+  const isCustomValid = !useCustom || (customTrimmed.length >= CUSTOM_CAT_MIN && customTrimmed.length <= CUSTOM_CAT_MAX)
+  const canSubmit = isQuestion && !isCompound && !isTooShort && !isTooLong && !isCriteriaTooLong && isCustomValid && !submitting
 
   // Inline hint shown below the textarea
   const inputHint: string | null =
@@ -82,11 +107,15 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
     isTooShort ? `Min ${MIN_TITLE_LENGTH} characters` :
     null
 
+  const placeholder = useCustom ? "e.g. Will my prediction come true this week?" : CATEGORY_EXAMPLES[category]
+
   const handleClose = () => {
     if (submitting) return
     setTitle("")
     setCategory("Sports")
-    setEndTime(endTimeOptions()[0].value)
+    setUseCustom(false)
+    setCustomCategory("")
+    setDurationHours(DEFAULT_HOURS)
     setCriteria("")
     setError(null)
     onClose()
@@ -98,13 +127,17 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
     setError(null)
 
     try {
+      const endTimeIso = new Date(Date.now() + durationHours * 3_600_000).toISOString()
       const res = await fetch("/api/markets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: titleTrimmed,
-          category,
-          end_time: new Date(endTime).toISOString(),
+          // A custom category is sent as a free-text tag; the system buckets it
+          // under "Wild" and displays the custom label. Otherwise a real category.
+          category: useCustom ? "Wild" : category,
+          ...(useCustom ? { subcategory: customTrimmed } : {}),
+          end_time: endTimeIso,
           ...(criteriaText ? { resolution_criteria: criteriaText } : {}),
         }),
       })
@@ -129,7 +162,6 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
 
   if (!open) return null
 
-  const timeOpts = endTimeOptions()
   const charCount = titleTrimmed.length
 
   return (
@@ -149,7 +181,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
         style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-surface-2">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-surface-2 z-10">
           <span className="text-sm font-semibold text-foreground">New Prediction</span>
           <button
             onClick={handleClose}
@@ -170,7 +202,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
             <textarea
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={CATEGORY_EXAMPLES[category]}
+              placeholder={placeholder}
               maxLength={MAX_TITLE_LENGTH + 10}
               rows={3}
               className={cn(
@@ -234,11 +266,11 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setCategory(cat)}
+                  onClick={() => { setCategory(cat); setUseCustom(false) }}
                   className={cn(
                     "py-2.5 text-xs font-semibold uppercase tracking-wider border flex flex-col items-center gap-1",
                     "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.96]",
-                    category === cat
+                    !useCustom && category === cat
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground active:bg-muted"
                   )}
@@ -249,31 +281,76 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                 </button>
               ))}
             </div>
+
+            {/* Make your own category */}
+            <button
+              onClick={() => setUseCustom((v) => !v)}
+              className={cn(
+                "w-full py-2 text-[11px] font-semibold border flex items-center justify-center gap-1.5",
+                "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.98]",
+                useCustom
+                  ? "bg-accent/15 text-accent border-accent/40"
+                  : "bg-surface text-muted-foreground border-dashed border-border hover:border-muted-foreground/40 hover:text-foreground"
+              )}
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {useCustom ? "Using a custom category" : "Make your own category"}
+            </button>
+
+            {useCustom && (
+              <div className="space-y-1 pt-1">
+                <input
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="e.g. Crypto, Local, School…"
+                  maxLength={CUSTOM_CAT_MAX + 4}
+                  className={cn(
+                    "w-full bg-surface border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40",
+                    "focus:outline-none focus:ring-1 transition-colors",
+                    customTrimmed.length > CUSTOM_CAT_MAX ? "border-danger focus:ring-danger" : "border-border focus:ring-accent/50"
+                  )}
+                  style={{ borderRadius: "var(--radius-button)" }}
+                  autoFocus
+                />
+                <p className="text-[10px] text-muted-foreground/50">
+                  {customTrimmed.length > CUSTOM_CAT_MAX
+                    ? `Keep it under ${CUSTOM_CAT_MAX} characters`
+                    : "Shown as the market's category. Lives in the Wild feed."}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Closes in */}
+          {/* Closes in — draggable duration */}
           <div className="space-y-2">
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-              Closes in
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {timeOpts.map((opt) => (
-                <button
-                  key={opt.label}
-                  onClick={() => setEndTime(opt.value)}
-                  className={cn(
-                    "py-2 text-xs font-semibold border",
-                    "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.96]",
-                    endTime === opt.value
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-surface text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground active:bg-muted"
-                  )}
-                  style={{ borderRadius: "var(--radius-badge)" }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="flex items-baseline justify-between">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                Closes in
+              </label>
+              <span className="text-sm font-bold text-accent tabular-nums">
+                {formatDuration(durationHours)}
+              </span>
             </div>
+            <input
+              type="range"
+              min={MIN_HOURS}
+              max={MAX_HOURS}
+              step={1}
+              value={durationHours}
+              onChange={(e) => setDurationHours(snapHours(Number(e.target.value)))}
+              className="w-full cursor-pointer"
+              style={{ accentColor: "var(--accent)" }}
+              aria-label="Market duration"
+            />
+            <div className="flex items-center justify-between text-[9px] text-muted-foreground/40 font-mono">
+              <span>2h</span>
+              <span>1 week</span>
+              <span>1 month</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground/50">
+              Closes {formatCloseDate(durationHours)}
+            </p>
           </div>
 
           {/* Error */}

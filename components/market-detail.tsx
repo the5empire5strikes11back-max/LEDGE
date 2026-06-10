@@ -27,6 +27,7 @@ interface MarketDetailProps {
     id: string
     title: string
     category: string
+    subcategory?: string | null
     yesPercent: number
     yesPool: number
     noPool: number
@@ -285,7 +286,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             )}
             style={{ borderRadius: "var(--radius-badge)" }}
           >
-            {market.category}
+            {market.subcategory || market.category}
           </span>
           {isHot && (
             <span className="inline-flex items-center gap-0.5 shrink-0 text-[9px] font-black text-review uppercase tracking-wider px-1.5 py-0.5 bg-review/10 border border-review/20 animate-pulse" style={{ borderRadius: "var(--radius-badge)" }}>

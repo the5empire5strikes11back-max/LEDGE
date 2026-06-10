@@ -202,6 +202,8 @@ export async function GET(request: Request) {
         resolvedAt: market.resolved_at ?? null,
       } : undefined,
       resolutionCriteria: market.resolution_criteria ?? null,
+      /** User-coined category label shown in place of the system category */
+      subcategory: market.subcategory ?? null,
       /** Pre-resolution source URL — used for "Resolves via …" chip on cards */
       resolutionSourceUrl: market.resolution_source_url ?? null,
       /** Raw JSON resolution key — used to derive source label & type */
@@ -285,6 +287,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
   }
 
+  // ── Optional custom subcategory ──────────────────────────────────────────
+  // A user-coined category label. The market still belongs to a real system
+  // category (the client sends "Wild" for custom), so liquidity, floors, and
+  // ranking are unaffected; the label is shown in place of the category on cards.
+  let subcategory: string | null = null
+  if (body.subcategory != null && body.subcategory !== '') {
+    if (typeof body.subcategory !== 'string') {
+      return NextResponse.json({ error: 'Invalid custom category' }, { status: 400 })
+    }
+    const cleaned = body.subcategory.trim().replace(/\s+/g, ' ')
+    if (cleaned.length < 2 || cleaned.length > 20) {
+      return NextResponse.json({ error: 'Custom category must be 2–20 characters' }, { status: 400 })
+    }
+    if (!/^[\p{L}\p{N} &-]+$/u.test(cleaned)) {
+      return NextResponse.json({ error: 'Custom category: letters, numbers, spaces, & and - only' }, { status: 400 })
+    }
+    subcategory = cleaned
+  }
+
   // ── Fetch creator trust + existing titles in parallel ────────────────────
   const [trustResult, existingMarketsResult] = await Promise.all([
     computeCreatorTrust(user.id, admin),
@@ -328,6 +349,7 @@ export async function POST(request: Request) {
     .insert({
       title: trimmedTitle,
       category,
+      ...(subcategory ? { subcategory } : {}),
       end_time,
       jackpot_pool: 0,
       created_by: user.id,

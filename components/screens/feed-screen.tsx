@@ -88,6 +88,8 @@ interface Market {
   resolutionSourceUrl?: string | null
   /** Raw JSON resolution key — used to derive source label & type */
   targetDataKey?: string | null
+  /** User-coined category label shown in place of the system category */
+  subcategory?: string | null
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: {
