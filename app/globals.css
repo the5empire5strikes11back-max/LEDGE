@@ -212,6 +212,21 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* ── Keyboard focus visibility (a11y, WCAG 2.4.7) ──────────────────────────
+     The app's custom controls (trade buttons, tabs, nav, FAB) only had tap/
+     hover feedback — keyboard users had no visible focus indicator. This adds a
+     consistent, on-brand ring using the design token. :focus-visible means it
+     ONLY appears for keyboard / assistive-tech navigation, so mouse and touch
+     users see no change. `outline` is layout-safe (no reflow / CLS) and modern
+     browsers round it to the element's border-radius automatically. */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 /* ── Components ──────────────────────────────────────────────────────────── */
