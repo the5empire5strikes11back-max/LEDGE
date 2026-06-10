@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -10,6 +10,26 @@ export async function GET(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+
+  // Private circle markets: only members may view betting activity. Look up the
+  // market's circle and verify membership before exposing any bet history.
+  const admin = createAdminClient()
+  const { data: marketRow } = await admin
+    .from('markets')
+    .select('circle_id')
+    .eq('id', id)
+    .maybeSingle()
+  if ((marketRow as { circle_id?: string | null } | null)?.circle_id) {
+    const { data: membership } = await admin
+      .from('circle_members')
+      .select('circle_id')
+      .eq('circle_id', (marketRow as { circle_id: string }).circle_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!membership) {
+      return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+    }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rawBets, error } = await (supabase as any)

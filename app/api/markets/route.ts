@@ -10,6 +10,7 @@ import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
 import { screenMarket, ALLOWED_CATEGORIES } from '@/lib/market-quality'
 import { validateMarket } from '@/lib/market-validation'
 import { computeCreatorTrust, batchCreatorTrust } from '@/lib/creator-trust'
+import { canAccessCircleMarket } from '@/lib/circle-access'
 import { logMessage } from '@/lib/logger'
 
 // Cache the full markets list for 30 seconds — same for all users
@@ -89,7 +90,13 @@ export async function GET(request: Request) {
 
   const recentBetsResult = { data: recentBetsData }
 
-  // Post-filter: hide queued/archived markets, and hide expired unresolved markets.
+  // Circle IDs the user belongs to — used to gate private circle markets.
+  const userCircleIds = new Set(
+    (circleMembershipsResult.data ?? []).map((cm) => cm.circle_id)
+  )
+
+  // Post-filter: hide queued/archived markets, hide expired unresolved markets,
+  // and hide PRIVATE circle markets the user is not a member of.
   // Pre-migration rows have no status field (undefined) and pass through as live.
   // Expired unresolved markets are excluded here so they never render as live
   // bettable cards between cron runs — resolve-expired archives them asynchronously.
@@ -99,6 +106,8 @@ export async function GET(request: Request) {
     if (s && s !== 'live') return false
     // Hide expired unresolved markets — stale events should never show as live
     if (!m.resolved && m.end_time && m.end_time < nowIso) return false
+    // Circle markets are private — only members of the circle may see them
+    if (!canAccessCircleMarket(m.circle_id, userCircleIds)) return false
     return true
   })
 
@@ -119,9 +128,6 @@ export async function GET(request: Request) {
     batchCreatorTrust(creatorIds, adminForCreators),
   ])
   const creatorMap = new Map((creatorProfilesResult.data ?? []).map((p: { id: string; username: string }) => [p.id, p.username]))
-  const userCircleIds = new Set(
-    (circleMembershipsResult.data ?? []).map((cm) => cm.circle_id)
-  )
 
   // Aggregate recent bets into per-market social data (in-memory grouping, O(n) on bets)
   const socialMap = aggregateRecentBets(recentBetsResult.data ?? [])

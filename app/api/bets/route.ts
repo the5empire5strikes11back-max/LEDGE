@@ -81,6 +81,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Market is closed' }, { status: 400 })
   }
 
+  // Private circle markets: only members of the circle may bet. Without this
+  // check, a non-member who learns a circle market's ID could place bets on it.
+  if (market.circle_id) {
+    const { data: membership } = await admin
+      .from('circle_members')
+      .select('circle_id')
+      .eq('circle_id', market.circle_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!membership) {
+      return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+    }
+  }
+
   // Anti-Sybil: cap bets inside user-created Circle markets
   const cappedAmount = market.circle_id ? Math.min(safeAmount, CIRCLE_BET_MAX_CR) : safeAmount
 
