@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateMarkets } from '@/lib/market-generator'
+import { generateMarkets, type GeneratedMarket } from '@/lib/market-generator'
+import { fetchUpcomingEspnMarkets } from '@/lib/espn-schedule'
 import { scoreMarkets, formatScoringLog } from '@/lib/market-scorer'
 import { screenCandidate } from '@/lib/market-pipeline'
 import { marketSignature, type MarketSignature } from '@/lib/market-dedup'
@@ -71,9 +72,26 @@ export async function POST(request: Request) {
     if (deficit > 0) categoryTargets[cat] = Math.ceil(deficit * OVER_GEN)
   }
 
+  // ── 1b. Sports backbone: seed from REAL ESPN games (guaranteed resolvable) ───
+  // The model is bad at guessing which teams actually play; pull live upcoming
+  // games from ESPN and let those BE the Sports markets. They resolve cleanly off
+  // the box score. Zero out the AI's Sports target so it focuses elsewhere.
+  let espnMarkets: GeneratedMarket[] = []
+  const sportsTarget = categoryTargets['Sports'] ?? 0
+  if (sportsTarget > 0) {
+    try {
+      espnMarkets = await fetchUpcomingEspnMarkets(sportsTarget)
+    } catch (err) {
+      logError(err, { context: 'cron:refresh-markets:espn-seed' })
+    }
+    const remaining = Math.max(0, sportsTarget - espnMarkets.length)
+    if (remaining > 0) categoryTargets['Sports'] = remaining
+    else delete categoryTargets['Sports']
+  }
+
   // When every category is already stocked, still rotate in a light fresh batch.
   const useTargets = totalDeficit > 0
-  const totalTarget = useTargets
+  const totalTarget = useTargets && Object.keys(categoryTargets).length > 0
     ? Math.max(20, Math.min(60, Object.values(categoryTargets).reduce((a, b) => a + b, 0)))
     : 12
 
@@ -154,10 +172,13 @@ export async function POST(request: Request) {
     if (sig) acceptedSignatures.push(sig)
   }
 
-  const toQueue: typeof qualityMarkets = []
+  // Screen the ESPN-seeded sports markets FIRST (they're guaranteed resolvable),
+  // then the AI-generated markets. Both pass through the identical gate.
+  const candidates: GeneratedMarket[] = [...espnMarkets, ...qualityMarkets]
+  const toQueue: GeneratedMarket[] = []
   const screenedOut: Array<{ title: string; status: string; reason: string | null }> = []
 
-  for (const m of qualityMarkets) {
+  for (const m of candidates) {
     const result = screenCandidate(
       {
         title: m.title,
@@ -188,7 +209,7 @@ export async function POST(request: Request) {
       return acc
     }, {})
     logMessage(
-      `[refresh-markets] pipeline dropped ${screenedOut.length}/${qualityMarkets.length} ` +
+      `[refresh-markets] pipeline dropped ${screenedOut.length}/${candidates.length} (${espnMarkets.length} espn-seeded) ` +
         `(${Object.entries(byStatus).map(([k, v]) => `${k}:${v}`).join(' ')}): ` +
         screenedOut.map((s) => `[${s.status}] ${s.title.slice(0, 48)}`).join(' · '),
       { context: 'cron:refresh-markets:pipeline' }

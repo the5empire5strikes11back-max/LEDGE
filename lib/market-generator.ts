@@ -295,12 +295,18 @@ NFL: NE KC DAL SF GB BUF BAL CIN PHI LAR MIA DEN CHI NYG SEA
 Use for non-game sports outcomes, rankings, factual checks.
 target_data_key: {"type":"json_field","path":"<dot.path>","yes_value":"<exact_string>"}
 
-━━ TIER 3 — rss_keyword ━━ (LAST RESORT — politics, culture, entertainment only)
-KEYWORD RULES — violations cause false resolutions:
-  • Each term MUST be a multi-word phrase (never a single common word)
-    BAD: "yes_terms": ["passes", "drops"]
-    GOOD: "yes_terms": ["bill passes Senate", "album drops Friday", "Taylor cancels"]
-  • 2–4 terms per side, specific enough that only a direct headline about THIS market matches
+━━ TIER 3 — rss_keyword ━━ (politics, culture, tech, viral, wild)
+THE #1 RULE: a market is only resolvable if a MAINSTREAM news outlet (BBC) will
+actually run a headline about its outcome. If the only place the result would ever
+appear is TikTok/Twitter/Reddit and never mainstream news, DO NOT create it — it
+cannot be resolved and will be voided. Anchor to events big enough for BBC to cover.
+KEYWORD RULES:
+  • Terms must read like REAL BBC headline language: the proper name(s) + a plain
+    outcome word that an actual news headline would use.
+  • 2–4 multi-word phrases per side. Specific enough to avoid false matches, but
+    using words a mainstream headline would really contain (NOT niche internet slang).
+    BAD (too niche, never in BBC): ["Drake responds to beef", "goes viral on TikTok"]
+    GOOD (BBC would headline this): ["Drake releases new song", "Taylor Swift announces tour", "Apple unveils iPhone"]
 resolution_source_url — you MUST use ONE of these EXACT urls verbatim. Do NOT invent or
 modify any url (made-up paths 404 and make the market unresolvable → it gets rejected):
   - US politics: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml"
