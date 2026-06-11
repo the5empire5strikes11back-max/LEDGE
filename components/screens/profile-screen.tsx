@@ -896,16 +896,21 @@ export function ProfileScreen({
             >
               <div className="divide-y divide-border">
                 {bets.map((bet) => {
-                  const isPending = bet.won === null
+                  // Voided market = resolved with no winner → stake was refunded.
+                  const m = bet.markets as { resolved?: boolean; winner?: string | null } | null
+                  const isVoided  = bet.won === null && m?.resolved === true && (m?.winner == null)
+                  const isPending = bet.won === null && !isVoided
                   const profit    = bet.won && bet.payout ? bet.payout - bet.amount : null
                   return (
                     <div key={bet.id} className="px-4 py-3 flex items-start gap-3">
                       <div className="mt-0.5 shrink-0">
-                        {isPending
-                          ? <Clock className="w-3.5 h-3.5 text-muted-foreground/50" />
-                          : bet.won
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                            : <XCircle className="w-3.5 h-3.5 text-danger" />
+                        {isVoided
+                          ? <RefreshCw className="w-3.5 h-3.5 text-muted-foreground/60" />
+                          : isPending
+                            ? <Clock className="w-3.5 h-3.5 text-muted-foreground/50" />
+                            : bet.won
+                              ? <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                              : <XCircle className="w-3.5 h-3.5 text-danger" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
@@ -939,6 +944,7 @@ export function ProfileScreen({
                           </p>
                         )}
                         {isPending && <p className="text-[10px] text-muted-foreground/50">pending</p>}
+                        {isVoided && <p className="text-[10px] text-muted-foreground/60">refunded</p>}
                       </div>
                     </div>
                   )

@@ -177,6 +177,53 @@ async function settleBets(
   return payoutCount
 }
 
+/**
+ * Void a market and REFUND every stake.
+ *
+ * Used when neither the trusted source nor the AI fallback could verify the
+ * outcome. We deliberately do NOT guess from the crowd (yes_percent) — a market
+ * must never pay out based on who pumped it. Everyone gets their stake back; the
+ * bet is neither a win nor a loss (won stays null, payout set to the refunded
+ * amount). The market's winner=null is the canonical "voided" signal.
+ */
+async function voidBets(
+  supabase: ReturnType<typeof createAdminClient>,
+  market: { id: string; title: string }
+): Promise<number> {
+  const { data: bets } = await supabase
+    .from('bets')
+    .select('*')
+    .eq('market_id', market.id)
+    .is('won', null)
+
+  let refundCount = 0
+  for (const bet of bets ?? []) {
+    // Record the refund amount on the bet (won stays null = neither win nor loss).
+    await supabase.from('bets').update({ payout: bet.amount }).eq('id', bet.id)
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('credits')
+      .eq('id', bet.user_id)
+      .single()
+
+    if (profile) {
+      await supabase
+        .from('profiles')
+        .update({ credits: profile.credits + bet.amount })
+        .eq('id', bet.user_id)
+
+      void pushToUser(bet.user_id, {
+        title: '↩️ Market Voided — Refunded',
+        body: `"${market.title.length > 47 ? market.title.slice(0, 47) + '…' : market.title}" couldn't be settled. Your ${Number(bet.amount).toLocaleString()} CR is back.`,
+        url: '/',
+      })
+      refundCount++
+    }
+  }
+  return refundCount
+}
+
 // ── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -221,8 +268,11 @@ export async function POST(request: Request) {
 
   for (const market of expiredMarkets) {
     try {
-      let winner: 'yes' | 'no' = market.yes_percent >= 50 ? 'yes' : 'no'
-      let resolvedBy = 'majority_vote'
+      // Determine the outcome from real data first, AI second, and VOID third.
+      // There is no crowd-vote fallback: an unverifiable market is voided and
+      // refunded, never settled on who believed what.
+      let outcome: 'yes' | 'no' | 'void' = 'void'
+      let resolvedBy = 'voided_unverifiable'
 
       // 2. Try direct HTTP resolution first (no AI tokens)
       const directOutcome = await resolveFromSource(
@@ -231,7 +281,7 @@ export async function POST(request: Request) {
       )
 
       if (directOutcome !== 'unknown') {
-        winner = directOutcome
+        outcome = directOutcome
         resolvedBy = 'direct_http'
       } else if (apiKey) {
         // 3. Claude fallback — only invoked when direct resolution fails
@@ -241,27 +291,55 @@ export async function POST(request: Request) {
           apiKey
         )
         if (aiOutcome !== 'unknown') {
-          winner = aiOutcome
+          outcome = aiOutcome
           resolvedBy = 'ai_fallback'
         }
       }
 
-      // 4. Persist resolution — clear engagement signals on close
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('markets')
-        .update({ resolved: true, winner, hot_score: 0, momentum_shift: 0, resolved_at: new Date().toISOString() })
-        .eq('id', market.id)
+      if (outcome === 'void') {
+        // 4a. VOID — couldn't verify from a trusted source or AI. Refund all
+        // stakes; winner=null is the canonical voided marker.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('markets')
+          .update({
+            resolved: true,
+            winner: null,
+            hot_score: 0,
+            momentum_shift: 0,
+            resolved_at: new Date().toISOString(),
+            resolution_note: 'Voided — outcome could not be verified from a trusted source. All stakes refunded.',
+          })
+          .eq('id', market.id)
 
-      const payoutCount = await settleBets(supabase, market, winner)
+        const refundCount = await voidBets(supabase, market)
 
-      results.push({
-        marketId: market.id,
-        title: market.title,
-        winner,
-        resolvedBy,
-        payoutCount,
-      })
+        results.push({
+          marketId: market.id,
+          title: market.title,
+          winner: null,
+          resolvedBy,
+          voided: true,
+          refundCount,
+        })
+      } else {
+        // 4b. Settle normally on the verified outcome
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('markets')
+          .update({ resolved: true, winner: outcome, hot_score: 0, momentum_shift: 0, resolved_at: new Date().toISOString() })
+          .eq('id', market.id)
+
+        const payoutCount = await settleBets(supabase, market, outcome)
+
+        results.push({
+          marketId: market.id,
+          title: market.title,
+          winner: outcome,
+          resolvedBy,
+          payoutCount,
+        })
+      }
     } catch (err) {
       // Log per-market failure to Sentry but continue resolving other markets
       logError(err, { context: 'resolve-expired:market', marketId: market.id, title: market.title })

@@ -301,11 +301,13 @@ KEYWORD RULES — violations cause false resolutions:
     BAD: "yes_terms": ["passes", "drops"]
     GOOD: "yes_terms": ["bill passes Senate", "album drops Friday", "Taylor cancels"]
   • 2–4 terms per side, specific enough that only a direct headline about THIS market matches
-resolution_source_url — pick the most topically relevant feed:
+resolution_source_url — you MUST use ONE of these EXACT urls verbatim. Do NOT invent or
+modify any url (made-up paths 404 and make the market unresolvable → it gets rejected):
   - US politics: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml"
   - World events: "https://feeds.bbci.co.uk/news/world/rss.xml"
   - Entertainment / Culture / Viral: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
   - Tech / gaming / AI: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+  - Sports (non-ESPN): "https://feeds.bbci.co.uk/sport/rss.xml"
 target_data_key: {"type":"rss_keyword","yes_terms":["<phrase1>","<phrase2>"],"no_terms":["<phrase3>","<phrase4>"]}
 
 For Tech, Viral, and Wild markets you will almost always use TIER 3 (rss_keyword) with the

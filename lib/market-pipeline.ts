@@ -17,6 +17,7 @@
  */
 
 import { validateMarket, type MarketRejectCode } from '@/lib/market-validation'
+import { checkResolutionSource } from '@/lib/resolution-sources'
 import { screenMarket } from '@/lib/market-quality'
 import {
   marketSignature,
@@ -37,6 +38,7 @@ export type PipelineStatus =
   | 'unsafe'
   | 'low_quality'
   | 'category_overflow'
+  | 'bad_source'
 
 export interface MarketCandidate {
   title: string
@@ -133,6 +135,19 @@ export function screenCandidate(
       status: statusForRejectCode(temporal.code),
       ok: false,
       reason: temporal.reason ?? 'Failed temporal validation',
+    }
+  }
+
+  // ── 1b. Resolution source must be live + parseable ──────────────────────────
+  // A market whose source is a dead/malformed URL can never resolve from data —
+  // it would void at settlement. Reject it now rather than publish a market that
+  // can only end in a refund.
+  const source = checkResolutionSource(candidate.resolutionSourceUrl, candidate.targetDataKey)
+  if (!source.ok) {
+    return {
+      status: 'bad_source',
+      ok: false,
+      reason: `Unresolvable source: ${source.reason}`,
     }
   }
 

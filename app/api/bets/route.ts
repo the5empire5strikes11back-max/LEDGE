@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('bets')
-    .select('*, markets(title, category)')
+    .select('*, markets(title, category, resolved, winner)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
