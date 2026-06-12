@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
@@ -78,13 +78,24 @@ function LedgeLogo({ size = 28 }: { size?: number }) {
   )
 }
 
+const VALID_SCREENS: Screen[] = ["feed", "circles", "profile"]
+
+function screenFromUrl(): Screen {
+  if (typeof window === "undefined") return "feed"
+  const tab = new URLSearchParams(window.location.search).get("tab")
+  return VALID_SCREENS.includes(tab as Screen) ? (tab as Screen) : "feed"
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("feed")
+  const [screen, setScreen] = useState<Screen>(screenFromUrl)
   const [circlesBadge, setCirclesBadge] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [betHistory, setBetHistory] = useState<BetRecord[]>([])
   const [dailyDropOpen, setDailyDropOpen] = useState(false)
   const [pendingDailyDrop, setPendingDailyDrop] = useState(false)
+  // Ref mirror so delayed callbacks read the current value, not a stale closure
+  const pendingDailyDropRef = useRef(false)
+  useEffect(() => { pendingDailyDropRef.current = pendingDailyDrop }, [pendingDailyDrop])
   const { state: ob, complete: completeOb } = useOnboarding()
   const [showFirstBetAchievement, setShowFirstBetAchievement] = useState(false)
   const [dailyDropData, setDailyDropData] = useState<{
@@ -212,11 +223,23 @@ export default function App() {
 
   const handleScreenChange = (s: Screen) => {
     setScreen(s)
+    // Keep the tab in the URL so back/refresh/deep-links work
+    const url = new URL(window.location.href)
+    if (s === "feed") url.searchParams.delete("tab")
+    else url.searchParams.set("tab", s)
+    window.history.pushState({}, "", url.toString())
     if (s === 'circles') {
       setCirclesBadge(false)
       localStorage.setItem(LS_LAST_CIRCLES_VISIT, String(Date.now()))
     }
   }
+
+  // Back/forward buttons switch tabs instead of leaving the app
+  useEffect(() => {
+    const onPop = () => setScreen(screenFromUrl())
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
 
   useEffect(() => {
     loadProfile()
@@ -293,10 +316,17 @@ export default function App() {
         completeOb("firstBetAchievementDone")
         completeOb("firstBetHintDone")
         setShowFirstBetAchievement(true)
-        // Trigger the daily drop that was deferred past first-load
+        // The deferred daily drop now waits for the post-bet panel to be
+        // dismissed (handleFirstBetFlowDone) instead of racing it on a timer.
+        // Fallback: if the panel never shows (e.g. bet placed from Circles),
+        // release the drop after the panel's max lifetime.
         if (pendingDailyDrop) {
-          setPendingDailyDrop(false)
-          setTimeout(() => setDailyDropOpen(true), 3000)
+          setTimeout(() => {
+            if (pendingDailyDropRef.current) {
+              setPendingDailyDrop(false)
+              setDailyDropOpen(true)
+            }
+          }, 12_000)
         }
       } else {
         const resolveHint = marketEndTime ? formatResolveTime(marketEndTime) : null
@@ -324,6 +354,16 @@ export default function App() {
       }
     }
   }
+
+  // Called when the first-bet "Prediction locked in" panel is dismissed.
+  // Only now do we release the deferred daily drop, so celebrations appear
+  // one at a time instead of stacking on top of each other.
+  const handleFirstBetFlowDone = useCallback(() => {
+    if (pendingDailyDropRef.current) {
+      setPendingDailyDrop(false)
+      setTimeout(() => setDailyDropOpen(true), 600)
+    }
+  }, [])
 
   const handleWin = (
     marketTitle: string,
@@ -388,6 +428,7 @@ export default function App() {
           onBet={handleBet}
           onWin={handleWin}
           onOpenShop={() => setShopOpen(true)}
+          onFirstBetFlowDone={handleFirstBetFlowDone}
           onUsernameClick={(username) => setPublicProfileUsername(username)}
           currentUsername={profile.username}
           currentAvatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}

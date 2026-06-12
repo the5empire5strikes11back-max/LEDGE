@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { X, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { calculateFixedOddsPayout } from "@/lib/game-engine"
+import { calculateFixedOddsPayout, payoutMultiplier } from "@/lib/game-engine"
 import { useOnboarding } from "@/lib/onboarding"
 
 interface BetModalProps {
@@ -41,8 +41,16 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const showHint = !ob.firstBetAchievementDone  // show until first bet is done
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 80)
+    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    return () => clearTimeout(t)
   }, [])
+
+  // Escape closes the sheet (dialog semantics)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
 
   const amount = parseFloat(rawAmount) || 0
   const yesPercent = market.yesPercent
@@ -52,9 +60,10 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const impliedProbPct = side === "yes" ? yesPercent : noPercent
   const lockedPayout = amount > 0 ? calculateFixedOddsPayout(amount, impliedProbPct) : 0
   const profit = lockedPayout - amount
-  const multiplier = impliedProbPct > 0 ? ((100 / impliedProbPct) * 0.95).toFixed(2) : "—"
+  const multiplier = payoutMultiplier(impliedProbPct)
 
-  const isValid = amount > 0 && amount <= availableCredits
+  const isOverBalance = amount > availableCredits
+  const isValid = amount > 0 && !isOverBalance
 
   const handleSubmit = async () => {
     if (!isValid) return
@@ -73,7 +82,13 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="relative w-full max-w-[430px] bg-surface-2 border-t border-border animate-in slide-in-from-bottom-4 duration-[350ms]" style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Place a bet on: ${market.title}`}
+        className="relative w-full max-w-[430px] bg-surface-2 border-t border-border animate-in slide-in-from-bottom-4 duration-[350ms]"
+        style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0", overscrollBehavior: "contain" }}
+      >
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
@@ -89,6 +104,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             </div>
             <button
               onClick={onClose}
+              aria-label="Close bet sheet"
               className="shrink-0 w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
             >
               <X className="w-4 h-4" />
@@ -141,12 +157,13 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             <div className="relative">
               <input
                 ref={inputRef}
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Bet amount in credits"
                 value={rawAmount}
-                onChange={(e) => setRawAmount(e.target.value)}
+                onChange={(e) => setRawAmount(e.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="0"
-                min={1}
-                max={availableCredits}
                 className={cn(
                   "w-full bg-muted border px-4 py-3 text-lg font-mono font-semibold tabular-nums",
                   "placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1",
@@ -223,6 +240,13 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 <span className="font-mono text-sm text-muted-foreground">{multiplier}×</span>
               </div>
             </div>
+          )}
+
+          {/* Over-balance inline error */}
+          {isOverBalance && (
+            <p role="alert" className="text-[11px] text-danger font-medium -mt-2">
+              That&rsquo;s more than your balance — max {formatCredits(availableCredits)} CR.
+            </p>
           )}
 
           {/* Balance row */}

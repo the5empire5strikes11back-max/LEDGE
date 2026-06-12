@@ -143,6 +143,8 @@ interface FeedScreenProps {
   ) => void
   /** Open the credit shop modal */
   onOpenShop?: () => void
+  /** Fired when the first-bet post-bet panel is dismissed — releases the next queued celebration */
+  onFirstBetFlowDone?: () => void
   onUsernameClick?: (username: string) => void
   currentUsername?: string | null
   currentAvatarUrl?: string | null
@@ -175,6 +177,7 @@ export function FeedScreen({
   onBet,
   onWin,
   onOpenShop,
+  onFirstBetFlowDone,
   onUsernameClick,
   currentUsername,
   currentAvatarUrl,
@@ -328,14 +331,14 @@ export function FeedScreen({
 
 
 
-  // Hide markets the user has already bet on — they move to Profile > Bets Made
-  const unbetMarkets = markets.filter((m) => !m.userBet)
-
+  // Markets the user has bet on stay in the feed as open-position cards —
+  // hiding them reads as a bug ("where did my market go?"). They also appear
+  // in Profile > Bets Made.
   const rawFiltered = activeTab === "All"
-    ? unbetMarkets
+    ? markets
     : activeTab === "Live"
-    ? unbetMarkets.filter((m) => !m.resolved && isLive(m.endTime))
-    : unbetMarkets.filter((m) => m.category === activeTab)
+    ? markets.filter((m) => !m.resolved && isLive(m.endTime))
+    : markets.filter((m) => m.category === activeTab)
 
   // Apply subcategory filter using keyword matching on market title
   const subcatFiltered = activeSubcat
@@ -732,6 +735,7 @@ export function FeedScreen({
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
                   className="absolute right-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
                 >
                   <XIcon className="w-3.5 h-3.5" />
@@ -1059,7 +1063,7 @@ export function FeedScreen({
           userSide={postBetInfo.side}
           currentOdds={postBetInfo.currentOdds}
           amount={postBetInfo.amount}
-          onDismiss={() => setPostBetInfo(null)}
+          onDismiss={() => { setPostBetInfo(null); onFirstBetFlowDone?.() }}
         />
       )}
 

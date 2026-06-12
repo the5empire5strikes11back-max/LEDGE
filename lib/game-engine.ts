@@ -145,6 +145,9 @@ export function vetoesFromStreak(streak: number, isPlus = false): number {
   return 0
 }
 
+/** House margin applied to every fixed-odds payout (5% cut). */
+export const HOUSE_MARGIN = 0.95
+
 /**
  * Fixed-odds payout locked at the moment a bet is placed.
  * impliedProbabilityPct is the market's yes_percent (or 100 - yes_percent for NO bets).
@@ -156,7 +159,17 @@ export function calculateFixedOddsPayout(
   impliedProbabilityPct: number
 ): number {
   if (impliedProbabilityPct <= 0 || impliedProbabilityPct >= 100) return betAmount
-  return Math.floor(betAmount * (100 / impliedProbabilityPct) * 0.95)
+  return Math.floor(betAmount * (100 / impliedProbabilityPct) * HOUSE_MARGIN)
+}
+
+/**
+ * The single user-facing payout multiplier, margin-inclusive, formatted "X.XX×".
+ * MUST be used everywhere a multiplier is shown — feed card, bet modal, market
+ * detail — so the number the user sees always matches the payout they receive.
+ */
+export function payoutMultiplier(impliedProbabilityPct: number): string {
+  if (impliedProbabilityPct <= 0 || impliedProbabilityPct >= 100) return "—"
+  return `${((100 / impliedProbabilityPct) * HOUSE_MARGIN).toFixed(2)}×`
 }
 
 // Rank decay: days since last active before decay starts

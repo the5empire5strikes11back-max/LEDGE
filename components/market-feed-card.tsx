@@ -12,6 +12,7 @@ import type { MarketSocialData } from "@/lib/social-signals"
 import type { CompoundState } from "@/lib/feed-signals"
 import { getResolutionMeta } from "@/lib/resolution-label"
 import { isLive, formatTimeLeft } from "@/lib/market-live"
+import { payoutMultiplier } from "@/lib/game-engine"
 
 interface FriendBet {
   username: string
@@ -140,14 +141,6 @@ function AnimatedNumber({
       {Math.round(displayValue)}{suffix && <span className={cn("not-italic", suffixClassName)}>{suffix}</span>}
     </span>
   )
-}
-
-// ── Payout multiplier ─────────────────────────────────────────────────────────
-// Returns the implied payout as "X.XX×" — the amount you get back per 1cr wagered
-// if your side wins. Mirrors real-market share pricing: 100¢ / probability%.
-function payoutMultiplier(pct: number): string {
-  if (pct <= 0 || pct >= 100) return "—"
-  return `${(100 / pct).toFixed(2)}×`
 }
 
 // ── Volatility glow class ─────────────────────────────────────────────────────

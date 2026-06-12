@@ -12,6 +12,7 @@ import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { Countdown } from "@/components/ui/countdown"
 import { computeDetailSignals } from "@/lib/social-signals"
 import { MarketComments } from "@/components/market-comments"
+import { payoutMultiplier } from "@/lib/game-engine"
 import {
   ResponsiveContainer,
   AreaChart,
@@ -295,13 +296,14 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           )}
           {hasMomentum && !isHot && (
             <span className="shrink-0 text-[9px] font-bold text-accent uppercase tracking-wider px-1.5 py-0.5 bg-accent/10 border border-accent/20" style={{ borderRadius: "var(--radius-badge)" }}>
-              ↑{market.momentumShift}% MOVING
+              ↑{(market.momentumShift ?? 0).toFixed(1)}% MOVING
             </span>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleShare}
+            aria-label="Share market"
             className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
             title="Share market"
           >
@@ -309,6 +311,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           </button>
           <button
             onClick={onClose}
+            aria-label="Close market detail"
             className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-[0.88] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
           >
             <X className="w-4 h-4" />
@@ -515,7 +518,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               <span className="mt-1.5 text-[10px] text-success/60 uppercase tracking-widest font-semibold">YES</span>
               {!isResolved && yesPercent > 0 && yesPercent < 100 && (
                 <span className="mt-1 text-[9px] text-success/40 font-mono">
-                  {(100 / yesPercent).toFixed(2)}× if correct
+                  {payoutMultiplier(yesPercent)} if correct
                 </span>
               )}
             </div>
@@ -524,7 +527,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               <span className="mt-1.5 text-[10px] text-danger/60 uppercase tracking-widest font-semibold">NO</span>
               {!isResolved && noPercent > 0 && noPercent < 100 && (
                 <span className="mt-1 text-[9px] text-danger/40 font-mono">
-                  {(100 / noPercent).toFixed(2)}× if correct
+                  {payoutMultiplier(noPercent)} if correct
                 </span>
               )}
             </div>
@@ -754,7 +757,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
           {/* Live probability split bar */}
           <div className="px-4 pt-3 pb-2.5 flex items-center gap-3">
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-xs font-mono font-bold text-success">{yesPercent.toFixed(0)}%</span>
+              <span className="text-xs font-mono font-bold text-success">{yesPercent.toFixed(1)}%</span>
               <span className="text-[10px] text-muted-foreground">YES</span>
             </div>
             <div className="flex-1 h-1 overflow-hidden bg-muted" style={{ borderRadius: "9999px" }}>
@@ -765,7 +768,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-[10px] text-muted-foreground">NO</span>
-              <span className="text-xs font-mono font-bold text-danger">{noPercent.toFixed(0)}%</span>
+              <span className="text-xs font-mono font-bold text-danger">{noPercent.toFixed(1)}%</span>
             </div>
           </div>
 
@@ -780,7 +783,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
                 <TrendingUp className="w-4 h-4" /> YES
               </span>
               <span className="text-[11px] font-normal opacity-80 lowercase tracking-normal">
-                pays {(100 / yesPercent).toFixed(2)}×
+                pays {payoutMultiplier(yesPercent)}
               </span>
             </button>
             <button
@@ -792,7 +795,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
                 <TrendingDown className="w-4 h-4" /> NO
               </span>
               <span className="text-[11px] font-normal opacity-80 lowercase tracking-normal">
-                pays {(100 / noPercent).toFixed(2)}×
+                pays {payoutMultiplier(noPercent)}
               </span>
             </button>
           </div>

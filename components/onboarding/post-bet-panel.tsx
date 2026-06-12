@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { X, Clock, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { calculateFixedOddsPayout } from "@/lib/game-engine"
 
 interface PostBetPanelProps {
   show: boolean
@@ -26,11 +27,8 @@ function formatTimeLeft(endTime: Date): string {
   return `${m}m`
 }
 
-// Conservative payout estimate: amount / prob × 0.95 (house edge approximation)
 function estimatePayout(side: "yes" | "no", odds: number, amount: number): number {
-  const prob = side === "yes" ? odds / 100 : (100 - odds) / 100
-  if (prob <= 0 || prob >= 1) return amount
-  return Math.round((amount / prob) * 0.95)
+  return calculateFixedOddsPayout(amount, side === "yes" ? odds : 100 - odds)
 }
 
 export function PostBetPanel({
@@ -99,6 +97,7 @@ export function PostBetPanel({
             </div>
             <button
               onClick={onDismiss}
+              aria-label="Dismiss"
               className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
             >
               <X className="w-3.5 h-3.5" />
