@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   title: 'Ledge — Social Prediction Market',
   description: 'Predict. Compete. Win. The Gen Z prediction market.',
   generator: 'v0.app',
+  // Google Search Console — "HTML tag" verification method.
+  // Renders <meta name="google-site-verification" content="..."> into <head>.
+  verification: {
+    google: 'oHDLFKp_3yALe6CKBstR8otJABidGi0XGsDLKeYRNMM',
+  },
   icons: {
     icon: [
       {
