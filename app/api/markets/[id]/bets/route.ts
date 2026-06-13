@@ -1,4 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { computeYesPercent } from '@/lib/liquidity'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -11,19 +12,29 @@ export async function GET(
 
   const { id } = await params
 
-  // Private circle markets: only members may view betting activity. Look up the
-  // market's circle and verify membership before exposing any bet history.
+  // Fetch the market once: circle gate + the liquidity state needed to
+  // reconstruct an accurate probability history.
   const admin = createAdminClient()
   const { data: marketRow } = await admin
     .from('markets')
-    .select('circle_id')
+    .select('circle_id, virtual_yes_pool, virtual_no_pool, hot_score, created_at')
     .eq('id', id)
     .maybeSingle()
-  if ((marketRow as { circle_id?: string | null } | null)?.circle_id) {
+
+  const mkt = marketRow as {
+    circle_id?: string | null
+    virtual_yes_pool?: number | null
+    virtual_no_pool?: number | null
+    hot_score?: number | null
+    created_at?: string | null
+  } | null
+
+  // Private circle markets: only members may view betting activity.
+  if (mkt?.circle_id) {
     const { data: membership } = await admin
       .from('circle_members')
       .select('circle_id')
-      .eq('circle_id', (marketRow as { circle_id: string }).circle_id)
+      .eq('circle_id', mkt.circle_id)
       .eq('user_id', user.id)
       .maybeSingle()
     if (!membership) {
@@ -31,8 +42,13 @@ export async function GET(
     }
   }
 
+  // Read EVERY bet on this market — this is public market activity (like an
+  // order book), the basis for crowd stats and recent trades. The admin client
+  // is required because RLS (`bets_select_own`) limits the user client to the
+  // caller's own bets; crowd stats must reflect all traders. Circle privacy is
+  // already enforced by the membership gate above.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rawBets, error } = await (supabase as any)
+  const { data: rawBets, error } = await (admin as any)
     .from('bets')
     .select('id, side, amount, created_at, profiles(username, avatar_url)')
     .eq('market_id', id)
@@ -49,18 +65,41 @@ export async function GET(
     profiles: { username: string; avatar_url?: string | null } | null
   }>
 
-  // Reconstruct probability history from sequential bets
-  let yesPool = 0
-  let noPool = 0
-  const history = bets.map((b) => {
-    if (b.side === 'yes') yesPool += b.amount
-    else noPool += b.amount
-    const total = yesPool + noPool
-    return {
-      timestamp: b.created_at,
-      yesPercent: total > 0 ? Math.round((yesPool / total) * 1000) / 10 : 50,
-    }
-  })
+  // Reconstruct probability history with the SAME formula as live trading
+  // (computeYesPercent — real bets blended with decaying virtual liquidity), so
+  // the chart matches the headline odds instead of diverging. Virtual depth and
+  // the per-step hot_score are replayed exactly as they were when each bet landed
+  // (hot_score increments by 1 per bet, so initialHot = current − betCount).
+  const vy = mkt?.virtual_yes_pool ?? 0
+  const vn = mkt?.virtual_no_pool ?? 0
+  const initialHot = Math.max(0, (mkt?.hot_score ?? bets.length) - bets.length)
+
+  const history: { timestamp: string; yesPercent: number }[] = []
+  if (bets.length > 0) {
+    // Opening point — the market's odds before any real bet landed
+    history.push({
+      timestamp: mkt?.created_at ?? bets[0].created_at,
+      yesPercent: computeYesPercent({
+        yes_pool: 0, no_pool: 0,
+        virtual_yes_pool: vy, virtual_no_pool: vn,
+        hot_score: initialHot,
+      }),
+    })
+    let realYes = 0
+    let realNo = 0
+    bets.forEach((b, i) => {
+      if (b.side === 'yes') realYes += b.amount
+      else realNo += b.amount
+      history.push({
+        timestamp: b.created_at,
+        yesPercent: computeYesPercent({
+          yes_pool: realYes, no_pool: realNo,
+          virtual_yes_pool: vy, virtual_no_pool: vn,
+          hot_score: initialHot + i + 1,
+        }),
+      })
+    })
+  }
 
   return NextResponse.json({
     bets: bets.map((b) => ({

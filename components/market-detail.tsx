@@ -177,7 +177,6 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const hasMomentum = (market.momentumShift ?? 0) >= 3
   const yesPercent  = market.yesPercent
   const noPercent   = 100 - yesPercent
-  const totalPool   = market.yesPool + market.noPool
   const resMeta     = getResolutionMeta(market.resolutionSourceUrl, market.targetDataKey)
 
   const load = useCallback(async () => {
@@ -256,8 +255,10 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
     }
   }, [loading, signals.hasWhale, ob.whaleTipDone, completeOb])
 
+  // History already ends at the live value (last reconstructed point uses the
+  // current pools), so it's used as-is — no duplicate "now" point appended.
   const chartData = history.length > 0
-    ? [...history.map((h, i) => ({ t: i, y: h.yesPercent })), { t: history.length, y: yesPercent }]
+    ? history.map((h, i) => ({ t: i, y: h.yesPercent }))
     : [{ t: 0, y: yesPercent }]
 
   const chartMin = Math.max(0, Math.min(...chartData.map((d) => d.y)) - 5)
@@ -545,8 +546,10 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
               <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Volume</span>
             </div>
             <div className="flex flex-col items-center py-2.5 px-2">
-              <span className="font-mono text-sm font-bold text-foreground tabular-nums">{formatCredits(totalPool)}</span>
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Pool</span>
+              <span className="font-mono text-sm font-bold text-foreground tabular-nums">
+                {loading ? "—" : signals.traderCount}
+              </span>
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Traders</span>
             </div>
             <div className="flex flex-col items-center py-2.5 px-2">
               <Countdown endTime={new Date(market.endTime)} resolved={isResolved} className="text-sm font-bold" />
