@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { validateMarket, MARKET_DURATION, describeValidation } from '@/lib/market-validation'
+import { validateMarket, MARKET_DURATION, describeValidation, resolveCloseTimeMs } from '@/lib/market-validation'
 import { verifySportsMarkets } from '@/lib/espn-verify'
 
 // ── RSS Feeds ────────────────────────────────────────────────────────────────
@@ -369,10 +369,15 @@ event so only a headline about THIS market can resolve it.`
       continue
     }
 
-    // Derive end_time from a clamped close window (relative offset is far more
-    // reliable than trusting an absolute LLM date for the *close* moment).
-    const hours = Math.max(4, Math.min(MARKET_DURATION.AI_PREFERRED_MAX_HOURS, m.hours_until_close ?? 24))
-    const endTime = new Date(nowMs + hours * 60 * 60 * 1000)
+    // Derive end_time, anchoring to the model's event_date when present so the
+    // market never closes before the outcome can resolve. Deriving from the
+    // relative offset alone (ignoring event_date) was the #1 cause of markets
+    // being dropped as `duration_inconsistent`. See resolveCloseTimeMs.
+    const endTime = new Date(resolveCloseTimeMs({
+      nowMs,
+      hoursUntilClose: m.hours_until_close,
+      eventDateIso: m.event_date ?? null,
+    }))
     const rawProb = m.starter_probability ?? 50
     const starterProbability = Math.max(30, Math.min(70, Math.round(rawProb)))
 

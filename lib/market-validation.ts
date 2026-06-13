@@ -75,6 +75,48 @@ export interface MarketValidation {
 const HOUR_MS = 3_600_000
 const DAY_MS = 86_400_000
 
+/** Hours after a dated event before its outcome is reliably knowable. */
+const RESOLVE_BUFFER_HOURS = 3
+
+/**
+ * Compute a market's close timestamp (ms).
+ *
+ * `hoursUntilClose` is the model's relative close offset; `eventDateIso` is the
+ * absolute moment the outcome becomes known. The two frequently disagree — an LLM
+ * can't keep a relative offset consistent with an absolute date, especially for
+ * "within N days" / "this week" window questions where it picks a small offset but
+ * a later deadline. So when a valid *future* event date is present we ANCHOR the
+ * close to it (event + buffer) instead of letting a smaller offset land before the
+ * event. That stray case used to be the #1 cause of generated markets being
+ * dropped as `duration_inconsistent`. Mirrors the ESPN re-anchoring already used
+ * for verified games. Always clamped to the system bounds [MIN_HOURS, MAX_HOURS].
+ */
+export function resolveCloseTimeMs(opts: {
+  nowMs: number
+  hoursUntilClose?: number | null
+  eventDateIso?: string | null
+}): number {
+  const { nowMs } = opts
+  // Baseline from the relative offset, clamped to the AI-preferred window.
+  const hours = Math.max(4, Math.min(MARKET_DURATION.AI_PREFERRED_MAX_HOURS, opts.hoursUntilClose ?? 24))
+  let closeMs = nowMs + hours * HOUR_MS
+
+  // Anchor to a concrete *future* event date so the market never closes before
+  // the outcome can resolve. Past/invalid dates are ignored here and caught by
+  // validateMarket's event-already-happened check.
+  if (opts.eventDateIso) {
+    const evMs = new Date(opts.eventDateIso).getTime()
+    if (!Number.isNaN(evMs) && evMs > nowMs) {
+      closeMs = Math.max(closeMs, evMs + RESOLVE_BUFFER_HOURS * HOUR_MS)
+    }
+  }
+
+  // Clamp to hard system bounds.
+  const minMs = nowMs + MARKET_DURATION.MIN_HOURS * HOUR_MS
+  const maxMs = nowMs + MARKET_DURATION.MAX_HOURS * HOUR_MS
+  return Math.min(maxMs, Math.max(minMs, closeMs))
+}
+
 // ── Language patterns (already-happened / vague / compound) ───────────────────
 
 /** Vague, unanchored timeframes — "no time anchor" rule. */
