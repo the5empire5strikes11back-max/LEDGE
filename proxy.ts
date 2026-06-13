@@ -90,7 +90,11 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === '/landing' ||
     request.nextUrl.pathname === '/privacy' ||
     request.nextUrl.pathname === '/terms' ||
-    request.nextUrl.pathname === '/onboarding'
+    request.nextUrl.pathname === '/onboarding' ||
+    // Search-engine verification / SEO files must be reachable while logged out
+    (request.nextUrl.pathname.startsWith('/google') && request.nextUrl.pathname.endsWith('.html')) ||
+    request.nextUrl.pathname === '/robots.txt' ||
+    request.nextUrl.pathname === '/sitemap.xml'
 
   if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
