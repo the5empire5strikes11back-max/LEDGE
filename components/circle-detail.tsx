@@ -36,6 +36,7 @@ interface CircleMarket {
   isNearMiss?: boolean
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
+  voided?: boolean
 }
 
 interface Circle {
@@ -256,8 +257,14 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
     }
   }, [tradeModal, onBet, availableCredits])
 
-  const openMarkets = markets.filter((m) => !m.resolved)
-  const resolvedMarkets = markets.filter((m) => !!m.resolved)
+  // A prediction leaves the active list the moment its time is up — whether it's
+  // already settled OR closed and awaiting a result — and moves to Past Predictions.
+  const nowMs = Date.now()
+  const isClosed = (m: CircleMarket) => !!m.resolved || m.voided || new Date(m.endTime).getTime() <= nowMs
+  const openMarkets = markets.filter((m) => !isClosed(m))
+  const pastMarkets = markets
+    .filter(isClosed)
+    .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background animate-in slide-in-from-bottom-full duration-300">
@@ -448,7 +455,7 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
               <div className="py-8 flex justify-center">
                 <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : openMarkets.length === 0 && resolvedMarkets.length === 0 ? (
+            ) : openMarkets.length === 0 && pastMarkets.length === 0 ? (
               <div
                 className="border-2 border-dashed border-border py-10 flex flex-col items-center gap-2 text-center"
                 style={{ borderRadius: "var(--radius-card)" }}
@@ -465,6 +472,11 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
               </div>
             ) : (
               <div className="space-y-3">
+                {openMarkets.length === 0 && pastMarkets.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground/70 text-center py-2">
+                    No open predictions — create one above.
+                  </p>
+                )}
                 {openMarkets.map((market) => (
                   <MarketFeedCard
                     key={market.id}
@@ -481,10 +493,10 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
                   />
                 ))}
 
-                {resolvedMarkets.length > 0 && (
+                {pastMarkets.length > 0 && (
                   <>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold pt-1">Resolved</p>
-                    {resolvedMarkets.map((market) => (
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold pt-1">Past Predictions</p>
+                    {pastMarkets.map((market) => (
                       <MarketFeedCard
                         key={market.id}
                         {...market}

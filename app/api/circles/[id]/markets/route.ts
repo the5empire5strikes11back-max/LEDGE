@@ -67,6 +67,8 @@ export async function GET(
       isFeatured: m.is_featured ?? false,
       isNearMiss,
       resolved: m.resolved && m.winner ? { winner: m.winner as 'yes' | 'no' } : undefined,
+      // Settled with no winner = voided + refunded (the canonical void marker).
+      voided: !!m.resolved && !m.winner,
       userBet: userBet ? { side: userBet.side as 'yes' | 'no', amount: userBet.amount } : undefined,
     }
   })

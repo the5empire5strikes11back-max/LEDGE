@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from "react"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
 import { OddsSparkline } from "@/components/ui/odds-sparkline"
@@ -41,6 +41,8 @@ interface MarketFeedCardProps {
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number }
   resolved?: { winner: "yes" | "no" }
+  /** Settled with no winner — outcome couldn't be verified, all stakes refunded. */
+  voided?: boolean
   className?: string
   /** Pulse the YES/NO buttons for first-time onboarding hint */
   pulseCTA?: boolean
@@ -222,6 +224,7 @@ export function MarketFeedCard({
   social = null,
   userBet,
   resolved,
+  voided = false,
   className,
   pulseCTA = false,
   isSpotlight = false,
@@ -248,6 +251,9 @@ export function MarketFeedCard({
   const resMeta = getResolutionMeta(resolutionSourceUrl, targetDataKey)
   // Live / in-play: event is happening right now (end_time ≤ 4h away)
   const isLiveNow = !isResolved && isLive(endTime)
+  // Closed but not yet settled — the event is over and we're waiting on the
+  // result (or the grace window before void). Not bettable; shows "Awaiting result".
+  const isAwaitingResult = !isResolved && !voided && endTime.getTime() <= Date.now()
 
   // Dominant-side display: always show the LEADING probability.
   // When YES leads (≥ 50%) → show yesPercent% with "YES" label (green)
@@ -377,6 +383,23 @@ export function MarketFeedCard({
                 </span>
               )}
             </div>
+          ) : voided ? (
+            /* Settled with no winner — outcome unverifiable, stakes refunded */
+            <span
+              className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-muted text-muted-foreground shrink-0"
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              ↩︎ Refunded
+            </span>
+          ) : isAwaitingResult ? (
+            /* Closed, settlement pending — event over, waiting on the result */
+            <span
+              className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-review/12 text-review shrink-0"
+              style={{ borderRadius: "var(--radius-badge)" }}
+            >
+              <Clock className="w-2.5 h-2.5" aria-hidden />
+              Awaiting result
+            </span>
           ) : isLiveNow ? (
             /* Live markets: show red ticking time instead of generic countdown */
             <span className="text-[10px] font-mono font-bold text-red-400 shrink-0 tabular-nums">
@@ -495,7 +518,7 @@ export function MarketFeedCard({
         )}
 
         {/* Row 4: Trade buttons */}
-        {!isResolved && !hasUserBet && (
+        {!isResolved && !isAwaitingResult && !voided && !hasUserBet && (
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={onBuyYes}
