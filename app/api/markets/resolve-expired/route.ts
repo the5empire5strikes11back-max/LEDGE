@@ -6,7 +6,12 @@
  *     (leverages partial index idx_markets_unresolved_expired)
  *  2. Direct HTTP GET to resolution_source_url, extract outcome from target_data_key
  *  3. Claude Haiku ONLY as fallback when direct resolution returns 'unknown'
- *  4. Final fallback: majority vote (yes_percent >= 50)
+ *  4. Still unverifiable? Distinguish "result not in yet" from "unresolvable":
+ *       • within VOID_GRACE_HOURS of close → leave PENDING, retry next pass
+ *         (handles slow / delayed official results — don't void a coming answer)
+ *       • past the grace window → VOID + refund all stakes (winner=null)
+ *     There is NO crowd-vote fallback — unverifiable markets are never settled
+ *     on who believed what.
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
@@ -26,6 +31,12 @@ export const maxDuration = 60
 // Kill switch: set DISABLE_RESOLUTION=true in Vercel env to halt automated resolution.
 // Use this if resolution is producing wrong outcomes and manual review is needed.
 const RESOLUTION_DISABLED = process.env.DISABLE_RESOLUTION === 'true'
+
+const HOUR_MS = 3_600_000
+// How long a closed-but-unverifiable market stays PENDING (retried each cron
+// pass) before it's voided + refunded. Covers slow/late official results so a
+// genuine answer that posts an hour after close settles instead of voiding.
+const VOID_GRACE_HOURS = 24
 
 // ── Anthropic key helper ─────────────────────────────────────────────────────
 
@@ -262,6 +273,7 @@ export async function POST(request: Request) {
   }
 
   const apiKey = getAnthropicKey()
+  const nowMs = Date.now()
   const results = []
 
   const errors: { marketId: string; error: string }[] = []
@@ -297,7 +309,22 @@ export async function POST(request: Request) {
       }
 
       if (outcome === 'void') {
-        // 4a. VOID — couldn't verify from a trusted source or AI. Refund all
+        // Grace window: a result that simply hasn't posted yet shouldn't be
+        // voided. Leave the market PENDING (still resolved=false) so a later
+        // cron pass can settle it once the source reports; only fall through to
+        // void once it's been unverifiable for VOID_GRACE_HOURS past close.
+        const hoursSinceClose = (nowMs - new Date(market.end_time).getTime()) / HOUR_MS
+        if (hoursSinceClose < VOID_GRACE_HOURS) {
+          results.push({
+            marketId: market.id,
+            title: market.title,
+            pending: true,
+            hoursSinceClose: Math.round(hoursSinceClose * 10) / 10,
+          })
+          continue
+        }
+
+        // 4a. VOID — still unverifiable past the grace window. Refund all
         // stakes; winner=null is the canonical voided marker.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
@@ -351,5 +378,6 @@ export async function POST(request: Request) {
     console.error(`[resolve-expired] ${errors.length} market(s) failed to resolve:`, errors)
   }
 
-  return NextResponse.json({ resolved: results.length, results, errors })
+  const pending = results.filter((r) => (r as { pending?: boolean }).pending).length
+  return NextResponse.json({ resolved: results.length - pending, pending, results, errors })
 }

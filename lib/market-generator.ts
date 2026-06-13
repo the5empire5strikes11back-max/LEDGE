@@ -274,7 +274,7 @@ Rules:
 - event_date: ISO 8601 datetime of when the outcome becomes known; must be in the future
 - hours_until_close: use 4–12 for events today, 24–48 for tomorrow, up to 168 (7 days) max; must land shortly AFTER event_date
 - jackpot_pool must be 10000–500000
-- resolution_criteria: one precise sentence defining exactly what makes this YES vs NO
+- resolution_criteria: one precise sentence defining exactly what makes this YES vs NO. It MUST be OBJECTIVELY checkable from the named source — a binary fact, not a matter of degree or opinion. BANNED subjective outcomes that can't be settled cleanly and will just get voided: "sparks backlash", "goes viral", "dominates the conversation", "gets mocked", "breaks the internet", "causes a stir", "people are talking". Reframe to a concrete, observable event the source will actually report: a release, an announcement, a signing, a game result, an official statement, a chart position, or a named numeric threshold. If settling it would need a human judgment call, DON'T generate it.
 - starter_probability: your best estimate (30–70) of the YES likelihood based on context, base rates, and how the headline frames the outcome. Use 50 ONLY when genuinely uncertain. Examples: home-team favourite winning tonight → 58–65; underdog upset → 32–42; incumbent keeping a lead → 60–68; celebrity doing something dramatic → 35–45. Never go below 30 or above 70 — markets must stay debatable.
 
 RESOLUTION STRATEGY — pick in strict priority order:
