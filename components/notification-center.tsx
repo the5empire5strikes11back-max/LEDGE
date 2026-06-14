@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Bell, Trash2, Users, TrendingUp, RefreshCw, Clock, TrendingDown, Scale, Award } from "lucide-react"
+import { Bell, Trash2, X, Users, TrendingUp, RefreshCw, Clock, TrendingDown, Scale, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import type { FeedItem } from "@/app/api/feed/following/route"
@@ -152,6 +152,10 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
   const [unreadCount,   setUnreadCount]   = useState(0)
   const [returnHooks,   setReturnHooks]   = useState<ReturnHook[]>([])
   const [hooksSeen,     setHooksSeen]     = useState(false)
+  // Dismissed "bets need attention" cards, keyed `${marketId}:${type}` and
+  // persisted to localStorage. Keying on type means a *different* alert for the
+  // same bet (e.g. it later "closes soon") can still resurface after a dismiss.
+  const [dismissedHooks, setDismissedHooks] = useState<Set<string>>(new Set())
   const [feedItems,     setFeedItems]     = useState<FeedItem[]>([])
   const [followingCount, setFollowingCount] = useState(0)
   const [feedLoading,   setFeedLoading]   = useState(false)
@@ -173,6 +177,23 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
     const res = await fetch("/api/return-hooks")
     if (res.ok) setReturnHooks(await res.json())
   }, [username])
+
+  // Restore dismissed bet-attention cards from localStorage on mount.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ledge_dismissed_hooks")
+      if (raw) setDismissedHooks(new Set(JSON.parse(raw) as string[]))
+    } catch { /* ignore */ }
+  }, [])
+
+  const dismissHook = useCallback((hook: ReturnHook) => {
+    const key = `${hook.marketId}:${hook.type}`
+    setDismissedHooks((prev) => {
+      const next = new Set(prev).add(key)
+      try { localStorage.setItem("ledge_dismissed_hooks", JSON.stringify([...next])) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
 
   const loadFeed = useCallback(async () => {
     if (!username) return
@@ -267,6 +288,8 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
   // so seen items vanish on the next open until a genuinely new one arrives.
   // "Bets that need attention" live in returnHooks and always persist.
   const visibleNotifications = notifications.filter((n) => !n.read)
+  // Bet-attention cards minus the ones the user dismissed.
+  const visibleHooks = returnHooks.filter((h) => !dismissedHooks.has(`${h.marketId}:${h.type}`))
 
   return (
     <div ref={ref} className="relative">
@@ -278,7 +301,7 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
       >
         <Bell className="w-4 h-4" />
         {(() => {
-          const urgentCount = hooksSeen ? 0 : returnHooks.filter((h) => h.urgent).length
+          const urgentCount = hooksSeen ? 0 : visibleHooks.filter((h) => h.urgent).length
           const badge = unreadCount + urgentCount
           if (badge === 0) return null
           return (
@@ -344,52 +367,63 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
             {tab === "notifications" && (
               <>
                 {/* Return hooks — bets in play that need attention */}
-                {returnHooks.length > 0 && (
+                {visibleHooks.length > 0 && (
                   <div className="border-b border-border">
                     <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-                        {returnHooks.some((h) => h.urgent)
-                          ? `⚡ ${returnHooks.length} bet${returnHooks.length > 1 ? "s" : ""} need attention`
-                          : `${returnHooks.length} active bet${returnHooks.length > 1 ? "s" : ""} in play`}
+                        {visibleHooks.some((h) => h.urgent)
+                          ? `⚡ ${visibleHooks.length} bet${visibleHooks.length > 1 ? "s" : ""} need attention`
+                          : `${visibleHooks.length} active bet${visibleHooks.length > 1 ? "s" : ""} in play`}
                       </p>
                     </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-none px-3 pb-3">
-                      {returnHooks.map((hook, i) => {
+                      {visibleHooks.map((hook) => {
                         const cfg = HOOK_CONFIG[hook.type]
                         const Icon = cfg.Icon
                         return (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              setOpen(false)
-                              window.location.href = `/?m=${hook.marketId}`
-                            }}
+                          <div
+                            key={`${hook.marketId}:${hook.type}`}
                             className={cn(
-                              "shrink-0 flex flex-col gap-1 px-2.5 py-2 border min-w-[130px] max-w-[160px] text-left transition-colors active:scale-[0.96]",
+                              "relative shrink-0 border min-w-[130px] max-w-[160px] transition-colors",
                               cfg.bg, cfg.border,
                               hook.urgent && "animate-pulse"
                             )}
                             style={{ borderRadius: "var(--radius-card)" }}
                           >
-                            <div className="flex items-center gap-1.5">
-                              <Icon className={cn("w-3 h-3 shrink-0", cfg.color)} />
-                              <span className={cn("text-[9px] font-bold uppercase tracking-wider", cfg.color)}>
-                                {cfg.chipLabel}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-foreground font-medium leading-tight line-clamp-2">
-                              {hook.title}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <span className={cn(
-                                "text-[9px] font-bold px-1 py-0.5 uppercase",
-                                hook.userSide === "yes" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-                              )} style={{ borderRadius: "var(--radius-badge)" }}>
-                                {hook.userSide.toUpperCase()}
-                              </span>
-                              <span className="text-[9px] text-muted-foreground font-mono">{hook.currentOdds}%</span>
-                            </div>
-                          </button>
+                            <button
+                              onClick={() => {
+                                setOpen(false)
+                                window.location.href = `/?m=${hook.marketId}`
+                              }}
+                              className="flex flex-col gap-1 px-2.5 py-2 pr-6 text-left w-full active:scale-[0.96] transition-transform"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Icon className={cn("w-3 h-3 shrink-0", cfg.color)} />
+                                <span className={cn("text-[9px] font-bold uppercase tracking-wider", cfg.color)}>
+                                  {cfg.chipLabel}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-foreground font-medium leading-tight line-clamp-2">
+                                {hook.title}
+                              </p>
+                              <div className="flex items-center gap-1">
+                                <span className={cn(
+                                  "text-[9px] font-bold px-1 py-0.5 uppercase",
+                                  hook.userSide === "yes" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                                )} style={{ borderRadius: "var(--radius-badge)" }}>
+                                  {hook.userSide.toUpperCase()}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground font-mono">{hook.currentOdds}%</span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); dismissHook(hook) }}
+                              aria-label="Dismiss"
+                              className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-background/40 rounded transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -407,7 +441,7 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
                     </button>
                   </div>
                 )}
-                {visibleNotifications.length === 0 && returnHooks.length === 0 ? (
+                {visibleNotifications.length === 0 && visibleHooks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
                     <Bell className="w-6 h-6 text-muted-foreground/30" />
                     <p className="text-xs text-muted-foreground">You&apos;re all caught up</p>
