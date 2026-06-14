@@ -8,6 +8,10 @@ import { NextResponse } from 'next/server'
  *
  * PATCH /api/notifications
  * Body: { ids?: string[] }  — mark specific (or all) notifications as read.
+ *
+ * DELETE /api/notifications
+ * Body: { ids?: string[] }  — delete specific notifications, or all of the
+ * user's when no ids are given ("clear all").
  */
 
 export async function GET() {
@@ -52,6 +56,31 @@ export async function PATCH(request: Request) {
   if (ids?.length) {
     query = query.in('id', ids)
   }
+
+  const { error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}
+
+export async function DELETE(request: Request) {
+  const userClient = await import('@/lib/supabase/server').then((m) => m.createClient())
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
+  const ids: string[] | undefined = body.ids
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from('notifications')
+    .delete()
+    .eq('user_id', user.id)
+
+  // No ids → clear all of this user's notifications.
+  if (ids?.length) query = query.in('id', ids)
 
   const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

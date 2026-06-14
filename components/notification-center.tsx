@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Bell, CheckCheck, Users, TrendingUp, RefreshCw, Clock, TrendingDown, Scale, Award } from "lucide-react"
+import { Bell, Trash2, Users, TrendingUp, RefreshCw, Clock, TrendingDown, Scale, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import type { FeedItem } from "@/app/api/feed/following/route"
@@ -210,10 +210,35 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
     return () => document.removeEventListener("mousedown", handler)
   }, [open])
 
-  const markAllRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  // When the panel closes, mark the notifications the user just saw as read in
+  // local state too (the server was already marked in openPanel). This makes the
+  // "viewed items go away" behavior hold even on an immediate reopen within the
+  // same session, not just on the next page load.
+  const wasOpenRef = useRef(false)
+  useEffect(() => {
+    if (wasOpenRef.current && !open) {
+      setNotifications((prev) => prev.map((n) => (n.read ? n : { ...n, read: true })))
+    }
+    wasOpenRef.current = open
+  }, [open])
+
+  // Delete a single notification (removes it from the DB permanently).
+  const deleteOne = useCallback(async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+    setUnreadCount((c) => Math.max(0, c - 1))
+    await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [id] }),
+    }).catch(() => {})
+  }, [])
+
+  // Clear all notifications. "Bets that need attention" (return hooks) are
+  // live-computed from open bets, not stored notifications, so they're untouched.
+  const clearAll = useCallback(async () => {
+    setNotifications([])
     setUnreadCount(0)
-    await fetch("/api/notifications", { method: "PATCH" })
+    await fetch("/api/notifications", { method: "DELETE" }).catch(() => {})
   }, [])
 
   const markOneRead = useCallback(async (id: string) => {
@@ -236,6 +261,12 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
     setHooksSeen(true)
     fetch("/api/notifications", { method: "PATCH" }).catch(() => {})
   }, [loadReturnHooks, loadNotifications])
+
+  // After viewing, read notifications "go away" — the list shows only unread
+  // items. Opening the panel marks everything read on the server (openPanel),
+  // so seen items vanish on the next open until a genuinely new one arrives.
+  // "Bets that need attention" live in returnHooks and always persist.
+  const visibleNotifications = notifications.filter((n) => !n.read)
 
   return (
     <div ref={ref} className="relative">
@@ -365,49 +396,56 @@ export function NotificationCenter({ username, onUsernameClick }: NotificationCe
                   </div>
                 )}
 
-                {unreadCount > 0 && (
+                {visibleNotifications.length > 0 && (
                   <div className="flex items-center justify-end px-3 py-2 border-b border-border/50">
                     <button
-                      onClick={markAllRead}
-                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={clearAll}
+                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-danger transition-colors"
                     >
-                      <CheckCheck className="w-3 h-3" />
-                      Mark all read
+                      <Trash2 className="w-3 h-3" />
+                      Clear all
                     </button>
                   </div>
                 )}
-                {notifications.length === 0 && returnHooks.length === 0 ? (
+                {visibleNotifications.length === 0 && returnHooks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
                     <Bell className="w-6 h-6 text-muted-foreground/30" />
-                    <p className="text-xs text-muted-foreground">No notifications yet</p>
+                    <p className="text-xs text-muted-foreground">You&apos;re all caught up</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
-                    {notifications.map((n) => (
-                      <button
+                    {visibleNotifications.map((n) => (
+                      <div
                         key={n.id}
-                        onClick={() => {
-                          if (!n.read) markOneRead(n.id)
-                          setOpen(false)
-                          if (n.url) window.location.href = n.url
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors",
-                          n.read ? "hover:bg-muted/20" : "bg-accent/5 hover:bg-accent/10"
-                        )}
+                        className="group flex items-stretch bg-accent/5 hover:bg-accent/10 transition-colors"
                       >
-                        <span className="shrink-0 text-sm leading-none mt-0.5">{TYPE_ICON[n.type] ?? "🔔"}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className={cn("text-xs leading-snug", n.read ? "text-muted-foreground" : "text-foreground font-semibold")}>
-                              {n.title}
-                            </p>
-                            <span className="text-[9px] text-muted-foreground/60 shrink-0">{timeAgo(n.created_at)}</span>
+                        <button
+                          onClick={() => {
+                            if (!n.read) markOneRead(n.id)
+                            setOpen(false)
+                            if (n.url) window.location.href = n.url
+                          }}
+                          className="flex-1 min-w-0 text-left px-3 py-2.5 flex items-start gap-2.5"
+                        >
+                          <span className="shrink-0 text-sm leading-none mt-0.5">{TYPE_ICON[n.type] ?? "🔔"}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs leading-snug text-foreground font-semibold">
+                                {n.title}
+                              </p>
+                              <span className="text-[9px] text-muted-foreground/60 shrink-0">{timeAgo(n.created_at)}</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-snug">{n.body}</p>
                           </div>
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-snug">{n.body}</p>
-                        </div>
-                        {!n.read && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-accent mt-1" />}
-                      </button>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteOne(n.id) }}
+                          aria-label="Delete notification"
+                          className="shrink-0 px-2.5 flex items-center text-muted-foreground/35 hover:text-danger transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
