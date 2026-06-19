@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from "react"
-import { TrendingUp, TrendingDown, Clock } from "lucide-react"
+import { TrendingUp, TrendingDown, Clock, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
 import { OddsSparkline } from "@/components/ui/odds-sparkline"
@@ -636,10 +636,11 @@ export function MarketFeedCard({
 
         {/* Footer: source chip + volume + details link */}
         <div className="flex items-center gap-3 pt-2 border-t border-border/50">
-          {/* Resolution source — "Resolves via ESPN" pre-resolution, nothing post (badge is in header) */}
+          {/* Resolution source — a trust signal: auto-resolves on official data */}
           {!isResolved && resMeta.label && (
-            <span className="text-[9px] text-muted-foreground/40 font-mono shrink-0">
-              via {resMeta.label}
+            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/70 shrink-0">
+              <ShieldCheck className={cn("w-3 h-3 shrink-0", resMeta.isAuto ? "text-success/70" : "text-muted-foreground/40")} aria-hidden />
+              {resMeta.label}
             </span>
           )}
 

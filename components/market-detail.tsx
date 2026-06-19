@@ -386,25 +386,37 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mo
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
 
-          {/* Resolution criteria + source — shown when set and market is not yet resolved */}
+          {/* How this resolves — front-and-center trust block. Ledge's edge over
+              creator-resolved markets: it settles on official data, or refunds. */}
           {!isResolved && (market.resolutionCriteria || resMeta.label) && (
-            <div className="bg-surface border border-border px-3 py-2.5 flex flex-col gap-2" style={{ borderRadius: "var(--radius-card)" }}>
-              {market.resolutionCriteria && (
-                <>
-                  <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/60">Resolution Criteria</span>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{market.resolutionCriteria}</p>
-                </>
+            <div
+              className={cn(
+                "px-3.5 py-3 flex flex-col gap-2.5",
+                resMeta.isAuto ? "bg-success/5 border border-success/20" : "bg-surface border border-border"
               )}
-              {resMeta.label && (
-                <div className="flex items-center gap-1.5 pt-0.5 border-t border-border/50">
-                  <ShieldCheck className="w-3 h-3 text-muted-foreground/50 shrink-0" />
-                  <span className="text-[10px] text-muted-foreground/60">
-                    Resolves via <span className="text-muted-foreground font-medium">{resMeta.label}</span>
-                    {resMeta.isAuto && (
-                      <span className="ml-1 text-accent/60">· auto</span>
-                    )}
+              style={{ borderRadius: "var(--radius-card)" }}
+            >
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className={cn("w-4 h-4 shrink-0", resMeta.isAuto ? "text-success" : "text-muted-foreground/60")} />
+                <span className="text-[11px] uppercase tracking-wider font-bold text-foreground">
+                  {resMeta.isAuto ? "Auto-resolves" : "Resolution"}
+                </span>
+                {resMeta.label && (
+                  <span className="text-[11px] text-muted-foreground">
+                    via <span className="text-foreground font-semibold">{resMeta.label}</span>
                   </span>
-                </div>
+                )}
+              </div>
+
+              {market.resolutionCriteria && (
+                <p className="text-xs text-muted-foreground leading-relaxed">{market.resolutionCriteria}</p>
+              )}
+
+              {resMeta.isAuto && (
+                <p className="text-[10px] text-success/80 leading-snug flex items-start gap-1.5">
+                  <Check className="w-3 h-3 shrink-0 mt-px" />
+                  Settles automatically on official data — no one decides the outcome by hand. If it can&rsquo;t be verified, every stake is refunded.
+                </p>
               )}
             </div>
           )}
