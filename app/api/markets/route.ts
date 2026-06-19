@@ -208,7 +208,7 @@ export async function GET(request: Request) {
       resolutionSourceUrl: market.resolution_source_url ?? null,
       /** Raw JSON resolution key — used to derive source label & type */
       targetDataKey: market.target_data_key ?? null,
-      userBet: userBet ? { side: userBet.side, amount: userBet.amount } : undefined,
+      userBet: userBet ? { side: userBet.side, amount: userBet.amount, payout: userBet.payout ?? null } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */
       creatorUsername: market.created_by ? (creatorMap.get(market.created_by) ?? null) : null,

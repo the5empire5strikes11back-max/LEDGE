@@ -46,11 +46,13 @@ interface MarketDetailProps {
     resolutionCriteria?: string | null
     resolutionSourceUrl?: string | null
     targetDataKey?: string | null
-    userBet?: { side: "yes" | "no"; amount: number }
+    userBet?: { side: "yes" | "no"; amount: number; payout?: number | null }
   }
   onClose: () => void
   onBuyYes: () => void
   onBuyNo: () => void
+  /** Cash out the user's open position early. Bubbles the new balance + payout up. */
+  onCashout?: (marketId: string, newCredits: number, cashoutValue: number) => void
   /** "overlay" = full-screen fixed modal (mobile default).
    *  "panel"   = fills its container, no fixed positioning (desktop side panel). */
   mode?: "overlay" | "panel"
@@ -159,8 +161,10 @@ function TraderDistribution({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overlay", onUsernameClick, currentUsername, currentAvatarUrl }: MarketDetailProps) {
+export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mode = "overlay", onUsernameClick, currentUsername, currentAvatarUrl }: MarketDetailProps) {
   const isPanel = mode === "panel"
+  const [confirmCashout, setConfirmCashout] = useState(false)
+  const [cashingOut, setCashingOut] = useState(false)
   const [bets, setBets]       = useState<BetActivity[]>([])
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -178,6 +182,35 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
   const yesPercent  = market.yesPercent
   const noPercent   = 100 - yesPercent
   const resMeta     = getResolutionMeta(market.resolutionSourceUrl, market.targetDataKey)
+
+  // Cash-out value = current probability of your side × your locked payout.
+  // Only offered while the market is live and we know the locked payout.
+  const isLiveForCashout = !isResolved && new Date(market.endTime).getTime() > Date.now()
+  const cashoutValue = (() => {
+    const ub = market.userBet
+    if (!ub || ub.payout == null || !isLiveForCashout) return null
+    const sideProb = ub.side === "yes" ? yesPercent : noPercent
+    return Math.max(0, Math.floor((sideProb / 100) * ub.payout))
+  })()
+
+  const handleCashout = useCallback(async () => {
+    if (cashingOut || !market.userBet) return
+    setCashingOut(true)
+    try {
+      const res = await fetch("/api/bets/cashout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ market_id: market.id }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        onCashout?.(market.id, data.newCredits, data.cashoutValue)
+      }
+    } finally {
+      setCashingOut(false)
+      setConfirmCashout(false)
+    }
+  }, [cashingOut, market.id, market.userBet, onCashout])
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/markets/${market.id}/bets`)
@@ -682,15 +715,45 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, mode = "overl
 
           {/* Your position */}
           {market.userBet && (
-            <div className="flex items-center justify-between px-4 py-3 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-button)" }}>
-              <div>
-                <p className="text-[10px] text-accent uppercase tracking-widest font-semibold mb-0.5">Your Position</p>
-                <p className="text-sm font-mono font-bold text-foreground">{market.userBet.side.toUpperCase()} · {formatCredits(market.userBet.amount)} CR</p>
+            <div className="flex flex-col gap-2.5 px-4 py-3 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-button)" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-accent uppercase tracking-widest font-semibold mb-0.5">Your Position</p>
+                  <p className="text-sm font-mono font-bold text-foreground">{market.userBet.side.toUpperCase()} · {formatCredits(market.userBet.amount)} CR</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Current odds</p>
+                  <p className="font-mono text-sm font-bold text-accent">{market.userBet.side === "yes" ? yesPercent.toFixed(1) : noPercent.toFixed(1)}%</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Current odds</p>
-                <p className="font-mono text-sm font-bold text-accent">{market.userBet.side === "yes" ? yesPercent.toFixed(1) : noPercent.toFixed(1)}%</p>
-              </div>
+
+              {/* Cash out — close the position early at its current value */}
+              {cashoutValue != null && (
+                <button
+                  onClick={() => (confirmCashout ? handleCashout() : setConfirmCashout(true))}
+                  disabled={cashingOut}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all active:scale-[0.98] disabled:opacity-50",
+                    confirmCashout
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-surface border-border text-foreground hover:border-accent/50"
+                  )}
+                  style={{ borderRadius: "var(--radius-button)" }}
+                >
+                  {cashingOut
+                    ? "Cashing out…"
+                    : confirmCashout
+                    ? `Confirm — take ${formatCredits(cashoutValue)} CR`
+                    : `Cash Out · ${formatCredits(cashoutValue)} CR`}
+                </button>
+              )}
+              {cashoutValue != null && !cashingOut && (
+                <p className="text-[10px] text-muted-foreground/70 text-center -mt-1">
+                  {confirmCashout
+                    ? "Closes your position now — tap again to confirm"
+                    : `Lock in ${cashoutValue >= market.userBet.amount ? "a profit" : "what's left"} before it resolves`}
+                </p>
+              )}
             </div>
           )}
 

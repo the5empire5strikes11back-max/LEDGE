@@ -91,7 +91,7 @@ interface Market {
   /** User-coined category label shown in place of the system category */
   subcategory?: string | null
   social?: MarketSocialData | null
-  userBet?: { side: "yes" | "no"; amount: number }
+  userBet?: { side: "yes" | "no"; amount: number; payout?: number | null }
   resolved?: {
     winner: "yes" | "no"
     note?: string | null
@@ -145,6 +145,8 @@ interface FeedScreenProps {
   onOpenShop?: () => void
   /** Fired when the first-bet post-bet panel is dismissed — releases the next queued celebration */
   onFirstBetFlowDone?: () => void
+  /** Update the app-level credit balance after a cash-out */
+  onCashout?: (newCredits: number) => void
   onUsernameClick?: (username: string) => void
   currentUsername?: string | null
   currentAvatarUrl?: string | null
@@ -178,6 +180,7 @@ export function FeedScreen({
   onWin,
   onOpenShop,
   onFirstBetFlowDone,
+  onCashout,
   onUsernameClick,
   currentUsername,
   currentAvatarUrl,
@@ -510,6 +513,18 @@ export function FeedScreen({
     if (!detailMarket) return
     setTradeModal({ market: detailMarket, side })
   }
+
+  const handleCashout = useCallback((marketId: string, newCredits: number, cashoutValue: number) => {
+    // Close the position locally and bubble the new balance up to the app shell.
+    setMarkets((prev) => prev.map((m) => m.id === marketId ? { ...m, userBet: undefined } : m))
+    setDetailMarket((prev) => prev && prev.id === marketId ? { ...prev, userBet: undefined } : prev)
+    onCashout?.(newCredits)
+    toast(`Cashed out · +${cashoutValue.toLocaleString()} CR`, {
+      description: "Position closed",
+      duration: 3000,
+      style: { background: "var(--card)", border: "1px solid var(--accent)", borderLeft: "3px solid var(--accent)", fontWeight: "700" },
+    })
+  }, [onCashout])
 
   // ── Feed column (shared by mobile full-width + desktop left column) ──────────
   const feedColumn = (
@@ -1008,6 +1023,7 @@ export function FeedScreen({
               onClose={() => setDetailMarket(null)}
               onBuyYes={() => openTradeFromDetail("yes")}
               onBuyNo={() => openTradeFromDetail("no")}
+              onCashout={handleCashout}
               onUsernameClick={onUsernameClick}
               currentUsername={currentUsername}
               currentAvatarUrl={currentAvatarUrl}
@@ -1036,6 +1052,7 @@ export function FeedScreen({
             onClose={() => setDetailMarket(null)}
             onBuyYes={() => openTradeFromDetail("yes")}
             onBuyNo={() => openTradeFromDetail("no")}
+            onCashout={handleCashout}
             onUsernameClick={onUsernameClick}
             currentUsername={currentUsername}
             currentAvatarUrl={currentAvatarUrl}

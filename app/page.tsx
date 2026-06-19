@@ -429,6 +429,7 @@ export default function App() {
           onWin={handleWin}
           onOpenShop={() => setShopOpen(true)}
           onFirstBetFlowDone={handleFirstBetFlowDone}
+          onCashout={(newCredits) => setProfile((prev) => prev ? { ...prev, credits: newCredits } : prev)}
           onUsernameClick={(username) => setPublicProfileUsername(username)}
           currentUsername={profile.username}
           currentAvatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
