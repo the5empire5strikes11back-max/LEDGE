@@ -4,6 +4,8 @@
  * Returns 'yes' | 'no' | 'unknown'. Callers should invoke Claude only on 'unknown'.
  */
 
+import { resolvePolymarketOutcome } from '@/lib/polymarket'
+
 const TIMEOUT_MS = 8_000
 
 // ── Target schemas ────────────────────────────────────────────────────────────
@@ -30,7 +32,13 @@ interface JsonFieldTarget {
   yes_value: string
 }
 
-type ResolutionTarget = EspnGameTarget | RssKeywordTarget | JsonFieldTarget
+interface PolymarketTarget {
+  type: 'polymarket'
+  /** Polymarket Gamma market id — resolution mirrors Polymarket's settled outcome. */
+  id: string
+}
+
+type ResolutionTarget = EspnGameTarget | RssKeywordTarget | JsonFieldTarget | PolymarketTarget
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -190,6 +198,9 @@ export async function resolveFromSource(
 
   const target = parseTarget(targetKey)
   if (!target) return 'unknown'
+
+  // Polymarket-mirrored markets resolve from the Gamma API by id, not the URL.
+  if (target.type === 'polymarket') return resolvePolymarketOutcome(target.id)
 
   try {
     const res = await fetchWithTimeout(sourceUrl)

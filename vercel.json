@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/notify-closing",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/mirror-polymarket",
+      "schedule": "0 6 * * *"
     }
   ]
 }

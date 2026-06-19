@@ -10,7 +10,7 @@ export interface ResolutionMeta {
   /** Whether this market auto-resolves (all structured types do) */
   isAuto: boolean
   /** Resolution mechanism type for icon selection */
-  type: 'espn' | 'rss' | 'json' | 'unknown'
+  type: 'espn' | 'rss' | 'json' | 'polymarket' | 'unknown'
 }
 
 function parseDataKeyType(targetDataKey: string | null | undefined): string | null {
@@ -68,6 +68,9 @@ export function getResolutionMeta(
   }
   if (dataKeyType === 'json_field') {
     return { label: labelFromUrl(url), isAuto: true, type: 'json' }
+  }
+  if (dataKeyType === 'polymarket') {
+    return { label: 'Polymarket', isAuto: true, type: 'polymarket' }
   }
   if (url) {
     return { label: labelFromUrl(url), isAuto: false, type: 'unknown' }
