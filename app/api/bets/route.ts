@@ -61,14 +61,14 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: market, error: marketError } = await (supabase as any)
     .from('markets')
-    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool, created_by')
+    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool, created_by, group_type')
     .eq('id', market_id)
     .single() as { data: {
       id: string; title: string; resolved: boolean; end_time: string
       circle_id: string | null; yes_pool: number; no_pool: number
       yes_percent: number; total_credits: number; hot_score: number
       virtual_yes_pool: number; virtual_no_pool: number
-      created_by: string | null
+      created_by: string | null; group_type: string | null
     } | null, error: unknown }
 
   if (marketError) {
@@ -77,6 +77,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errMsg }, { status: 500 })
   }
   if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+  if (market.group_type === 'poll') {
+    return NextResponse.json({ error: 'Polls are voted on, not bet on' }, { status: 400 })
+  }
   if (market.resolved || new Date(market.end_time) < new Date()) {
     return NextResponse.json({ error: 'Market is closed' }, { status: 400 })
   }

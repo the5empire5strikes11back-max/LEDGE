@@ -389,6 +389,13 @@ export async function POST(request: Request) {
 
   for (const market of expiredMarkets) {
     if (handledIds.has(market.id)) continue
+    // Polls aren't bet on — they just close. Mark resolved, no settlement.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((market as any).group_type === 'poll') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('markets').update({ resolved: true, winner: null, resolved_at: new Date().toISOString() }).eq('id', market.id)
+      continue
+    }
     try {
       // Determine the outcome from real data first, AI second, and VOID third.
       // There is no crowd-vote fallback: an unverifiable market is voided and

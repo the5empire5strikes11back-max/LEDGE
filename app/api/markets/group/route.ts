@@ -15,7 +15,7 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 
 const ALLOWED_CATEGORIES = ['Sports', 'Politics', 'Culture', 'Tech', 'Viral', 'Wild']
-const GROUP_TYPES: GroupType[] = ['multiple_choice', 'numeric', 'date', 'set']
+const GROUP_TYPES = ['multiple_choice', 'numeric', 'date', 'set', 'poll'] as const
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
   const question = typeof body.question === 'string' ? body.question.trim() : ''
   const category = body.category
   const endTime = body.end_time
-  const type = body.type as GroupType
+  const type = body.type as (typeof GROUP_TYPES)[number]
   const criteria = typeof body.criteria === 'string' ? body.criteria.trim() : ''
   const options = normalizeOptions(Array.isArray(body.options) ? body.options : [])
 
   if (!question || !category || !endTime) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  if (!GROUP_TYPES.includes(type)) return NextResponse.json({ error: 'Invalid market type' }, { status: 400 })
+  if (!(GROUP_TYPES as readonly string[]).includes(type)) return NextResponse.json({ error: 'Invalid market type' }, { status: 400 })
   if (options.length < 2) return NextResponse.json({ error: 'Add at least 2 options' }, { status: 400 })
   if (options.length > 12) return NextResponse.json({ error: 'Up to 12 options' }, { status: 400 })
   if (!ALLOWED_CATEGORIES.includes(category)) return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
@@ -47,7 +47,9 @@ export async function POST(request: Request) {
   const temporal = validateMarket({ title: question.endsWith('?') ? question : `${question}?`, endTimeIso: endIso })
   if (!temporal.valid) return NextResponse.json({ error: temporal.reason }, { status: 422 })
 
-  const exclusive = GROUP_EXCLUSIVE[type] ?? true
+  // Polls aren't bet on, so exclusivity is irrelevant — keep them out of the
+  // exclusive-group resolver path by marking them non-exclusive.
+  const exclusive = type === 'poll' ? false : (GROUP_EXCLUSIVE[type as GroupType] ?? true)
   const groupId = randomUUID()
   // Opening odds: exclusive → each option's share (1/N); independent Set → 50/50.
   const openingPct = exclusive ? Math.max(2, Math.round(100 / options.length)) : 50

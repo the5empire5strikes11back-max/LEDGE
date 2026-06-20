@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useTransition } from "react"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { MarketGroupCard } from "@/components/market-group-card"
+import { PollCard } from "@/components/poll-card"
 import type { GroupType } from "@/lib/market-groups"
 import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
@@ -107,7 +108,7 @@ interface Market {
   groupId?: string | null
   groupLabel?: string | null
   optionLabel?: string | null
-  groupType?: GroupType
+  groupType?: GroupType | "poll"
   groupExclusive?: boolean
 }
 
@@ -941,6 +942,19 @@ export function FeedScreen({
                 if (seenGroups.has(market.groupId)) return null
                 seenGroups.add(market.groupId)
                 const opts = filtered.filter((m) => m.groupId === market.groupId)
+                if (market.groupType === "poll") {
+                  return (
+                    <PollCard
+                      key={market.groupId}
+                      className="card-enter"
+                      style={{ animationDelay: `${Math.min(idx * 40, 200)}ms` } as React.CSSProperties}
+                      groupId={market.groupId}
+                      groupLabel={market.groupLabel ?? market.title}
+                      category={market.subcategory || market.category}
+                      endTime={new Date(market.endTime)}
+                    />
+                  )
+                }
                 return (
                   <MarketGroupCard
                     key={market.groupId}

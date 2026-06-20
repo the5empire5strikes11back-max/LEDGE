@@ -63,8 +63,8 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
   const [numCount, setNumCount] = useState(4)
 
   const titleTrimmed = title.trim()
-  const isGroup = marketType === "multiple_choice" || marketType === "set" || marketType === "numeric" || marketType === "date"
-  const isManualOptions = marketType === "multiple_choice" || marketType === "set"
+  const isGroup = marketType !== "yes_no"
+  const isManualOptions = marketType === "multiple_choice" || marketType === "set" || marketType === "poll"
 
   // Derived option preview for numeric/date
   const previewOptions: string[] =
@@ -79,8 +79,8 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
     marketType === "yes_no" ? titleTrimmed.endsWith("?")
     : isManualOptions ? manualClean.length >= 2
     : marketType === "numeric" || marketType === "date" ? previewOptions.length >= 2
-    : false // poll not wired yet
-  const canSubmit = titleOk && optionsOk && !submitting && marketType !== "poll"
+    : false
+  const canSubmit = titleOk && optionsOk && !submitting
 
   const handleClose = () => {
     if (submitting) return
@@ -161,12 +161,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
             <p className="text-[10px] text-muted-foreground/60">{TYPES.find((t) => t.id === marketType)?.desc}</p>
           </div>
 
-          {marketType === "poll" ? (
-            <div className="py-6 text-center text-xs text-muted-foreground border border-dashed border-border" style={{ borderRadius: "var(--radius-card)" }}>
-              Polls are coming next — they’re votes, not bets.
-            </div>
-          ) : (
-            <>
+          <>
               {/* Question */}
               <div className="space-y-2">
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
@@ -279,17 +274,18 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
               </div>
 
               {/* Criteria */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                  How will this resolve? <span className="text-muted-foreground/50">(optional)</span>
-                </label>
-                <textarea value={criteria} onChange={(e) => setCriteria(e.target.value)} rows={2} maxLength={410}
-                  placeholder="e.g. Resolves on the official result."
-                  className="w-full bg-surface border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/50 transition-colors"
-                  style={{ borderRadius: "var(--radius-card)" }} />
-              </div>
+              {marketType !== "poll" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                    How will this resolve? <span className="text-muted-foreground/50">(optional)</span>
+                  </label>
+                  <textarea value={criteria} onChange={(e) => setCriteria(e.target.value)} rows={2} maxLength={410}
+                    placeholder="e.g. Resolves on the official result."
+                    className="w-full bg-surface border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/50 transition-colors"
+                    style={{ borderRadius: "var(--radius-card)" }} />
+                </div>
+              )}
             </>
-          )}
 
           {error && <p className="text-xs text-danger px-1">{error}</p>}
 
