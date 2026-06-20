@@ -24,6 +24,8 @@ import { resolveFromSource } from '@/lib/market-resolver'
 import { pushToUser } from '@/lib/push'
 import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // Allow up to 60 s — resolving many markets with Claude fallbacks can be slow.
 export const maxDuration = 60
@@ -41,7 +43,17 @@ const VOID_GRACE_HOURS = 24
 // ── Anthropic key helper ─────────────────────────────────────────────────────
 
 function getAnthropicKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY
+  const fromEnv = process.env.ANTHROPIC_API_KEY
+  if (fromEnv) return fromEnv
+  // Claude Code injects ANTHROPIC_API_KEY="" into subprocesses, overriding
+  // .env.local — read the file directly as a fallback (same as refresh-markets).
+  try {
+    const envPath = join(process.cwd(), '.env.local')
+    const content = readFileSync(envPath, 'utf-8')
+    return content.match(/^ANTHROPIC_API_KEY=(.+)$/m)?.[1]?.trim() ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 // ── Claude fallback ──────────────────────────────────────────────────────────
@@ -84,6 +96,44 @@ Do not write any other words, punctuation, or explanation. One word only.`
     if (YES_PATTERN.test(text)) return 'yes'
     if (NO_PATTERN.test(text)) return 'no'
     return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+/**
+ * Pick the single winning option of an exclusive group (Multiple Choice / Numeric
+ * / Date). Returns the winning option's market id, or 'unknown'. Resolving at the
+ * group level guarantees exactly one YES — letting options resolve independently
+ * could yield two winners.
+ */
+async function resolveGroupWinner(
+  groupLabel: string,
+  options: { id: string; label: string }[],
+  apiKey: string
+): Promise<string | 'unknown'> {
+  const client = new Anthropic({ apiKey })
+  const prompt = `A multiple-choice prediction question: "${groupLabel}"
+
+Options:
+${options.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}
+
+Exactly one option is the correct, settled outcome. Respond with ONLY the number
+of the winning option (e.g. "3"). If the event has not concluded or you cannot
+determine the winner with confidence, respond with ONLY "UNKNOWN". No other text.`
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 10,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = (message.content[0].type === 'text' ? message.content[0].text : '').trim()
+    const m = text.match(/\d+/)
+    if (!m) return 'unknown'
+    const idx = parseInt(m[0], 10) - 1
+    if (idx < 0 || idx >= options.length) return 'unknown'
+    return options[idx].id
   } catch {
     return 'unknown'
   }
@@ -278,7 +328,67 @@ export async function POST(request: Request) {
 
   const errors: { marketId: string; error: string }[] = []
 
+  // ── Exclusive groups (Multiple Choice / Numeric / Date) ────────────────────
+  // Resolve at the group level so exactly one option wins. Standalone markets and
+  // Set (independent) options fall through to the per-market loop below.
+  const handledIds = new Set<string>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const exclusiveGroups = new Map<string, any[]>()
+  for (const raw of expiredMarkets) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = raw as any
+    if (m.group_id && m.group_exclusive) {
+      const arr = exclusiveGroups.get(m.group_id) ?? []
+      arr.push(m)
+      exclusiveGroups.set(m.group_id, arr)
+    }
+  }
+
+  for (const [groupId, opts] of exclusiveGroups) {
+    try {
+      const winnerId = apiKey
+        ? await resolveGroupWinner(opts[0].group_label ?? opts[0].title, opts.map((o) => ({ id: o.id, label: o.option_label ?? o.title })), apiKey)
+        : 'unknown'
+
+      if (winnerId !== 'unknown') {
+        for (const o of opts) {
+          const w: 'yes' | 'no' = o.id === winnerId ? 'yes' : 'no'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from('markets').update({
+            resolved: true, winner: w, hot_score: 0, momentum_shift: 0,
+            resolved_at: new Date().toISOString(),
+          }).eq('id', o.id)
+          const payoutCount = await settleBets(supabase, o, w)
+          results.push({ marketId: o.id, group_id: groupId, winner: w, resolvedBy: 'group_ai', payoutCount })
+          handledIds.add(o.id)
+        }
+      } else {
+        // Grace window for the whole group — same as standalone markets.
+        const hoursSinceClose = (nowMs - new Date(opts[0].end_time).getTime()) / HOUR_MS
+        for (const o of opts) {
+          if (hoursSinceClose < VOID_GRACE_HOURS) {
+            results.push({ marketId: o.id, group_id: groupId, pending: true })
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any).from('markets').update({
+              resolved: true, winner: null, hot_score: 0, momentum_shift: 0,
+              resolved_at: new Date().toISOString(),
+              resolution_note: 'Voided — winner could not be determined. All stakes refunded.',
+            }).eq('id', o.id)
+            const refundCount = await voidBets(supabase, o)
+            results.push({ marketId: o.id, group_id: groupId, voided: true, refundCount })
+          }
+          handledIds.add(o.id)
+        }
+      }
+    } catch (err) {
+      logError(err, { context: 'resolve-expired:group', groupId })
+      for (const o of opts) handledIds.add(o.id) // skip in the per-market loop; retry next pass
+    }
+  }
+
   for (const market of expiredMarkets) {
+    if (handledIds.has(market.id)) continue
     try {
       // Determine the outcome from real data first, AI second, and VOID third.
       // There is no crowd-vote fallback: an unverifiable market is voided and
