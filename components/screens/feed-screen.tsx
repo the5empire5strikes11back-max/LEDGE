@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useTransition } from "react"
 import { MarketFeedCard } from "@/components/market-feed-card"
+import { MarketGroupCard } from "@/components/market-group-card"
+import type { GroupType } from "@/lib/market-groups"
 import { BetModal } from "@/components/bet-modal"
 import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
@@ -101,6 +103,12 @@ interface Market {
   resolutionCriteria?: string | null
   creatorUsername?: string | null
   friendBets?: FriendBet[]
+  /** Multi-option grouping — null for standalone Yes/No markets */
+  groupId?: string | null
+  groupLabel?: string | null
+  optionLabel?: string | null
+  groupType?: GroupType
+  groupExclusive?: boolean
 }
 
 interface PostBetInfo {
@@ -925,7 +933,38 @@ export function FeedScreen({
             </div>
 
           ) : (
-            filtered.map((market, idx) => {
+            (() => {
+            const seenGroups = new Set<string>()
+            return filtered.map((market, idx) => {
+              // Multi-option group → one MarketGroupCard for the whole group
+              if (market.groupId) {
+                if (seenGroups.has(market.groupId)) return null
+                seenGroups.add(market.groupId)
+                const opts = filtered.filter((m) => m.groupId === market.groupId)
+                return (
+                  <MarketGroupCard
+                    key={market.groupId}
+                    className="card-enter"
+                    style={{ animationDelay: `${Math.min(idx * 40, 200)}ms` } as React.CSSProperties}
+                    groupLabel={market.groupLabel ?? market.title}
+                    category={market.subcategory || market.category}
+                    endTime={new Date(market.endTime)}
+                    groupType={(market.groupType ?? "multiple_choice") as GroupType}
+                    exclusive={market.groupExclusive ?? true}
+                    resolutionSourceUrl={market.resolutionSourceUrl}
+                    targetDataKey={market.targetDataKey}
+                    options={opts.map((o) => ({
+                      id: o.id,
+                      optionLabel: o.optionLabel ?? o.title,
+                      yesPercent: o.yesPercent,
+                      userBet: o.userBet ?? null,
+                      resolvedWinner: o.resolved?.winner ?? null,
+                    }))}
+                    onBetOption={(id) => { const om = markets.find((m) => m.id === id); if (om) { recordInteraction(); openTrade(om, "yes") } }}
+                    onOpenOption={(id) => { const om = markets.find((m) => m.id === id); if (om) { recordInteraction(); setDetailMarket(om) } }}
+                  />
+                )
+              }
               const isSpotlight = market.id === spotlightId
               // Pulse CTA buttons only when tooltip is still showing (no spotlight)
               const pulseCTA =
@@ -972,6 +1011,7 @@ export function FeedScreen({
                 />
               )
             })
+            })()
           )}
         </div>
       </div>

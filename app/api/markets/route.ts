@@ -208,6 +208,12 @@ export async function GET(request: Request) {
       resolutionSourceUrl: market.resolution_source_url ?? null,
       /** Raw JSON resolution key — used to derive source label & type */
       targetDataKey: market.target_data_key ?? null,
+      /** Multi-option grouping — null for standalone Yes/No markets */
+      groupId: market.group_id ?? null,
+      groupLabel: market.group_label ?? null,
+      optionLabel: market.option_label ?? null,
+      groupType: market.group_type ?? 'yes_no',
+      groupExclusive: market.group_exclusive ?? true,
       userBet: userBet ? { side: userBet.side, amount: userBet.amount, payout: userBet.payout ?? null } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */
