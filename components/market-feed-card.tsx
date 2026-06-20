@@ -255,14 +255,14 @@ export function MarketFeedCard({
   // result (or the grace window before void). Not bettable; shows "Awaiting result".
   const isAwaitingResult = !isResolved && !voided && endTime.getTime() <= Date.now()
 
-  // Dominant-side display: always show the LEADING probability.
-  // When YES leads (≥ 50%) → show yesPercent% with "YES" label (green)
-  // When NO leads (< 50%)  → flip to noPercent% with "NO"  label (red)
-  // At exactly 50%         → show 50% with "50/50" neutral
-  const dominantValue      = yesPercent >= 50 ? yesPercent : noPercent
-  const dominantLabel      = yesPercent > 50 ? "YES" : yesPercent < 50 ? "NO" : "50/50"
-  const dominantColor      = yesPercent > 50 ? "text-success" : yesPercent < 50 ? "text-danger" : "text-foreground"
-  const dominantLabelColor = yesPercent > 50 ? "text-success/40" : yesPercent < 50 ? "text-danger/40" : "text-muted-foreground/40"
+  // Headline = the chance the answer is YES (i.e. the thing in the question
+  // happens), exactly like Polymarket/Kalshi. One number, one meaning, never
+  // flips to the other side — so "Will Scotland win? 31%" reads as "31% chance".
+  // Kept neutral (no red/green) so the number never contradicts the bar/buttons.
+  const dominantValue      = yesPercent
+  const dominantLabel      = "CHANCE"
+  const dominantColor      = "text-foreground"
+  const dominantLabelColor = "text-muted-foreground/50"
 
   const isWin  = isResolved && userBet && resolved.winner === userBet.side
   const isLoss = isResolved && userBet && resolved.winner !== userBet.side

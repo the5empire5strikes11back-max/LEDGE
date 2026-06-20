@@ -586,8 +586,9 @@ export function FeedScreen({
             <div className="ticker-track">
               {/* Duplicate list for seamless infinite loop */}
               {[...tickerItems, ...tickerItems].map((m, i) => {
-                const dominantPct = m.yesPercent >= 50 ? m.yesPercent : 100 - m.yesPercent
-                const dominantSide = m.yesPercent > 50 ? "YES" : m.yesPercent < 50 ? "NO" : "—"
+                // Show the YES chance consistently (matches the cards), not the
+                // leading side — so the ticker never flips between YES/NO.
+                const dominantPct = Math.round(m.yesPercent)
                 const shift = m.momentumShift ?? 0
                 const isLiveItem = isLive(m.endTime)
                 return (
@@ -606,18 +607,12 @@ export function FeedScreen({
                       <span className="text-muted-foreground/60">
                         {m.title.length > 24 ? `${m.title.slice(0, 24)}…` : m.title}
                       </span>
-                      {/* Dominant probability */}
-                      <span className={cn(
-                        "font-black tabular-nums",
-                        m.yesPercent > 50 ? "text-success" : m.yesPercent < 50 ? "text-danger" : "text-foreground"
-                      )}>
+                      {/* YES chance — same meaning as the cards */}
+                      <span className="font-black tabular-nums text-foreground">
                         {dominantPct}%
                       </span>
-                      <span className={cn(
-                        "text-[9px] font-bold uppercase",
-                        m.yesPercent > 50 ? "text-success/50" : m.yesPercent < 50 ? "text-danger/50" : "text-muted-foreground/40"
-                      )}>
-                        {dominantSide}
+                      <span className="text-[9px] font-bold uppercase text-muted-foreground/40">
+                        YES
                       </span>
                       {/* Momentum arrow — only when meaningful */}
                       {Math.abs(shift) >= 3 && (
@@ -709,11 +704,8 @@ export function FeedScreen({
                   </p>
                   {/* Stats row */}
                   <div className="flex items-center justify-between gap-1">
-                    <span className={cn(
-                      "font-mono text-sm font-black tabular-nums",
-                      m.yesPercent > 50 ? "text-success" : m.yesPercent < 50 ? "text-danger" : "text-foreground"
-                    )}>
-                      {m.yesPercent}%
+                    <span className="font-mono text-sm font-black tabular-nums text-foreground">
+                      {Math.round(m.yesPercent)}<span className="text-muted-foreground/60">% YES</span>
                     </span>
                     <span className="text-[9px] font-mono text-red-400/80 tabular-nums">
                       {formatTimeLeft(m.endTime)}
