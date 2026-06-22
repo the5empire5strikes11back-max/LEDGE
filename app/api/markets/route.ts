@@ -4,6 +4,7 @@ import { unstable_cache, revalidatePath } from 'next/cache'
 import { rankFeed, buildAffinityMap } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
+import { positionValue, seedReserves } from '@/lib/amm'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateMarketTitle, validateEndTime } from '@/lib/validate'
 import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
@@ -68,12 +69,13 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from('bets')
-      .select('market_id, side, amount, payout, won, markets(title, category)')
+      .select('market_id, side, amount, payout, shares, won, markets(title, category)')
       .eq('user_id', user.id) as Promise<{ data: Array<{
         market_id: string
         side: string
         amount: number
         payout: number | null
+        shares: number | null
         won: boolean | null
         markets: { title: string; category: string } | null
       }> | null }>,
@@ -214,7 +216,22 @@ export async function GET(request: Request) {
       optionLabel: market.option_label ?? null,
       groupType: market.group_type ?? 'yes_no',
       groupExclusive: market.group_exclusive ?? true,
-      userBet: userBet ? { side: userBet.side, amount: userBet.amount, payout: userBet.payout ?? null } : undefined,
+      userBet: userBet ? {
+        side: userBet.side,
+        amount: userBet.amount,
+        payout: userBet.payout ?? null,
+        /** Shares held = locked max payout (each winning share pays 1 credit) */
+        shares: userBet.shares ?? userBet.payout ?? null,
+        /** Live cash-out value right now: shares × current side price */
+        value: (() => {
+          const held = userBet.shares ?? userBet.payout
+          if (held == null || market.resolved) return null
+          const reserves = m.yes_shares != null && m.no_shares != null
+            ? { y: m.yes_shares as number, n: m.no_shares as number }
+            : seedReserves((market.yes_percent ?? 50) / 100, Math.max(6000, vYes + vNo + (market.total_credits ?? 0)))
+          return positionValue(reserves, userBet.side as 'yes' | 'no', held)
+        })(),
+      } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */
       creatorUsername: market.created_by ? (creatorMap.get(market.created_by) ?? null) : null,

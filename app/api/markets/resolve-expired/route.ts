@@ -156,9 +156,10 @@ async function settleBets(
 
   for (const bet of bets ?? []) {
     const won = bet.side === winner
-    // Fixed-odds payout was locked at bet time and stored on the bet record.
-    // Winners receive their locked payout. Losers receive 0.
-    const payout = won ? (bet.payout ?? 0) : 0
+    // Shares held = locked max payout; each winning share pays 1 credit. Legacy
+    // rows store this as `payout`. Winners receive their shares; losers receive 0.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payout = won ? ((bet as any).shares ?? bet.payout ?? 0) : 0
 
     await supabase.from('bets').update({ won, payout }).eq('id', bet.id)
 

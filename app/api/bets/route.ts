@@ -1,8 +1,8 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD, calculateFixedOddsPayout } from '@/lib/game-engine'
+import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
-import { computeYesPercent, type PoolState } from '@/lib/liquidity'
+import { buyShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateBetAmount } from '@/lib/validate'
 import { logError } from '@/lib/logger'
@@ -61,13 +61,14 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: market, error: marketError } = await (supabase as any)
     .from('markets')
-    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool, created_by, group_type')
+    .select('id, title, resolved, end_time, circle_id, yes_pool, no_pool, yes_percent, total_credits, hot_score, virtual_yes_pool, virtual_no_pool, yes_shares, no_shares, created_by, group_type')
     .eq('id', market_id)
     .single() as { data: {
       id: string; title: string; resolved: boolean; end_time: string
       circle_id: string | null; yes_pool: number; no_pool: number
       yes_percent: number; total_credits: number; hot_score: number
       virtual_yes_pool: number; virtual_no_pool: number
+      yes_shares: number | null; no_shares: number | null
       created_by: string | null; group_type: string | null
     } | null, error: unknown }
 
@@ -101,11 +102,21 @@ export async function POST(request: Request) {
   // Anti-Sybil: cap bets inside user-created Circle markets
   const cappedAmount = market.circle_id ? Math.min(safeAmount, CIRCLE_BET_MAX_CR) : safeAmount
 
-  // Lock payout at current odds — fixed at time of bet, never changes
-  const impliedProbPct = side === 'yes'
-    ? (market.yes_percent ?? 50)
-    : 100 - (market.yes_percent ?? 50)
-  const lockedPayout = calculateFixedOddsPayout(cappedAmount, impliedProbPct)
+  // CPMM buy: spend credits → receive shares of the chosen side at the current
+  // curve price. The share count is locked here (the "max payout" — each winning
+  // share pays 1 credit), while its live value floats with the market. Reserves
+  // are seeded from current odds if a market predates the AMM migration.
+  const reservesBefore: Reserves =
+    market.yes_shares != null && market.no_shares != null
+      ? { y: market.yes_shares, n: market.no_shares }
+      : seedReserves(
+          (market.yes_percent ?? 50) / 100,
+          Math.max(6000, (market.virtual_yes_pool ?? 0) + (market.virtual_no_pool ?? 0) + (market.total_credits ?? 0))
+        )
+  const { shares: lockedShares, reserves: reservesAfter } = buyShares(reservesBefore, side, cappedAmount)
+  // Mirror shares into `payout` for backward compatibility (settlement/cash-out
+  // read shares, falling back to payout for legacy rows).
+  const lockedPayout = lockedShares
 
   // Check user has enough credits
   const { data: profile } = await supabase
@@ -124,9 +135,10 @@ export async function POST(request: Request) {
   // authenticated role, otherwise a user could insert a fake winning bet with a
   // client-chosen payout (resolution trusts the stored payout). user_id is
   // pinned to the verified session.
-  const { data: bet, error: betError } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: bet, error: betError } = await (admin as any)
     .from('bets')
-    .insert({ user_id: user.id, market_id, side, amount: cappedAmount, payout: lockedPayout })
+    .insert({ user_id: user.id, market_id, side, amount: cappedAmount, payout: lockedPayout, shares: lockedShares })
     .select()
     .single()
 
@@ -141,31 +153,25 @@ export async function POST(request: Request) {
   // Deduct credits + add XP — use admin client to bypass RLS on profiles
   // (admin client already created above for rate limiting)
 
-  // Update pools (for live odds display), yes_percent, and engagement signals
-  // Uses virtual liquidity for odds calculation — virtual pools absorb volatility
+  // Odds now come straight from the CPMM reserves after the buy — price is truly
+  // continuous (every trade moves the curve). yes_pool/no_pool stay as a running
+  // tally of real user volume for stats; the AMM reserves are authoritative.
   const oldYesPercent = market.yes_percent ?? 50
   const newYesPool = (market.yes_pool ?? 0) + (side === 'yes' ? cappedAmount : 0)
   const newNoPool  = (market.no_pool  ?? 0) + (side === 'no'  ? cappedAmount : 0)
   const newHotScore = (market.hot_score ?? 0) + 1
-
-  // Liquidity-adjusted odds: effective pools include decaying virtual depth
-  const poolState: PoolState = {
-    yes_pool:         newYesPool,
-    no_pool:          newNoPool,
-    virtual_yes_pool: market.virtual_yes_pool ?? 0,
-    virtual_no_pool:  market.virtual_no_pool  ?? 0,
-    hot_score:        newHotScore,
-  }
-  const newYesPercent = computeYesPercent(poolState)
+  const newYesPercent = ammYesPercent(reservesAfter)
   const momentumShift = Math.abs(newYesPercent - oldYesPercent)
-  // Real user volume only (virtual pools excluded from total_credits)
   const newTotal = newYesPool + newNoPool
 
-  await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any)
     .from('markets')
     .update({
       yes_pool: newYesPool,
       no_pool: newNoPool,
+      yes_shares: reservesAfter.y,
+      no_shares: reservesAfter.n,
       yes_percent: newYesPercent,
       total_credits: newTotal,
       hot_score: newHotScore,

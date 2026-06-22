@@ -46,7 +46,7 @@ interface MarketDetailProps {
     resolutionCriteria?: string | null
     resolutionSourceUrl?: string | null
     targetDataKey?: string | null
-    userBet?: { side: "yes" | "no"; amount: number; payout?: number | null }
+    userBet?: { side: "yes" | "no"; amount: number; payout?: number | null; shares?: number | null; value?: number | null }
   }
   onClose: () => void
   onBuyYes: () => void
@@ -183,12 +183,16 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mo
   const noPercent   = 100 - yesPercent
   const resMeta     = getResolutionMeta(market.resolutionSourceUrl, market.targetDataKey)
 
-  // Cash-out value = current probability of your side × your locked payout.
-  // Only offered while the market is live and we know the locked payout.
+  // Cash-out value comes from the server's CPMM (the exact value you'd get by
+  // selling your shares back into the pool right now). Use it directly so the
+  // preview matches the executed cash-out — no drift. Fall back to the old
+  // estimate only for legacy positions the server didn't value.
   const isLiveForCashout = !isResolved && new Date(market.endTime).getTime() > Date.now()
   const cashoutValue = (() => {
     const ub = market.userBet
-    if (!ub || ub.payout == null || !isLiveForCashout) return null
+    if (!ub || !isLiveForCashout) return null
+    if (ub.value != null) return ub.value
+    if (ub.payout == null) return null
     const sideProb = ub.side === "yes" ? yesPercent : noPercent
     return Math.max(0, Math.floor((sideProb / 100) * ub.payout))
   })()
@@ -738,6 +742,14 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mo
                   <p className="font-mono text-sm font-bold text-accent">{market.userBet.side === "yes" ? yesPercent.toFixed(1) : noPercent.toFixed(1)}%</p>
                 </div>
               </div>
+
+              {/* Live value: what the position is worth to sell now vs its max payout */}
+              {cashoutValue != null && (market.userBet.shares ?? market.userBet.payout) != null && (
+                <div className="flex items-center justify-between text-[11px] font-mono pt-0.5 border-t border-accent/15">
+                  <span className="text-muted-foreground">Worth now <span className="font-bold text-foreground">{formatCredits(cashoutValue)}</span></span>
+                  <span className="text-muted-foreground">Up to <span className="font-bold text-foreground">{formatCredits(Math.round(market.userBet.shares ?? market.userBet.payout ?? 0))}</span> if {market.userBet.side.toUpperCase()}</span>
+                </div>
+              )}
 
               {/* Cash out — close the position early at its current value */}
               {cashoutValue != null && (
