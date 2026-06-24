@@ -4,7 +4,7 @@ import { unstable_cache, revalidatePath } from 'next/cache'
 import { rankFeed, buildAffinityMap } from '@/lib/feed-ranker'
 import { aggregateRecentBets } from '@/lib/social-signals'
 import { seedLiquidity, type MarketCategory } from '@/lib/liquidity'
-import { positionValue, seedReserves } from '@/lib/amm'
+import { sellShares, seedReserves } from '@/lib/amm'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateMarketTitle, validateEndTime } from '@/lib/validate'
 import { inferInterestsFromBets, mergeInterests } from '@/lib/interest-tags'
@@ -222,14 +222,18 @@ export async function GET(request: Request) {
         payout: userBet.payout ?? null,
         /** Shares held = locked max payout (each winning share pays 1 credit) */
         shares: userBet.shares ?? userBet.payout ?? null,
-        /** Live cash-out value right now: shares × current side price */
+        /**
+         * Live cash-out value right now — computed with the SAME sellShares the
+         * cash-out endpoint executes, so the previewed "Worth now" equals the
+         * credited amount exactly (no drift). Not a naive shares×price mark.
+         */
         value: (() => {
           const held = userBet.shares ?? userBet.payout
           if (held == null || market.resolved) return null
           const reserves = m.yes_shares != null && m.no_shares != null
             ? { y: m.yes_shares as number, n: m.no_shares as number }
             : seedReserves((market.yes_percent ?? 50) / 100, Math.max(6000, vYes + vNo + (market.total_credits ?? 0)))
-          return positionValue(reserves, userBet.side as 'yes' | 'no', held)
+          return sellShares(reserves, userBet.side as 'yes' | 'no', held).credits
         })(),
       } : undefined,
       social: socialMap.get(market.id) ?? null,
