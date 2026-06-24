@@ -48,6 +48,11 @@ interface MarketDetailProps {
     targetDataKey?: string | null
     userBet?: { side: "yes" | "no"; amount: number; payout?: number | null; shares?: number | null; value?: number | null }
     autoBet?: { id: string; side: "yes" | "no"; targetPercent: number; amount: number }
+    /** Creator-resolution (subjective markets). */
+    resolutionMode?: "auto" | "creator"
+    creatorProposedWinner?: "yes" | "no" | null
+    creatorResolvedAt?: string | null
+    isCreator?: boolean
   }
   onClose: () => void
   onBuyYes: () => void
@@ -248,11 +253,42 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
     }
   }, [market.id, disputeText, disputeSubmitting])
 
-  // Dispute window: 24h after resolution, only if user has bet
+  // Creator-resolution (subjective markets)
+  const isCreatorMode = market.resolutionMode === "creator"
+  const isClosedNow = new Date(market.endTime).getTime() <= Date.now()
+  // The creator settles their own closed market that hasn't been proposed yet.
+  const canCreatorSettle =
+    isCreatorMode && market.isCreator && isClosedNow && !market.resolved && !market.creatorProposedWinner
+  // A proposed-but-held market is in its dispute window for 24h.
+  const inCreatorDisputeWindow = (() => {
+    if (!isCreatorMode || market.resolved || !market.creatorProposedWinner || !market.creatorResolvedAt) return false
+    const hoursAgo = (Date.now() - new Date(market.creatorResolvedAt).getTime()) / 3_600_000
+    return hoursAgo <= 24
+  })()
+  const [settling, setSettling] = useState(false)
+  const [settledProposal, setSettledProposal] = useState<"yes" | "no" | null>(null)
+
+  const handleProposeSettle = useCallback(async (winner: "yes" | "no") => {
+    if (settling) return
+    setSettling(true)
+    try {
+      const res = await fetch(`/api/markets/${market.id}/propose`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winner }),
+      })
+      if (res.ok) setSettledProposal(winner)
+    } finally {
+      setSettling(false)
+    }
+  }, [market.id, settling])
+
+  // Dispute window: 24h after resolution OR during the creator dispute window,
+  // only if the viewer placed a bet (and isn't the creator).
   const isResolutionDisputeable = (() => {
-    if (!market.resolved?.resolvedAt) return false
-    if (!market.userBet) return false
     if (disputeSubmitted) return false
+    if (!market.userBet || market.isCreator) return false
+    if (inCreatorDisputeWindow) return true
+    if (!market.resolved?.resolvedAt) return false
     const hoursAgo = (Date.now() - new Date(market.resolved.resolvedAt).getTime()) / 3_600_000
     return hoursAgo <= 24
   })()
@@ -395,20 +431,24 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
 
           {/* How this resolves — front-and-center trust block. Ledge's edge over
               creator-resolved markets: it settles on official data, or refunds. */}
-          {!isResolved && (market.resolutionCriteria || resMeta.label) && (
+          {!isResolved && (market.resolutionCriteria || resMeta.label || isCreatorMode) && (
             <div
               className={cn(
                 "px-3.5 py-3 flex flex-col gap-2.5",
-                resMeta.isAuto ? "bg-success/5 border border-success/20" : "bg-surface border border-border"
+                isCreatorMode ? "bg-surface border border-accent/25" : resMeta.isAuto ? "bg-success/5 border border-success/20" : "bg-surface border border-border"
               )}
               style={{ borderRadius: "var(--radius-card)" }}
             >
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className={cn("w-4 h-4 shrink-0", resMeta.isAuto ? "text-success" : "text-muted-foreground/60")} />
+                {isCreatorMode ? (
+                  <span className="text-sm leading-none" aria-hidden>👤</span>
+                ) : (
+                  <ShieldCheck className={cn("w-4 h-4 shrink-0", resMeta.isAuto ? "text-success" : "text-muted-foreground/60")} />
+                )}
                 <span className="text-[11px] uppercase tracking-wider font-bold text-foreground">
-                  {resMeta.isAuto ? "Auto-resolves" : "Resolution"}
+                  {isCreatorMode ? "Creator-resolved" : resMeta.isAuto ? "Auto-resolves" : "Resolution"}
                 </span>
-                {resMeta.label && (
+                {!isCreatorMode && resMeta.label && (
                   <span className="text-[11px] text-muted-foreground">
                     via <span className="text-foreground font-semibold">{resMeta.label}</span>
                   </span>
@@ -419,12 +459,45 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
                 <p className="text-xs text-muted-foreground leading-relaxed">{market.resolutionCriteria}</p>
               )}
 
-              {resMeta.isAuto && (
+              {isCreatorMode ? (
+                <p className="text-[10px] text-muted-foreground/80 leading-snug flex items-start gap-1.5">
+                  <span aria-hidden>⚖️</span>
+                  The creator settles this when it closes. You get 24h to dispute the call — if enough bettors do, it voids and everyone is refunded.
+                </p>
+              ) : resMeta.isAuto && (
                 <p className="text-[10px] text-success/80 leading-snug flex items-start gap-1.5">
                   <Check className="w-3 h-3 shrink-0 mt-px" />
                   Settles automatically on official data — no one decides the outcome by hand. If it can&rsquo;t be verified, every stake is refunded.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Creator settle control — the creator settles their own closed market */}
+          {canCreatorSettle && !settledProposal && (
+            <div className="px-3.5 py-3 flex flex-col gap-2.5 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-card)" }}>
+              <p className="text-[11px] uppercase tracking-wider font-bold text-foreground">Settle this market</p>
+              <p className="text-[10px] text-muted-foreground/80">Pick the outcome. Bettors get 24h to dispute before it pays out.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => handleProposeSettle("yes")} disabled={settling}
+                  className="py-2.5 text-xs font-bold uppercase tracking-wider bg-success/15 text-success border border-success/30 hover:bg-success/25 active:scale-[0.98] disabled:opacity-50 transition-all"
+                  style={{ borderRadius: "var(--radius-button)" }}>Resolve YES</button>
+                <button onClick={() => handleProposeSettle("no")} disabled={settling}
+                  className="py-2.5 text-xs font-bold uppercase tracking-wider bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 active:scale-[0.98] disabled:opacity-50 transition-all"
+                  style={{ borderRadius: "var(--radius-button)" }}>Resolve NO</button>
+              </div>
+            </div>
+          )}
+
+          {/* Proposed — held in the dispute window */}
+          {(settledProposal || inCreatorDisputeWindow) && !isResolved && (
+            <div className="px-3.5 py-3 flex flex-col gap-1.5 bg-surface border border-border" style={{ borderRadius: "var(--radius-card)" }}>
+              <p className="text-[11px] uppercase tracking-wider font-bold text-foreground">
+                Proposed: {(settledProposal ?? market.creatorProposedWinner)?.toUpperCase()}
+              </p>
+              <p className="text-[10px] text-muted-foreground/80">
+                Held for 24h while bettors can dispute. If enough do, it voids and refunds; otherwise it settles on this call.
+              </p>
             </div>
           )}
 

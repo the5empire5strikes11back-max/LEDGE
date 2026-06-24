@@ -27,25 +27,37 @@ export async function POST(
 
   const supabase = createAdminClient()
 
-  // Verify market exists, is resolved, and within 24h dispute window
+  // A dispute is valid in two windows:
+  //  (a) a resolved market, within 24h of resolved_at (post-resolution complaint);
+  //  (b) a creator-proposed market still being held, within CREATOR_DISPUTE_HOURS
+  //      of creator_resolved_at — these disputes can flip the outcome to a void.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: market } = await (supabase as any)
     .from('markets')
-    .select('id, resolved, resolved_at')
+    .select('id, created_by, resolved, resolved_at, resolution_mode, creator_proposed_winner, creator_resolved_at')
     .eq('id', id)
     .single()
 
-  if (!market?.resolved) {
-    return NextResponse.json({ error: 'Market is not resolved' }, { status: 400 })
+  if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+
+  // The creator can't dispute their own market.
+  if (market.created_by === user.id) {
+    return NextResponse.json({ error: "You can't dispute your own market" }, { status: 403 })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const resolvedAt = (market as any).resolved_at as string | null
-  if (resolvedAt) {
-    const hoursAgo = (Date.now() - new Date(resolvedAt).getTime()) / 3_600_000
-    if (hoursAgo > 24) {
-      return NextResponse.json({ error: 'Dispute window has closed (24h after resolution)' }, { status: 400 })
-    }
+  const HOUR = 3_600_000
+  const inCreatorWindow =
+    market.resolution_mode === 'creator' &&
+    !market.resolved &&
+    market.creator_proposed_winner &&
+    market.creator_resolved_at &&
+    (Date.now() - new Date(market.creator_resolved_at as string).getTime()) / HOUR <= 24
+  const inResolvedWindow =
+    market.resolved &&
+    (!market.resolved_at || (Date.now() - new Date(market.resolved_at as string).getTime()) / HOUR <= 24)
+
+  if (!inCreatorWindow && !inResolvedWindow) {
+    return NextResponse.json({ error: 'This market is not open for disputes' }, { status: 400 })
   }
 
   // Verify user has a bet on this market

@@ -23,6 +23,7 @@ import {
 import { resolveFromSource } from '@/lib/market-resolver'
 import { expirePendingAutoBets } from '@/lib/auto-bet-trigger'
 import { repayAdvance } from '@/lib/advance'
+import { creatorStage, shouldVoid } from '@/lib/creator-resolution'
 import { pushToUser } from '@/lib/push'
 import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
@@ -345,10 +346,83 @@ export async function POST(request: Request) {
 
   const errors: { marketId: string; error: string }[] = []
 
+  const handledIds = new Set<string>()
+
+  // ── Creator-resolved (subjective) markets ──────────────────────────────────
+  // These never go through source/AI. The creator proposes the outcome at close;
+  // we hold it through a dispute window, then settle on the proposal unless the
+  // crowd disputed past the threshold (→ void + refund). Worst case is a refund.
+  for (const raw of expiredMarkets) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = raw as any
+    if (m.resolution_mode !== 'creator' || m.group_id) continue
+    handledIds.add(m.id)
+    try {
+      const stage = creatorStage(m.end_time, m.creator_resolved_at ?? null, nowMs)
+      if (stage.stage === 'await_proposal' || stage.stage === 'in_dispute_window') {
+        results.push({ marketId: m.id, title: m.title, pending: true, creatorStage: stage.stage })
+        continue
+      }
+
+      if (stage.stage === 'abandoned') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from('markets').update({
+          resolved: true, winner: null, hot_score: 0, momentum_shift: 0,
+          resolved_at: new Date().toISOString(),
+          resolution_note: 'Voided — the creator did not settle it in time. All stakes refunded.',
+        }).eq('id', m.id)
+        const refundCount = await voidBets(supabase, m)
+        results.push({ marketId: m.id, title: m.title, voided: true, reason: 'abandoned', refundCount })
+        continue
+      }
+
+      // ready_to_settle: count disputes + unique bettors + whether the creator bet.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count: disputeCount } = await (supabase as any)
+        .from('market_disputes').select('user_id', { count: 'exact', head: true }).eq('market_id', m.id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: betRows } = await (supabase as any).from('bets').select('user_id').eq('market_id', m.id)
+      const bettors = new Set((betRows ?? []).map((b: { user_id: string }) => b.user_id))
+      const creatorHasBet = m.created_by ? bettors.has(m.created_by) : false
+
+      if (shouldVoid(disputeCount ?? 0, bettors.size, creatorHasBet)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from('markets').update({
+          resolved: true, winner: null, hot_score: 0, momentum_shift: 0,
+          resolved_at: new Date().toISOString(),
+          resolution_note: 'Voided — bettors disputed the creator’s call. All stakes refunded.',
+        }).eq('id', m.id)
+        const refundCount = await voidBets(supabase, m)
+        // Reputation: the creator's proposal was overturned.
+        if (m.created_by) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: cp } = await (supabase as any).from('profiles').select('disputes_upheld').eq('id', m.created_by).single()
+          if (cp) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any).from('profiles').update({ disputes_upheld: (cp.disputes_upheld ?? 0) + 1 }).eq('id', m.created_by)
+          }
+        }
+        results.push({ marketId: m.id, title: m.title, voided: true, reason: 'disputed', disputes: disputeCount ?? 0, refundCount })
+      } else {
+        const winner: 'yes' | 'no' = m.creator_proposed_winner === 'no' ? 'no' : 'yes'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from('markets').update({
+          resolved: true, winner, hot_score: 0, momentum_shift: 0,
+          resolved_at: new Date().toISOString(),
+          resolution_note: 'Settled by the market creator.',
+        }).eq('id', m.id)
+        const payoutCount = await settleBets(supabase, m, winner)
+        results.push({ marketId: m.id, title: m.title, winner, resolvedBy: 'creator', payoutCount })
+      }
+    } catch (err) {
+      logError(err, { context: 'resolve-expired:creator', marketId: m.id })
+      errors.push({ marketId: m.id, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
   // ── Exclusive groups (Multiple Choice / Numeric / Date) ────────────────────
   // Resolve at the group level so exactly one option wins. Standalone markets and
   // Set (independent) options fall through to the per-market loop below.
-  const handledIds = new Set<string>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const exclusiveGroups = new Map<string, any[]>()
   for (const raw of expiredMarkets) {

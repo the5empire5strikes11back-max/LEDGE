@@ -52,6 +52,9 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
   const [category, setCategory] = useState<MarketCategory>("Sports")
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [criteria, setCriteria] = useState("")
+  // Yes/No only: 'auto' = source/AI settles it; 'creator' = you settle it at close
+  // (subjective markets), held through a dispute window.
+  const [resolutionMode, setResolutionMode] = useState<"auto" | "creator">("auto")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,7 +88,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
   const handleClose = () => {
     if (submitting) return
     setMarketType("yes_no"); setTitle(""); setCategory("Sports"); setDurationHours(DEFAULT_HOURS)
-    setCriteria(""); setOptions(["", ""]); setNumMin("0"); setNumMax("100"); setNumCount(4); setError(null)
+    setCriteria(""); setResolutionMode("auto"); setOptions(["", ""]); setNumMin("0"); setNumMax("100"); setNumCount(4); setError(null)
     onClose()
   }
 
@@ -98,7 +101,7 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
       if (marketType === "yes_no") {
         const res = await fetch("/api/markets", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: titleTrimmed, category, end_time: endTimeIso, ...(criteria.trim() ? { resolution_criteria: criteria.trim() } : {}) }),
+          body: JSON.stringify({ title: titleTrimmed, category, end_time: endTimeIso, resolution_mode: resolutionMode, ...(criteria.trim() ? { resolution_criteria: criteria.trim() } : {}) }),
         })
         if (!res.ok) { setError((await res.json().catch(() => ({}))).error ?? "Failed to create market"); return }
         const result = await res.json().catch(() => ({}))
@@ -273,11 +276,41 @@ export function CreateMarketSheet({ open, onClose, onCreated }: CreateMarketShee
                   className="w-full cursor-pointer" style={{ accentColor: "var(--accent)" }} aria-label="Market duration" />
               </div>
 
+              {/* Resolution mode — Yes/No only. Subjective markets the creator settles. */}
+              {marketType === "yes_no" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                    How is it settled?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "auto" as const, icon: "🛡️", label: "Auto-verify", desc: "Source / AI decides" },
+                      { id: "creator" as const, icon: "👤", label: "I'll settle it", desc: "For subjective calls" },
+                    ]).map((m) => (
+                      <button key={m.id} type="button" onClick={() => setResolutionMode(m.id)}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 px-3 py-2 border text-left transition-colors",
+                          resolutionMode === m.id ? "bg-accent/10 border-accent/50" : "bg-surface border-border hover:border-accent/30"
+                        )}
+                        style={{ borderRadius: "var(--radius-card)" }}>
+                        <span className="text-xs font-semibold text-foreground">{m.icon} {m.label}</span>
+                        <span className="text-[10px] text-muted-foreground/70">{m.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {resolutionMode === "creator" && (
+                    <p className="text-[10px] text-muted-foreground/70 px-1">
+                      You settle the outcome when it closes. Bettors get a 24h window to dispute — if enough do, it voids and refunds. Shown as “👤 Creator-resolved” before anyone bets.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Criteria */}
               {marketType !== "poll" && (
                 <div className="space-y-2">
                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                    How will this resolve? <span className="text-muted-foreground/50">(optional)</span>
+                    {marketType === "yes_no" && resolutionMode === "creator" ? "How will you decide it?" : "How will this resolve?"} <span className="text-muted-foreground/50">(optional)</span>
                   </label>
                   <textarea value={criteria} onChange={(e) => setCriteria(e.target.value)} rows={2} maxLength={410}
                     placeholder="e.g. Resolves on the official result."

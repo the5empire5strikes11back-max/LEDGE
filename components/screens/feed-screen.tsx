@@ -96,6 +96,10 @@ interface Market {
   social?: MarketSocialData | null
   userBet?: { side: "yes" | "no"; amount: number; payout?: number | null; shares?: number | null; value?: number | null }
   autoBet?: { id: string; side: "yes" | "no"; targetPercent: number; amount: number }
+  resolutionMode?: "auto" | "creator"
+  creatorProposedWinner?: "yes" | "no" | null
+  creatorResolvedAt?: string | null
+  isCreator?: boolean
   resolved?: {
     winner: "yes" | "no"
     note?: string | null

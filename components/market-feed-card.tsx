@@ -62,6 +62,8 @@ interface MarketFeedCardProps {
   openingYesPercent?: number
   /** Resolution source URL — drives the "Resolves via …" chip */
   resolutionSourceUrl?: string | null
+  /** 'creator' = subjective market the creator settles (disclosed before betting) */
+  resolutionMode?: "auto" | "creator"
   /** Raw JSON resolution key — used to derive source label & type */
   targetDataKey?: string | null
   /** User-coined category label shown in place of the system category */
@@ -233,6 +235,7 @@ export function MarketFeedCard({
   friendBets,
   openingYesPercent,
   resolutionSourceUrl,
+  resolutionMode,
   targetDataKey,
   subcategory,
   style,
@@ -636,8 +639,12 @@ export function MarketFeedCard({
 
         {/* Footer: source chip + volume + details link */}
         <div className="flex items-center gap-3 pt-2 border-t border-border/50">
-          {/* Resolution source — a trust signal: auto-resolves on official data */}
-          {!isResolved && resMeta.label && (
+          {/* Resolution trust signal: creator-settled (disclosed) vs auto on official data */}
+          {!isResolved && resolutionMode === "creator" ? (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/70 shrink-0">
+              <span aria-hidden>👤</span> Creator-resolved
+            </span>
+          ) : !isResolved && resMeta.label && (
             <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/70 shrink-0">
               <ShieldCheck className={cn("w-3 h-3 shrink-0", resMeta.isAuto ? "text-success/70" : "text-muted-foreground/40")} aria-hidden />
               {resMeta.label}

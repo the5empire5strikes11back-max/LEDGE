@@ -217,6 +217,11 @@ export async function GET(request: Request) {
         resolvedAt: market.resolved_at ?? null,
       } : undefined,
       resolutionCriteria: market.resolution_criteria ?? null,
+      /** Creator-resolution (subjective markets): mode + proposal + viewer-is-creator. */
+      resolutionMode: (market as { resolution_mode?: string }).resolution_mode ?? 'auto',
+      creatorProposedWinner: (market as { creator_proposed_winner?: string | null }).creator_proposed_winner ?? null,
+      creatorResolvedAt: (market as { creator_resolved_at?: string | null }).creator_resolved_at ?? null,
+      isCreator: !!market.created_by && market.created_by === user.id,
       /** User-coined category label shown in place of the system category */
       subcategory: market.subcategory ?? null,
       /** Pre-resolution source URL — used for "Resolves via …" chip on cards */
@@ -386,6 +391,10 @@ export async function POST(request: Request) {
   const status = screen.verdict === 'review' ? 'review' : 'live'
   const liquiditySeed = seedLiquidity(category as MarketCategory, false)
 
+  // Subjective markets: the creator settles the outcome at close (held through a
+  // dispute window). Default is 'auto' (source/AI resolution, creator locked out).
+  const resolutionMode = body.resolution_mode === 'creator' ? 'creator' : 'auto'
+
   // Insert via the service-role client. Direct market inserts are revoked for
   // the authenticated role — otherwise a user could bypass all the validation
   // above (quality screening, rate limit, category allowlist) by writing to the
@@ -402,6 +411,7 @@ export async function POST(request: Request) {
       created_by: user.id,
       status,
       published_at: status === 'live' ? new Date().toISOString() : null,
+      resolution_mode: resolutionMode,
       ...liquiditySeed,
     })
     .select()
