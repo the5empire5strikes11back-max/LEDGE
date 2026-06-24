@@ -94,7 +94,8 @@ interface Market {
   /** User-coined category label shown in place of the system category */
   subcategory?: string | null
   social?: MarketSocialData | null
-  userBet?: { side: "yes" | "no"; amount: number; payout?: number | null }
+  userBet?: { side: "yes" | "no"; amount: number; payout?: number | null; shares?: number | null; value?: number | null }
+  autoBet?: { id: string; side: "yes" | "no"; targetPercent: number; amount: number }
   resolved?: {
     winner: "yes" | "no"
     note?: string | null
@@ -517,6 +518,55 @@ export function FeedScreen({
       })
     }
   }
+
+  const handleArmAutoBet = async (side: "yes" | "no", amount: number, targetPercent: number) => {
+    const market = tradeModal?.market
+    if (!market) return
+    setTradeModal(null)
+
+    const res = await fetch('/api/auto-bets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ market_id: market.id, side, target_percent: targetPercent, amount }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const errMsg = err?.error ?? `Server error (${res.status})`
+      if (res.status === 400 && errMsg === 'Insufficient credits') onOpenShop?.()
+      else toast.error("Couldn't arm auto-bet", { description: errMsg, duration: 4000 })
+      return
+    }
+
+    const data = await res.json()
+    // Reflect the escrowed credits in the shell balance, and show the trigger.
+    if (typeof data?.credits === 'number') onCashout?.(data.credits)
+    const patch = { autoBet: { id: data?.autoBet?.id, side, targetPercent, amount } }
+    setMarkets((prev) => prev.map((m) => m.id === market.id ? { ...m, ...patch } : m))
+    setDetailMarket((prev) => prev?.id === market.id ? { ...prev, ...patch } : prev)
+
+    toast(`🎯 Auto-bet armed`, {
+      description: `Buys ${side.toUpperCase()} if it drops to ${targetPercent}% · ${amount.toLocaleString()} CR held`,
+      duration: 4000,
+    })
+  }
+
+  const handleCancelAutoBet = useCallback(async (marketId: string) => {
+    const m = markets.find((mk) => mk.id === marketId) ?? (detailMarket?.id === marketId ? detailMarket : undefined)
+    const autoBetId = (m as { autoBet?: { id: string } } | undefined)?.autoBet?.id
+    if (!autoBetId) return
+    const res = await fetch(`/api/auto-bets/${autoBetId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error("Couldn't cancel", { description: err?.error ?? 'Try again.', duration: 3000 })
+      return
+    }
+    const data = await res.json()
+    setMarkets((prev) => prev.map((mk) => mk.id === marketId ? { ...mk, autoBet: undefined } : mk))
+    setDetailMarket((prev) => prev?.id === marketId ? { ...prev, autoBet: undefined } : prev)
+    if (typeof data?.refunded === 'number') onCashout?.(availableCredits + data.refunded)
+    toast(`Auto-bet cancelled · +${(data?.refunded ?? 0).toLocaleString()} CR back`, { duration: 3000 })
+  }, [markets, detailMarket, availableCredits, onCashout])
 
   const openTradeFromDetail = (side: "yes" | "no") => {
     if (!detailMarket) return
@@ -1070,6 +1120,7 @@ export function FeedScreen({
               onBuyYes={() => openTradeFromDetail("yes")}
               onBuyNo={() => openTradeFromDetail("no")}
               onCashout={handleCashout}
+            onCancelAutoBet={handleCancelAutoBet}
               onUsernameClick={onUsernameClick}
               currentUsername={currentUsername}
               currentAvatarUrl={currentAvatarUrl}
@@ -1099,6 +1150,7 @@ export function FeedScreen({
             onBuyYes={() => openTradeFromDetail("yes")}
             onBuyNo={() => openTradeFromDetail("no")}
             onCashout={handleCashout}
+            onCancelAutoBet={handleCancelAutoBet}
             onUsernameClick={onUsernameClick}
             currentUsername={currentUsername}
             currentAvatarUrl={currentAvatarUrl}
@@ -1114,6 +1166,7 @@ export function FeedScreen({
           availableCredits={availableCredits}
           onClose={() => setTradeModal(null)}
           onSubmit={handleBetSubmit}
+          onArmAutoBet={handleArmAutoBet}
         />
       )}
 

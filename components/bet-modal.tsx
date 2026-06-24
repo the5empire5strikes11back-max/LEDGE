@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { X, TrendingUp, TrendingDown } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { calculateFixedOddsPayout, payoutMultiplier } from "@/lib/game-engine"
 import { useOnboarding } from "@/lib/onboarding"
@@ -17,6 +17,8 @@ interface BetModalProps {
   availableCredits: number
   onClose: () => void
   onSubmit: (side: "yes" | "no", amount: number) => void
+  /** Arm an auto-bet that fires when the side's chance drops to targetPercent. */
+  onArmAutoBet?: (side: "yes" | "no", amount: number, targetPercent: number) => void
 }
 
 function formatCredits(value: number): string {
@@ -25,11 +27,12 @@ function formatCredits(value: number): string {
   return value.toLocaleString()
 }
 
-export function BetModal({ market, initialSide, availableCredits, onClose, onSubmit }: BetModalProps) {
+export function BetModal({ market, initialSide, availableCredits, onClose, onSubmit, onArmAutoBet }: BetModalProps) {
   const [side, setSide]       = useState<"yes" | "no">(initialSide)
   const [popping, setPopping] = useState<"yes" | "no" | null>(null)
   const [rawAmount, setRawAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [autoMode, setAutoMode] = useState(false)
 
   function selectSide(s: "yes" | "no") {
     setSide(s)
@@ -55,6 +58,16 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const amount = parseFloat(rawAmount) || 0
   const yesPercent = market.yesPercent
   const noPercent = 100 - yesPercent
+  const currentSidePct = side === "yes" ? yesPercent : noPercent
+
+  // Auto-bet target: the side's chance at which to auto-buy (a dip below now).
+  const [target, setTarget] = useState<number | null>(null)
+  const defaultTarget = Math.max(1, Math.round(currentSidePct) - 10)
+  const effectiveTarget = Math.min(99, Math.max(1, target ?? defaultTarget))
+  // Suggested targets, each a step below the current chance (buy the dip).
+  const targetChips = [5, 10, 15, 20]
+    .map((d) => Math.round(currentSidePct) - d)
+    .filter((v) => v >= 1)
 
   // Fixed odds — payout is locked right now at current probability
   const impliedProbPct = side === "yes" ? yesPercent : noPercent
@@ -68,7 +81,8 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const handleSubmit = async () => {
     if (!isValid) return
     setSubmitting(true)
-    onSubmit(side, amount)
+    if (autoMode && onArmAutoBet) onArmAutoBet(side, amount, effectiveTarget)
+    else onSubmit(side, amount)
   }
 
   const quickAmounts = [100, 500, 1_000, 5_000].filter((v) => v <= availableCredits)
@@ -151,6 +165,56 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
               <span className="font-mono text-xl font-black text-danger tabular-nums">{noPercent.toFixed(1)}%</span>
             </button>
           </div>
+
+          {/* Auto-bet toggle — only when the parent supports arming triggers */}
+          {onArmAutoBet && (
+            <button
+              onClick={() => setAutoMode((v) => !v)}
+              className={cn(
+                "flex items-center justify-between gap-2 px-3 py-2 border transition-colors",
+                autoMode ? "bg-accent/10 border-accent/40" : "bg-surface border-border hover:border-accent/30"
+              )}
+              style={{ borderRadius: "var(--radius-button)" }}
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Target className={cn("w-3.5 h-3.5", autoMode ? "text-accent" : "text-muted-foreground")} />
+                Set a target price
+              </span>
+              <span className={cn(
+                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                autoMode ? "bg-accent" : "bg-muted"
+              )}>
+                <span className={cn(
+                  "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                  autoMode ? "translate-x-3.5" : "translate-x-0.5"
+                )} />
+              </span>
+            </button>
+          )}
+
+          {/* Target picker — pick the chance to auto-buy your side at (a dip) */}
+          {autoMode && onArmAutoBet && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                Auto-buys <span className={cn("font-bold", side === "yes" ? "text-success" : "text-danger")}>{side.toUpperCase()}</span> when its chance drops to <span className="font-mono font-bold text-foreground">{effectiveTarget}%</span> (now {currentSidePct.toFixed(0)}%).
+              </p>
+              <div className="flex gap-1.5">
+                {targetChips.map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setTarget(v)}
+                    className={cn(
+                      "px-2.5 py-1 text-[11px] font-mono font-medium border active:scale-[0.94] transition-all duration-[80ms]",
+                      effectiveTarget === v ? "bg-accent/20 border-accent text-accent" : "bg-secondary border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                    style={{ borderRadius: "var(--radius-badge)" }}
+                  >
+                    {v}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Amount input */}
           <div className="flex flex-col gap-2">
@@ -276,7 +340,9 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             style={{ borderRadius: "var(--radius-button)" }}
           >
             {submitting
-              ? "Placing…"
+              ? (autoMode ? "Arming…" : "Placing…")
+              : autoMode
+              ? (amount > 0 ? `Arm auto-bet · ${side.toUpperCase()} at ${effectiveTarget}%` : `Arm auto-bet`)
               : amount > 0
               ? `Buy ${side.toUpperCase()} — ${formatCredits(amount)} CR`
               : `Buy ${side.toUpperCase()}`}

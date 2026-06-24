@@ -21,6 +21,7 @@ import {
   COMEBACK_LOSS_TRIGGER,
 } from '@/lib/game-engine'
 import { resolveFromSource } from '@/lib/market-resolver'
+import { expirePendingAutoBets } from '@/lib/auto-bet-trigger'
 import { pushToUser } from '@/lib/push'
 import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
@@ -321,6 +322,13 @@ export async function POST(request: Request) {
   }
   if (!expiredMarkets?.length) {
     return NextResponse.json({ resolved: 0, message: 'No expired markets' })
+  }
+
+  // Refund + expire any resting auto-bets on these closing markets so escrowed
+  // credits are never trapped in a market that's about to resolve/void.
+  for (const m of expiredMarkets) {
+    try { await expirePendingAutoBets(supabase, m.id) }
+    catch (err) { logError(err, { context: 'resolve-expired:autobet-expire', marketId: m.id }) }
   }
 
   const apiKey = getAnthropicKey()

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
 import { buyShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
+import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateBetAmount } from '@/lib/validate'
 import { logError } from '@/lib/logger'
@@ -182,6 +183,8 @@ export async function POST(request: Request) {
   // Invalidate the cached feed so the live position value reflects the new
   // reserves immediately — keeps the cash-out preview in step with execution.
   revalidatePath('/', 'layout')
+  // This trade may have pushed the price into someone's auto-bet target.
+  await fireEligibleAutoBets(admin, market.id)
   const { data: updated } = await admin
     .from('profiles')
     .update({ credits: profile.credits - cappedAmount, xp: profile.xp + XP_PER_BET })

@@ -10,6 +10,8 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchTopPolymarketMarkets } from '@/lib/polymarket'
+import { seedReserves } from '@/lib/amm'
+import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
 import { NextResponse } from 'next/server'
 
 export const maxDuration = 60
@@ -73,23 +75,32 @@ export async function POST(request: Request) {
 
     const existingId = byPolyId.get(pm.id)
     if (existingId) {
-      // Re-sync the live price.
+      // Re-sync the live price. Re-seed the AMM reserves to Polymarket's price at
+      // mirror depth so the tradeable price tracks the source (these markets are
+      // externally priced by design), then fire any auto-bets the move crossed.
+      const reserves = seedReserves(yesPct / 100, MIRROR_DEPTH)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from('markets').update({
         yes_percent: yesPct,
+        yes_shares: reserves.y,
+        no_shares: reserves.n,
         virtual_yes_pool: virtualYes,
         virtual_no_pool: virtualNo,
         category: mapCategory(pm.question),
       }).eq('id', existingId)
+      await fireEligibleAutoBets(admin, existingId)
       resynced++
       continue
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const seeded = seedReserves(yesPct / 100, MIRROR_DEPTH)
     const { error } = await (admin as any).from('markets').insert({
       title: pm.question,
       category: mapCategory(pm.question),
       yes_percent: yesPct,
+      yes_shares: seeded.y,
+      no_shares: seeded.n,
       virtual_yes_pool: virtualYes,
       virtual_no_pool: virtualNo,
       yes_pool: 0,

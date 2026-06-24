@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   }
 
   // Cached queries (shared across all users) + user-specific queries run in parallel
-  const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult, profileResult] = await Promise.all([
+  const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult, profileResult, autoBetsResult] = await Promise.all([
     getCachedMarkets(category),
     getCachedRecentBets(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,6 +88,15 @@ export async function GET(request: Request) {
       .select('interests')
       .eq('id', user.id)
       .single(),
+    // Pending auto-bets so the feed can show an armed trigger on a market.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('auto_bets')
+      .select('id, market_id, side, target_percent, amount')
+      .eq('user_id', user.id)
+      .eq('status', 'pending') as Promise<{ data: Array<{
+        id: string; market_id: string; side: string; target_percent: number; amount: number
+      }> | null }>,
   ])
 
   const recentBetsResult = { data: recentBetsData }
@@ -116,6 +125,9 @@ export async function GET(request: Request) {
   // Build lookup structures
   const betMap = new Map(
     (userBetsResult.data ?? []).map((b) => [b.market_id, b])
+  )
+  const autoBetMap = new Map(
+    (autoBetsResult?.data ?? []).map((a) => [a.market_id, a])
   )
 
   // Batch-fetch creator usernames + trust scores for user-created markets
@@ -166,6 +178,7 @@ export async function GET(request: Request) {
   // Enrich markets with client-facing aliases and derived fields
   const enriched = markets.map((market) => {
     const userBet = betMap.get(market.id)
+    const autoBet = autoBetMap.get(market.id)
     const isNearMiss =
       !!market.resolved &&
       (market.yes_percent ?? 50) >= 40 &&
@@ -235,6 +248,13 @@ export async function GET(request: Request) {
             : seedReserves((market.yes_percent ?? 50) / 100, Math.max(6000, vYes + vNo + (market.total_credits ?? 0)))
           return sellShares(reserves, userBet.side as 'yes' | 'no', held).credits
         })(),
+      } : undefined,
+      /** Armed auto-bet trigger on this market, if any (Phase 2). */
+      autoBet: autoBet ? {
+        id: autoBet.id,
+        side: autoBet.side,
+        targetPercent: autoBet.target_percent,
+        amount: autoBet.amount,
       } : undefined,
       social: socialMap.get(market.id) ?? null,
       /** Username of the person who created this market (null for AI-generated) */

@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { sellShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
+import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
 
 /**
  * POST /api/bets/cashout  { market_id }
@@ -92,6 +93,8 @@ export async function POST(request: Request) {
   // Drop the cached feed so the next read reflects the post-trade reserves —
   // otherwise a stale cached price makes the displayed live value lag execution.
   revalidatePath('/', 'layout')
+  // Selling moved the price — it may have crossed an auto-bet target.
+  await fireEligibleAutoBets(admin, marketId)
 
   return NextResponse.json({ cashoutValue, newCredits, side: b.side, amount: b.amount })
 }

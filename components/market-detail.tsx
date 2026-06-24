@@ -47,12 +47,15 @@ interface MarketDetailProps {
     resolutionSourceUrl?: string | null
     targetDataKey?: string | null
     userBet?: { side: "yes" | "no"; amount: number; payout?: number | null; shares?: number | null; value?: number | null }
+    autoBet?: { id: string; side: "yes" | "no"; targetPercent: number; amount: number }
   }
   onClose: () => void
   onBuyYes: () => void
   onBuyNo: () => void
   /** Cash out the user's open position early. Bubbles the new balance + payout up. */
   onCashout?: (marketId: string, newCredits: number, cashoutValue: number) => void
+  /** Cancel an armed auto-bet on this market (refunds the escrowed credits). */
+  onCancelAutoBet?: (marketId: string) => void
   /** "overlay" = full-screen fixed modal (mobile default).
    *  "panel"   = fills its container, no fixed positioning (desktop side panel). */
   mode?: "overlay" | "panel"
@@ -161,7 +164,7 @@ function TraderDistribution({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mode = "overlay", onUsernameClick, currentUsername, currentAvatarUrl }: MarketDetailProps) {
+export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, onCancelAutoBet, mode = "overlay", onUsernameClick, currentUsername, currentAvatarUrl }: MarketDetailProps) {
   const isPanel = mode === "panel"
   const [confirmCashout, setConfirmCashout] = useState(false)
   const [cashingOut, setCashingOut] = useState(false)
@@ -730,6 +733,24 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, mo
           </div>
 
           {/* Your position */}
+          {!market.userBet && market.autoBet && (
+            <div className="flex items-center justify-between gap-2 px-4 py-3 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-button)" }}>
+              <div className="min-w-0">
+                <p className="text-[10px] text-accent uppercase tracking-widest font-semibold mb-0.5">⏱ Auto-bet armed</p>
+                <p className="text-xs font-mono text-foreground">
+                  Buys <span className="font-bold">{market.autoBet.side.toUpperCase()}</span> at <span className="font-bold">{market.autoBet.targetPercent}%</span> · {formatCredits(market.autoBet.amount)} CR held
+                </p>
+              </div>
+              <button
+                onClick={() => onCancelAutoBet?.(market.id)}
+                className="shrink-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider border border-border text-muted-foreground hover:text-foreground hover:border-accent/40 active:scale-[0.97] transition-all"
+                style={{ borderRadius: "var(--radius-button)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {market.userBet && (
             <div className="flex flex-col gap-2.5 px-4 py-3 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-button)" }}>
               <div className="flex items-center justify-between">
