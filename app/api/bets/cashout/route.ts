@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { sellShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 
 /**
@@ -88,6 +89,9 @@ export async function POST(request: Request) {
     .from('markets')
     .update({ yes_shares: reservesAfter.y, no_shares: reservesAfter.n, yes_percent: ammYesPercent(reservesAfter) })
     .eq('id', marketId)
+  // Drop the cached feed so the next read reflects the post-trade reserves —
+  // otherwise a stale cached price makes the displayed live value lag execution.
+  revalidateTag('markets')
 
   return NextResponse.json({ cashoutValue, newCredits, side: b.side, amount: b.amount })
 }
