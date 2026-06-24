@@ -20,6 +20,7 @@ import { ShareCardModal } from "@/components/share-card"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { compressToSquare } from "@/lib/compress-image"
 import { CreatorAnalytics } from "@/components/creator-analytics"
+import { AdvanceCard } from "@/components/advance-card"
 import type { CreatorMarket } from "@/app/api/creator/markets/route"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,6 +64,8 @@ interface ProfileScreenProps {
   isPlus?: boolean
   onOpenShop?: () => void
   onUsernameClick?: (username: string) => void
+  /** Update the app-level balance after claiming a daily advance. */
+  onCreditsChange?: (credits: number) => void
 }
 
 interface UserStats {
@@ -288,7 +291,7 @@ function LbRow({
 export function ProfileScreen({
   xp, rank, credits, streak, persona, decay,
   username, avatarUrl: initialAvatarUrl, isPlus = false,
-  onOpenShop, onUsernameClick,
+  onOpenShop, onUsernameClick, onCreditsChange,
 }: ProfileScreenProps) {
   const progress    = xpProgress(xp)
   const rankConfig  = RANKS[rank]
@@ -549,6 +552,9 @@ export function ProfileScreen({
               </div>
             )}
           </div>
+
+          {/* Daily Advance — borrow against locked positions, repaid from winnings */}
+          <AdvanceCard onCreditsChange={onCreditsChange} />
 
           {/* Avatar upload error */}
           {avatarError && <p className="text-xs text-danger px-1">{avatarError}</p>}

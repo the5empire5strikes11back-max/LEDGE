@@ -447,6 +447,7 @@ export default function App() {
           isPlus={isPlus}
           onOpenShop={() => setShopOpen(true)}
           onUsernameClick={(u) => setPublicProfileUsername(u)}
+          onCreditsChange={(c) => setProfile((prev) => prev ? { ...prev, credits: c } : prev)}
         />
       )}
     </>

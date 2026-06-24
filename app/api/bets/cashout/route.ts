@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { sellShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
+import { repayAdvance } from '@/lib/advance'
 
 /**
  * POST /api/bets/cashout  { market_id }
@@ -76,14 +77,18 @@ export async function POST(request: Request) {
 
   // Credit the user and close the position. Read-modify-write on credits via the
   // service role (authenticated writes to profiles are revoked at the DB level).
-  const { data: profile } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile } = await (admin as any)
     .from('profiles')
-    .select('credits')
+    .select('credits, outstanding_advance')
     .eq('id', user.id)
     .single()
-  const newCredits = (profile?.credits ?? 0) + cashoutValue
+  // Repay any outstanding advance off the top of the cash-out proceeds.
+  const { net, remaining } = repayAdvance((profile as { outstanding_advance?: number } | null)?.outstanding_advance ?? 0, cashoutValue)
+  const newCredits = (profile?.credits ?? 0) + net
 
-  await admin.from('profiles').update({ credits: newCredits }).eq('id', user.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any).from('profiles').update({ credits: newCredits, outstanding_advance: remaining }).eq('id', user.id)
   await admin.from('bets').delete().eq('id', b.id)
   // Push the post-sale reserves + odds back so the market price reflects the exit.
   await (admin as any)
@@ -96,5 +101,7 @@ export async function POST(request: Request) {
   // Selling moved the price — it may have crossed an auto-bet target.
   await fireEligibleAutoBets(admin, marketId)
 
-  return NextResponse.json({ cashoutValue, newCredits, side: b.side, amount: b.amount })
+  // `cashoutValue` reflects what actually hit the wallet (net of any advance
+  // repayment); `repaid`/`grossValue` let the UI explain a skim if it happened.
+  return NextResponse.json({ cashoutValue: net, grossValue: cashoutValue, repaid: cashoutValue - net, newCredits, side: b.side, amount: b.amount })
 }

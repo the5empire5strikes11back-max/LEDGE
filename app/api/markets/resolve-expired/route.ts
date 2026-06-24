@@ -22,6 +22,7 @@ import {
 } from '@/lib/game-engine'
 import { resolveFromSource } from '@/lib/market-resolver'
 import { expirePendingAutoBets } from '@/lib/auto-bet-trigger'
+import { repayAdvance } from '@/lib/advance'
 import { pushToUser } from '@/lib/push'
 import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
@@ -200,9 +201,10 @@ async function settleBets(
     }
 
     if (won && payout > 0) {
-      const { data: profile } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: profile } = await (supabase as any)
         .from('profiles')
-        .select('credits, xp, comeback_eligible')
+        .select('credits, xp, comeback_eligible, outstanding_advance')
         .eq('id', bet.user_id)
         .single()
 
@@ -211,10 +213,16 @@ async function settleBets(
         const isComeback = (profile as { comeback_eligible?: boolean }).comeback_eligible === true
         const bonusXP = isComeback ? COMEBACK_XP_BONUS : 0
 
-        await supabase
+        // Repay any outstanding advance off the top of the winnings.
+        const outstanding = (profile as { outstanding_advance?: number }).outstanding_advance ?? 0
+        const { net, remaining } = repayAdvance(outstanding, payout)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
           .from('profiles')
           .update({
-            credits: profile.credits + payout,
+            credits: profile.credits + net,
+            outstanding_advance: remaining,
             xp: profile.xp + 60 + bonusXP,
             loss_streak: 0,
             comeback_eligible: false,
