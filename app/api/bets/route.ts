@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { revalidateTag } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
 import { buyShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
     .eq('id', market.id)
   // Invalidate the cached feed so the live position value reflects the new
   // reserves immediately — keeps the cash-out preview in step with execution.
-  revalidateTag('markets')
+  revalidatePath('/', 'layout')
   const { data: updated } = await admin
     .from('profiles')
     .update({ credits: profile.credits - cappedAmount, xp: profile.xp + XP_PER_BET })
