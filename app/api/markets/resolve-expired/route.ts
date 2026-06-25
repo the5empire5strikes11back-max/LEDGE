@@ -24,6 +24,7 @@ import { resolveFromSource } from '@/lib/market-resolver'
 import { expirePendingAutoBets } from '@/lib/auto-bet-trigger'
 import { repayAdvance } from '@/lib/advance'
 import { creatorStage, shouldVoid } from '@/lib/creator-resolution'
+import { rateLimit } from '@/lib/rate-limit'
 import { pushToUser } from '@/lib/push'
 import { logError, logMessage } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
@@ -42,6 +43,11 @@ const HOUR_MS = 3_600_000
 // pass) before it's voided + refunded. Covers slow/late official results so a
 // genuine answer that posts an hour after close settles instead of voiding.
 const VOID_GRACE_HOURS = 24
+
+// Client feed-loads trigger this endpoint, and each run can make Claude calls for
+// unverifiable markets. Throttle non-cron callers so it runs at most once per
+// window no matter how many users load the feed — the single biggest AI-cost win.
+const RESOLVE_THROTTLE_MS = 30 * 60 * 1000
 
 // ── Anthropic key helper ─────────────────────────────────────────────────────
 
@@ -304,12 +310,20 @@ export async function POST(request: Request) {
   const supabase = createAdminClient()
 
   // Auth: allow cron secret OR authenticated user
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const isCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+  if (!isCron) {
     const userClient = await import('@/lib/supabase/server').then((m) => m.createClient())
     const {
       data: { user },
     } = await userClient.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Throttle client (feed-load) triggers — every load otherwise re-runs AI
+    // resolution on the same unverifiable markets. Cron callers bypass this.
+    const rl = await rateLimit(supabase, { key: 'global:resolve-expired', limit: 1, windowMs: RESOLVE_THROTTLE_MS })
+    if (!rl.allowed) {
+      return NextResponse.json({ skipped: true, throttled: true, reason: `Resolution ran recently; next in ${rl.retryAfter}s` })
+    }
   }
 
   // Kill switch — halt resolution without a deploy
