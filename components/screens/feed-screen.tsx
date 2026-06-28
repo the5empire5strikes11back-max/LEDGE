@@ -13,7 +13,7 @@ import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Plus, Flame, Star, BarChart2, Search, X as XIcon } from "lucide-react"
+import { Plus, Flame, Star, ChevronLeft, Search, X as XIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
@@ -988,7 +988,8 @@ export function FeedScreen({
             </div>
 
           ) : (
-            (() => {
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4 lg:[&>*]:h-full">
+            {(() => {
             const seenGroups = new Set<string>()
             return filtered.map((market, idx) => {
               // Multi-option group → one MarketGroupCard for the whole group
@@ -1079,7 +1080,8 @@ export function FeedScreen({
                 />
               )
             })
-            })()
+            })()}
+            </div>
           )}
         </div>
       </div>
@@ -1094,9 +1096,8 @@ export function FeedScreen({
           "hover:opacity-90 active:scale-95 transition-all duration-150",
           // Mobile: above bottom nav bar, right edge
           "right-4",
-          // Desktop: bottom-right of the feed column
-          // sidebar=220px + feed=380px − button=44px − padding=16px = 540px from left
-          "lg:right-auto lg:left-[540px] lg:bottom-6"
+          // Desktop: bottom-right of the full-width feed grid
+          "lg:right-6 lg:left-auto lg:bottom-6"
         )}
         style={{ bottom: "calc(65px + env(safe-area-inset-bottom) + 12px)" }}
       >
@@ -1107,38 +1108,36 @@ export function FeedScreen({
 
   return (
     <>
-      {/* ── Desktop two-column layout (lg+) ────────────────────────────────── */}
-      <div className="hidden lg:flex h-full overflow-hidden">
-        {/* Left: scrollable feed list */}
-        <div className="w-[380px] shrink-0 border-r border-border overflow-hidden flex flex-col">
-          {feedColumn}
-        </div>
-
-        {/* Right: detail panel — fills remaining width */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {detailMarket ? (
-            <MarketDetail
-              mode="panel"
-              market={detailMarket}
-              onClose={() => setDetailMarket(null)}
-              onBuyYes={() => openTradeFromDetail("yes")}
-              onBuyNo={() => openTradeFromDetail("no")}
-              onCashout={handleCashout}
-            onCancelAutoBet={handleCancelAutoBet}
-              onUsernameClick={onUsernameClick}
-              currentUsername={currentUsername}
-              currentAvatarUrl={currentAvatarUrl}
-            />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground select-none">
-              <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center">
-                <BarChart2 className="w-6 h-6 text-muted-foreground/40" />
-              </div>
-              <p className="text-sm font-medium">Select a market to view details</p>
-              <p className="text-xs text-muted-foreground/60">Click any card on the left</p>
+      {/* ── Desktop layout (lg+) — a full-width library of market cards;
+            clicking a card opens it full-screen, with a back button to return. ── */}
+      <div className="hidden lg:flex flex-col h-full overflow-hidden">
+        {detailMarket ? (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {/* Back bar — return to the market library */}
+            <button
+              onClick={() => setDetailMarket(null)}
+              className="shrink-0 flex items-center gap-2 px-5 py-3 border-b border-border text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" /> Back to markets
+            </button>
+            <div className="flex-1 overflow-hidden">
+              <MarketDetail
+                mode="panel"
+                market={detailMarket}
+                onClose={() => setDetailMarket(null)}
+                onBuyYes={() => openTradeFromDetail("yes")}
+                onBuyNo={() => openTradeFromDetail("no")}
+                onCashout={handleCashout}
+                onCancelAutoBet={handleCancelAutoBet}
+                onUsernameClick={onUsernameClick}
+                currentUsername={currentUsername}
+                currentAvatarUrl={currentAvatarUrl}
+              />
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          feedColumn
+        )}
       </div>
 
       {/* ── Mobile single-column layout (<lg) ──────────────────────────────── */}
