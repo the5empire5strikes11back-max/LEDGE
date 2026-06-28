@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { X, LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -12,14 +13,22 @@ interface ProgressiveTipProps {
 }
 
 export function ProgressiveTip({ show, icon: Icon, title, body, onDismiss }: ProgressiveTipProps) {
+  // Auto-dismiss — it's a one-time tip, never a persistent overlay.
+  useEffect(() => {
+    if (!show) return
+    const t = setTimeout(onDismiss, 6000)
+    return () => clearTimeout(t)
+  }, [show, onDismiss])
+
   if (!show) return null
 
   return (
     <div
       className={cn(
         "fixed z-[300] w-[268px]",
-        // Bottom-right, above mobile nav
-        "bottom-[88px] lg:bottom-10 right-4",
+        // Mobile: bottom-right above the nav. Desktop: TOP-right, clear of the
+        // full-width YES/NO action buttons that live along the bottom.
+        "bottom-[88px] right-4 lg:bottom-auto lg:top-20",
         "bg-surface border border-accent/35 px-4 py-3.5 shadow-xl",
         "animate-in fade-in slide-in-from-right-4 duration-400"
       )}
