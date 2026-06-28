@@ -10,14 +10,17 @@
  * ceilings) read these numbers, so balance policy lives in exactly one place.
  */
 
-/** Floor: minimum live, non-resolved markets a category should hold. */
+/** Floor: minimum live, non-resolved markets a category should hold.
+ *  Sized to real content supply per vertical — Sports/Tech/Politics have plenty
+ *  of distinct, specific, near-term events; Culture/Viral/Wild are thinner, and
+ *  forcing 15 there only yields duplicates or generic filler. */
 export const CATEGORY_FLOORS: Record<string, number> = {
   Sports:   15,
-  Culture:  15,
-  Politics: 15,
-  Tech:     15,
-  Viral:    15,
-  Wild:     15,
+  Tech:     12,
+  Politics: 12,
+  Culture:  10,
+  Viral:    10,
+  Wild:     10,
 }
 
 /** Ceiling: hard cap on live markets per category. At/above → stop adding. */
