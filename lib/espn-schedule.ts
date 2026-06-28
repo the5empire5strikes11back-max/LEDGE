@@ -62,6 +62,44 @@ async function fetchJson(url: string): Promise<EspnScoreboard | null> {
   }
 }
 
+/** American moneyline → implied win probability (0–1). */
+function mlToProb(ml: number): number {
+  return ml < 0 ? (-ml) / (-ml + 100) : 100 / (ml + 100)
+}
+
+/**
+ * Home-team win probability (30–70) from ESPN's pre-game odds.
+ *
+ * ESPN usually leaves homeTeamOdds.moneyLine null and instead encodes the line
+ * in `details` like "PIT -136" (the FAVORED team's abbreviation + its moneyline).
+ * We parse that, decide whether the favorite is home or away, and convert. Falls
+ * back to the home moneyline field, then to 55 (mild home-field edge) if no odds
+ * are posted yet.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function homeWinProbFromOdds(comp: any, homeAbbr: string): number {
+  const clamp = (p: number) => Math.round(Math.max(30, Math.min(70, p)))
+  const odds = comp?.odds?.[0]
+  if (!odds) return 55
+
+  // 1. details string: "<ABBR> <±moneyline>" — the favorite and its line.
+  const details: string = typeof odds.details === 'string' ? odds.details : ''
+  const m = details.match(/([A-Z]{2,4})\s*([+-]\d{2,4})/)
+  if (m) {
+    const favAbbr = m[1].toUpperCase()
+    const favProb = mlToProb(parseInt(m[2], 10))
+    const homeProb = favAbbr === homeAbbr ? favProb : 1 - favProb
+    return clamp(homeProb * 100)
+  }
+
+  // 2. Explicit home moneyline, when ESPN populates it.
+  const ml = odds.homeTeamOdds?.moneyLine
+  if (typeof ml === 'number' && ml !== 0) return clamp(mlToProb(ml) * 100)
+
+  // 3. No usable odds — mild home-field default.
+  return 55
+}
+
 /**
  * Pull upcoming games across the active leagues and build resolvable markets.
  * @param limit  max markets to return (cap to the Sports deficit).
@@ -100,7 +138,8 @@ export async function fetchUpcomingEspnMarkets(
       const hoursToClose = (closeMs - nowMs) / HOUR_MS
       if (hoursToGame < 0.5 || hoursToClose > MARKET_DURATION.MAX_HOURS) continue
 
-      const comps = ev.competitions?.[0]?.competitors ?? []
+      const comp = ev.competitions?.[0]
+      const comps = comp?.competitors ?? []
       const home = comps.find((c) => c.homeAway === 'home') ?? comps[0]
       const away = comps.find((c) => c.homeAway === 'away') ?? comps[1]
       const homeAbbr = home?.team?.abbreviation?.toUpperCase()
@@ -113,8 +152,9 @@ export async function fetchUpcomingEspnMarkets(
         category: 'Sports',
         end_time: new Date(closeMs).toISOString(),
         jackpot_pool: 50_000,
-        // Slight home-court edge; stays debatable.
-        starter_probability: 55,
+        // Real home-win probability from ESPN's moneyline odds when available,
+        // so each game opens at its true price — not a flat 55%.
+        starter_probability: homeWinProbFromOdds(comp, homeAbbr),
         resolution_criteria: `Resolves YES if the ${homeName} win this ${lg.label} game per the official ESPN box score.`,
         resolution_source_url: base,
         target_data_key: JSON.stringify({ type: 'espn_game', team: homeAbbr, condition: 'win' }),
