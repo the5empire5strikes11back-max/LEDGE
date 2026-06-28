@@ -76,8 +76,10 @@ const REJECTION_THRESHOLD = 6.5
 
 /** Minimum hours a market must have remaining to be accepted. */
 const MIN_HOURS_REMAINING = 2
-/** Maximum hours until close (7 days). Beyond this, attention completely drifts. */
-const MAX_HOURS_REMAINING = 168
+/** Maximum hours until close (10 days). The model aims for ~7 days but often
+ *  rounds just over 168h; 240h keeps those good, specific markets instead of
+ *  cutting them. Beyond ~10 days attention genuinely drifts. */
+const MAX_HOURS_REMAINING = 240
 
 // ── Instant Reject Patterns ───────────────────────────────────────────────────
 //
