@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle } from "lucide-react"
+import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle, ShoppingBag } from "lucide-react"
+import { ShopModal } from "@/components/shop-modal"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -34,9 +35,10 @@ import type { Database } from "@/types/database"
 
 type Screen = "feed" | "circles" | "profile"
 
-const NAV_ITEMS: { id: Screen; label: string; icon: React.ElementType }[] = [
+const NAV_ITEMS: { id: Screen | "shop"; label: string; icon: React.ElementType }[] = [
   { id: "feed",    label: "Feed",    icon: TrendingUp },
   { id: "circles", label: "Circles", icon: Users },
+  { id: "shop",    label: "Shop",    icon: ShoppingBag },
   { id: "profile", label: "Profile", icon: User },
 ]
 
@@ -89,6 +91,7 @@ function screenFromUrl(): Screen {
 export default function App() {
   const [screen, setScreen] = useState<Screen>(screenFromUrl)
   const [circlesBadge, setCirclesBadge] = useState(false)
+  const [boostShopOpen, setBoostShopOpen] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [betHistory, setBetHistory] = useState<BetRecord[]>([])
   const [dailyDropOpen, setDailyDropOpen] = useState(false)
@@ -499,7 +502,7 @@ export default function App() {
             return (
             <button
               key={id}
-              onClick={() => handleScreenChange(id)}
+              onClick={() => { if (id === "shop") setBoostShopOpen(true); else handleScreenChange(id) }}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-all duration-150 text-left w-full",
                 screen === id
@@ -661,7 +664,7 @@ export default function App() {
             return (
             <button
               key={id}
-              onClick={() => handleScreenChange(id)}
+              onClick={() => { if (id === "shop") setBoostShopOpen(true); else handleScreenChange(id) }}
               className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors duration-200 relative",
                 screen === id ? "text-accent" : "text-muted-foreground hover:text-foreground"
@@ -720,6 +723,13 @@ export default function App() {
         open={shopOpen}
         onClose={() => setShopOpen(false)}
         isPlus={isPlus}
+      />
+      {/* Boost shop — opened from the main nav */}
+      <ShopModal
+        open={boostShopOpen}
+        onClose={() => setBoostShopOpen(false)}
+        onCreditsChange={(c) => setProfile((prev) => prev ? { ...prev, credits: c } : prev)}
+        onOpenBuyCredits={() => setShopOpen(true)}
       />
       <PublicProfileSheet
         username={publicProfileUsername}
