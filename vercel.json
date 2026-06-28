@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/refresh-markets",
-      "schedule": "0 12 * * *"
+      "schedule": "0 12 */2 * *"
     },
     {
       "path": "/api/cron/release-markets",

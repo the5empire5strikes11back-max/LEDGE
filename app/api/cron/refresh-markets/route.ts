@@ -64,10 +64,14 @@ export async function POST(request: Request) {
   // Over-generate vs raw deficit because the editorial pipeline rejects a large
   // share (stale, dup, overflow). Generating ~1.7× the gap keeps floors filling.
   const OVER_GEN = 1.7
+  // Generation runs every other day, so each run must stock ~2 days of supply:
+  // refill each category to its floor PLUS a cushion that the daily release cron
+  // drips out over the off-day, keeping every category at ≥15 the whole time.
+  const CADENCE_BUFFER = 12
   const categoryTargets: Record<string, number> = {}
   let totalDeficit = 0
   for (const [cat, floor] of Object.entries(CATEGORY_FLOORS)) {
-    const deficit = Math.max(0, floor - (invCounts.get(cat) ?? 0))
+    const deficit = Math.max(0, (floor + CADENCE_BUFFER) - (invCounts.get(cat) ?? 0))
     totalDeficit += deficit
     if (deficit > 0) categoryTargets[cat] = Math.ceil(deficit * OVER_GEN)
   }
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
   // When every category is already stocked, still rotate in a light fresh batch.
   const useTargets = totalDeficit > 0
   const totalTarget = useTargets && Object.keys(categoryTargets).length > 0
-    ? Math.max(20, Math.min(60, Object.values(categoryTargets).reduce((a, b) => a + b, 0)))
+    ? Math.max(20, Math.min(110, Object.values(categoryTargets).reduce((a, b) => a + b, 0)))
     : 12
 
   logMessage(
