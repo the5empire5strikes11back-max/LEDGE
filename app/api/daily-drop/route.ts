@@ -8,6 +8,7 @@ import {
   chestAmount,
 } from '@/lib/game-engine'
 import { rateLimit } from '@/lib/rate-limit'
+import { advanceStreak } from '@/lib/streak'
 
 export async function GET() {
   const supabase = await createClient()
@@ -31,13 +32,20 @@ export async function GET() {
   return NextResponse.json({ claimed: !!existing })
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // The client sends its local calendar date so the streak day flips at the
+  // user's local midnight. Validate the shape; fall back to UTC date if missing.
+  const body = await request.json().catch(() => ({}))
+  const localDate = typeof body?.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.localDate)
+    ? body.localDate
+    : new Date().toISOString().slice(0, 10)
 
   // Rate limit: max 5 attempts per minute (idempotent check below guards actual grant)
   const admin = createAdminClient()
@@ -64,7 +72,7 @@ export async function POST() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: profile } = await (supabase as any)
     .from('profiles')
-    .select('credits, xp, streak, last_active_at, is_plus, streak_freeze_used_at')
+    .select('credits, xp, streak, last_active_at, is_plus, last_streak_date, streak_freezes')
     .eq('id', user.id)
     .single()
 
@@ -91,37 +99,17 @@ export async function POST() {
 
   const totalGain = dropAmount + chestCredits
 
-  // Check if streak continues (last active within 48 hours)
-  const lastActive = new Date(profile.last_active_at ?? 0)
-  const hoursSinceActive = (Date.now() - lastActive.getTime()) / (1000 * 60 * 60)
-
-  // Streak freeze: earned every 7 days of streak (max 3 shields), consumed when gap > 48h
-  // Plus members get shields; free users get 1 shield per 7-day milestone (capped at 1 without Plus)
-  const shieldsEarned = profile.is_plus
-    ? Math.min(Math.floor((profile.streak ?? 0) / 7), 3)
-    : Math.min(Math.floor((profile.streak ?? 0) / 7), 1)
-
-  const freezeLastUsed = profile.streak_freeze_used_at ? new Date(profile.streak_freeze_used_at) : null
-  const daysSinceFreezeUsed = freezeLastUsed
-    ? (Date.now() - freezeLastUsed.getTime()) / 86_400_000
-    : Infinity
-  const freezeAvailable = shieldsEarned > 0 && daysSinceFreezeUsed > 7
-
-  const streakBroken = hoursSinceActive > 48
-  const freezeUsed   = streakBroken && freezeAvailable
-
-  let newStreak: number
-  let streakFreezeUsedAt: string | null = profile.streak_freeze_used_at ?? null
-
-  if (!streakBroken) {
-    newStreak = (profile.streak ?? 0) + 1
-  } else if (freezeUsed) {
-    // Freeze absorbed the miss — keep streak, mark freeze consumed
-    newStreak = (profile.streak ?? 0) + 1
-    streakFreezeUsedAt = new Date().toISOString()
-  } else {
-    newStreak = 1
-  }
+  // Advance the streak through the single source of truth. Missed days are
+  // auto-covered by freezes; 7-day milestones grant one. Idempotent per local day.
+  const streakResult = advanceStreak(
+    {
+      streak: profile.streak ?? 0,
+      lastStreakDate: profile.last_streak_date ?? null,
+      freezes: profile.streak_freezes ?? 0,
+    },
+    localDate,
+  )
+  const newStreak = streakResult.streak
 
   // Save drop record + credit the drop via the service-role client. Direct
   // writes to daily_drops and profiles are revoked for the authenticated role:
@@ -142,8 +130,9 @@ export async function POST() {
     .update({
       credits: profile.credits + totalGain,
       streak: newStreak,
+      last_streak_date: streakResult.lastStreakDate,
+      streak_freezes: streakResult.freezes,
       last_active_at: new Date().toISOString(),
-      ...(freezeUsed && { streak_freeze_used_at: streakFreezeUsedAt }),
     })
     .eq('id', user.id)
     .select()
@@ -157,8 +146,10 @@ export async function POST() {
     chestTier,
     chestCredits,
     newStreak,
-    freezeUsed,
-    shieldsRemaining: freezeUsed ? Math.max(0, shieldsEarned - 1) : shieldsEarned,
+    streakOutcome: streakResult.outcome,         // started | extended | frozen | reset | already
+    freezesUsed: streakResult.freezesConsumed,   // freezes auto-consumed to save the streak
+    freezeGranted: streakResult.freezeGranted,   // a milestone awarded a freeze
+    freezes: streakResult.freezes,               // remaining freeze inventory
     profile: updated,
   })
 }

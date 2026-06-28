@@ -21,6 +21,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { compressToSquare } from "@/lib/compress-image"
 import { CreatorAnalytics } from "@/components/creator-analytics"
 import { AdvanceCard } from "@/components/advance-card"
+import { StreakFreezeCard } from "@/components/streak-freeze-card"
 import type { CreatorMarket } from "@/app/api/creator/markets/route"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -542,16 +543,12 @@ export function ProfileScreen({
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent">
                   <Flame className="w-3.5 h-3.5 shrink-0 streak-flame" />{streak}-day streak
                 </span>
-                {Math.min(Math.floor(streak / 7), 3) > 0 && (
-                  <div className="flex items-center gap-0.5" title="Streak shields earned">
-                    {Array.from({ length: Math.min(Math.floor(streak / 7), 3) }).map((_, i) => (
-                      <ShieldCheck key={i} className="w-3.5 h-3.5 text-accent/70" />
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
+
+          {/* Streak Freezes — Duolingo-style: hold up to N, auto-save a missed day */}
+          <StreakFreezeCard onCreditsChange={onCreditsChange} />
 
           {/* Daily Advance — borrow against locked positions, repaid from winnings */}
           <AdvanceCard onCreditsChange={onCreditsChange} />

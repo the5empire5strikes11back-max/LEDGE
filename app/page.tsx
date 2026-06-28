@@ -281,11 +281,29 @@ export default function App() {
 
   const handleDailyDropClose = async () => {
     setDailyDropOpen(false)
-    const res = await fetch('/api/daily-drop', { method: 'POST' })
+    // Send the user's LOCAL calendar date so the streak day flips at their midnight.
+    const localDate = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+    const res = await fetch('/api/daily-drop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localDate }),
+    })
     if (res.ok) {
       const data = await res.json()
       setDailyDropData(data)
       setProfile(data.profile)
+      // Surface streak-freeze events Duolingo-style.
+      if (data.freezesUsed > 0) {
+        toast(`🧊 Streak freeze used — your ${data.newStreak}-day streak is safe`, {
+          description: `${data.freezesUsed} freeze${data.freezesUsed > 1 ? 's' : ''} saved you. ${data.freezes} left.`,
+          duration: 5000,
+        })
+      } else if (data.freezeGranted) {
+        toast(`🎁 You earned a Streak Freeze!`, {
+          description: `${data.newStreak}-day milestone. You now hold ${data.freezes}.`,
+          duration: 4500,
+        })
+      }
       if (data.chestTier) setTimeout(() => setChestOpen(true), 600)
       // Show streak progressive tip on first active streak
       if (!ob.streakTipDone && data.profile?.streak >= 2) {

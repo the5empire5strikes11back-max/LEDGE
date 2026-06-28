@@ -192,47 +192,9 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  // Prediction streak — if the user hasn't placed a bet today yet, advance their streak
-  // (fire-and-forget; never blocks the response)
-  void (async () => {
-    try {
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
-      const todayEnd = new Date()
-      todayEnd.setHours(23, 59, 59, 999)
-
-      // Count bets placed *today* excluding the one we just inserted
-      const { count } = await admin
-        .from('bets')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', todayStart.toISOString())
-        .lte('created_at', todayEnd.toISOString())
-        .neq('id', bet.id)
-
-      // If this is the first bet today, advance the streak
-      if ((count ?? 0) === 0) {
-        const { data: prof } = await admin
-          .from('profiles')
-          .select('streak, last_active_at')
-          .eq('id', user.id)
-          .single()
-
-        if (prof) {
-          const lastActive = new Date(prof.last_active_at ?? 0)
-          const hoursSince = (Date.now() - lastActive.getTime()) / 3_600_000
-          const newStreak = hoursSince <= 48 ? (prof.streak ?? 0) + 1 : 1
-
-          await admin
-            .from('profiles')
-            .update({ streak: newStreak, last_active_at: new Date().toISOString() })
-            .eq('id', user.id)
-        }
-      }
-    } catch {
-      // Non-critical — streak is best-effort
-    }
-  })()
+  // Mark activity (drives rank decay). The daily STREAK is advanced solely by the
+  // daily-drop claim — the single source of truth — so it isn't touched here.
+  void admin.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', user.id)
 
   // Creator XP reward — fire-and-forget (+15 XP when someone bets your market)
   if (market.created_by && market.created_by !== user.id) {
