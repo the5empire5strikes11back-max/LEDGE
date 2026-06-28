@@ -16,7 +16,7 @@ interface BetModalProps {
   initialSide: "yes" | "no"
   availableCredits: number
   onClose: () => void
-  onSubmit: (side: "yes" | "no", amount: number) => void
+  onSubmit: (side: "yes" | "no", amount: number, useDoubleDown: boolean) => void
   /** Arm an auto-bet that fires when the side's chance drops to targetPercent. */
   onArmAutoBet?: (side: "yes" | "no", amount: number, targetPercent: number) => void
 }
@@ -33,6 +33,17 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
   const [rawAmount, setRawAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [autoMode, setAutoMode] = useState(false)
+  // Double Down inventory (shop boost) — fetched on open.
+  const [doubleDownTokens, setDoubleDownTokens] = useState(0)
+  const [doubleDown, setDoubleDown] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/shop").then((r) => r.ok ? r.json() : null).then((d) => {
+      if (alive && d?.inventory) setDoubleDownTokens(d.inventory.double_down_tokens ?? 0)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   function selectSide(s: "yes" | "no") {
     setSide(s)
@@ -71,7 +82,9 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
 
   // Fixed odds — payout is locked right now at current probability
   const impliedProbPct = side === "yes" ? yesPercent : noPercent
-  const lockedPayout = amount > 0 ? calculateFixedOddsPayout(amount, impliedProbPct) : 0
+  const ddActive = doubleDown && doubleDownTokens > 0
+  const basePayout = amount > 0 ? calculateFixedOddsPayout(amount, impliedProbPct) : 0
+  const lockedPayout = ddActive ? basePayout * 2 : basePayout
   const profit = lockedPayout - amount
   const multiplier = payoutMultiplier(impliedProbPct)
 
@@ -82,7 +95,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
     if (!isValid) return
     setSubmitting(true)
     if (autoMode && onArmAutoBet) onArmAutoBet(side, amount, effectiveTarget)
-    else onSubmit(side, amount)
+    else onSubmit(side, amount, doubleDown && doubleDownTokens > 0)
   }
 
   const quickAmounts = [100, 500, 1_000, 5_000].filter((v) => v <= availableCredits)
@@ -275,6 +288,28 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 Free credits only — no real money. Pick an amount and lock in your call.
               </p>
             </div>
+          )}
+
+          {/* Double Down — spend a token to pay 2× (shop boost) */}
+          {!autoMode && doubleDownTokens > 0 && (
+            <button
+              onClick={() => setDoubleDown((v) => !v)}
+              className={cn(
+                "flex items-center justify-between gap-2 px-3 py-2 border transition-colors",
+                doubleDown ? "bg-accent/15 border-accent/50" : "bg-surface border-border hover:border-accent/30"
+              )}
+              style={{ borderRadius: "var(--radius-button)" }}
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                🎯 Double Down <span className="text-[10px] text-muted-foreground font-normal">pays 2× if you win · {doubleDownTokens} left</span>
+              </span>
+              <span className={cn(
+                "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                doubleDown ? "bg-accent" : "bg-muted"
+              )}>
+                <span className={cn("inline-block h-3 w-3 transform rounded-full bg-white transition-transform", doubleDown ? "translate-x-3.5" : "translate-x-0.5")} />
+              </span>
+            </button>
           )}
 
           {/* Trade stats */}

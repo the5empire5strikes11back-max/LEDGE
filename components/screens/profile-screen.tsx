@@ -22,6 +22,7 @@ import { compressToSquare } from "@/lib/compress-image"
 import { CreatorAnalytics } from "@/components/creator-analytics"
 import { AdvanceCard } from "@/components/advance-card"
 import { StreakFreezeCard } from "@/components/streak-freeze-card"
+import { ShopModal } from "@/components/shop-modal"
 import type { CreatorMarket } from "@/app/api/creator/markets/route"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -303,6 +304,7 @@ export function ProfileScreen({
   const [creatorMarkets, setCreatorMarkets] = useState<CreatorMarket[]>([])
   const [settingsOpen,   setSettingsOpen]   = useState(false)
   const [shareOpen,      setShareOpen]      = useState(false)
+  const [shopOpen,       setShopOpen]       = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState<string | null>(initialAvatarUrl ?? null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError,    setAvatarError]    = useState<string | null>(null)
@@ -546,6 +548,16 @@ export function ProfileScreen({
               </div>
             )}
           </div>
+
+          {/* Shop — spend credits on boosts */}
+          <button
+            onClick={() => setShopOpen(true)}
+            className="flex items-center justify-between gap-3 px-4 py-3 bg-surface border border-border hover:border-accent/40 transition-colors active:scale-[0.99]"
+            style={{ borderRadius: "var(--radius-button)" }}
+          >
+            <span className="flex items-center gap-2 text-sm font-bold text-foreground">🛒 Shop</span>
+            <span className="text-[11px] text-muted-foreground">Double Down · XP Boost · Freezes →</span>
+          </button>
 
           {/* Streak Freezes — Duolingo-style: hold up to N, auto-save a missed day */}
           <StreakFreezeCard onCreditsChange={onCreditsChange} />
@@ -972,6 +984,13 @@ export function ProfileScreen({
       </div>
 
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} username={username} />
+
+      <ShopModal
+        open={shopOpen}
+        onClose={() => setShopOpen(false)}
+        onCreditsChange={onCreditsChange}
+        onOpenBuyCredits={onOpenShop}
+      />
 
       {shareOpen && (
         <ShareCardModal

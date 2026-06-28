@@ -5,6 +5,7 @@ import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRE
 import { pushToMarketBettors } from '@/lib/push'
 import { buyShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
+import { isXpBoostActive, DOUBLE_DOWN_MULTIPLIER } from '@/lib/shop'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
 import { validateBetAmount } from '@/lib/validate'
 import { logError } from '@/lib/logger'
@@ -43,10 +44,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { market_id, side, amount } = body as {
+  const { market_id, side, amount, useDoubleDown } = body as {
     market_id?: string
     side?: 'yes' | 'no'
     amount?: number
+    useDoubleDown?: boolean
   }
 
   if (!market_id || typeof market_id !== 'string' || !side || !['yes','no'].includes(side) || !amount) {
@@ -115,17 +117,23 @@ export async function POST(request: Request) {
           (market.yes_percent ?? 50) / 100,
           Math.max(6000, (market.virtual_yes_pool ?? 0) + (market.virtual_no_pool ?? 0) + (market.total_credits ?? 0))
         )
-  const { shares: lockedShares, reserves: reservesAfter } = buyShares(reservesBefore, side, cappedAmount)
+  const buy = buyShares(reservesBefore, side, cappedAmount)
+  const reservesAfter = buy.reserves
+
+  // Check user has enough credits + read shop inventory (Double Down / XP boost).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('credits, xp, username, double_down_tokens, xp_boost_until')
+    .eq('id', user.id)
+    .single()
+
+  // Double Down: spend a token to double this bet's payout (stake unchanged).
+  const applyDoubleDown = !!useDoubleDown && (profile?.double_down_tokens ?? 0) > 0
+  const lockedShares = applyDoubleDown ? buy.shares * DOUBLE_DOWN_MULTIPLIER : buy.shares
   // Mirror shares into `payout` for backward compatibility (settlement/cash-out
   // read shares, falling back to payout for legacy rows).
   const lockedPayout = lockedShares
-
-  // Check user has enough credits
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('credits, xp, username')
-    .eq('id', user.id)
-    .single()
 
   if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   if (profile.credits < cappedAmount) {
@@ -185,9 +193,16 @@ export async function POST(request: Request) {
   revalidatePath('/', 'layout')
   // This trade may have pushed the price into someone's auto-bet target.
   await fireEligibleAutoBets(admin, market.id)
-  const { data: updated } = await admin
+  // XP Boost: 2× XP while active. Double Down: consume the token if applied.
+  const xpGain = isXpBoostActive(profile.xp_boost_until) ? XP_PER_BET * 2 : XP_PER_BET
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: updated } = await (admin as any)
     .from('profiles')
-    .update({ credits: profile.credits - cappedAmount, xp: profile.xp + XP_PER_BET })
+    .update({
+      credits: profile.credits - cappedAmount,
+      xp: profile.xp + xpGain,
+      ...(applyDoubleDown && { double_down_tokens: Math.max(0, (profile.double_down_tokens ?? 0) - 1) }),
+    })
     .eq('id', user.id)
     .select()
     .single()
@@ -274,7 +289,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { bet, profile: updated, cappedAmount },
+    { bet, profile: updated, cappedAmount, doubleDownApplied: applyDoubleDown },
     { status: 201 }
   )
   } catch (err) {

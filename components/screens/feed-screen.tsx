@@ -445,7 +445,7 @@ export function FeedScreen({
     setTradeModal({ market, side })
   }
 
-  const handleBetSubmit = async (side: "yes" | "no", amount: number) => {
+  const handleBetSubmit = async (side: "yes" | "no", amount: number, useDoubleDown = false) => {
     const market = tradeModal?.market
     if (!market) return
 
@@ -462,7 +462,7 @@ export function FeedScreen({
     const res = await fetch('/api/bets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ market_id: market.id, side, amount }),
+      body: JSON.stringify({ market_id: market.id, side, amount, useDoubleDown }),
     })
 
     if (!res.ok) {
@@ -484,6 +484,9 @@ export function FeedScreen({
 
     const data = await res.json()
     const placed = data?.cappedAmount ?? amount
+    if (data?.doubleDownApplied) {
+      toast(`🎯 Double Down active — this bet pays 2×`, { duration: 3500 })
+    }
 
     const patch = { userBet: { side, amount: placed } }
     setMarkets((prev) => prev.map((m) => m.id === market.id ? { ...m, ...patch } : m))
