@@ -213,7 +213,24 @@ EXAMPLES OF GREAT MARKETS (use as reference for tone and energy):
 ✅ "Will [team] win tonight?"
 ✅ "Will [artist] cancel their tour dates?"
 
+🚨 #1 RULE — BE SPECIFIC. NAME REAL THINGS. 🚨
+Every market MUST name a SPECIFIC, real person, team, show, game, song, or product
+that exists right now. NEVER use a generic, unnamed subject — those are unverifiable
+and boring, and they are the #1 thing ruining the feed. If you can't name who/what,
+DO NOT generate the market.
+❌ "Will a celebrity accidentally leak new music during a livestream this week?"  (which celebrity??)
+❌ "Will a gaming streamer hit 1M concurrent viewers this week?"  (which streamer??)
+❌ "Will a surprise collaboration drop completely unannounced this week?"  (between WHO??)
+❌ Banned generic subjects: "a celebrity", "a streamer", "a creator", "an artist",
+   "a rapper", "a YouTuber", "a team", "someone", "a surprise X", "a major brand".
+✅ Instead: "Will Kai Cenat hit 500K concurrent viewers on his next stream?"
+✅ Instead: "Will Drake drop a track before Sunday?"
+✅ Instead: "Will Travis Scott bring out a surprise guest at his Friday show?"
+A good test: a real fan could argue about the answer and check who's right. If the
+subject is a faceless "a [noun]", it fails — rewrite it with a real name or cut it.
+
 EXAMPLES OF BAD MARKETS — NEVER GENERATE THESE:
+❌ Generic/unnamed subjects (see #1 rule above) — this is the most common failure
 ❌ Anything about: GDP, CPI, inflation, interest rates, earnings, trade deficit, bond yields
 ❌ Anything about: parliamentary procedure, cloture, filibuster, reconciliation, appropriations
 ❌ Anything about: bilateral agreements, sanctions, geopolitical negotiations, diplomatic accords

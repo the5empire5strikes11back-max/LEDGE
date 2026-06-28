@@ -158,6 +158,22 @@ const INSTANT_REJECT_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
     label: 'vague/unresolvable timeframe',
   },
 
+  // ── Generic / Unnamed Subject (the #1 quality problem) ────────────────────
+  {
+    // "Will a celebrity / a streamer / a creator ... " — no named subject = unverifiable + boring
+    pattern: /\b(a|an|any|some|another)\s+(\w+\s+){0,2}(celebrity|celeb|streamer|creator|influencer|youtuber|tiktoker|gamer|rapper|artist|singer|musician|actor|actress|athlete|player|brand|company|startup|team|show|movie|film|song|album|game)\b/i,
+    label: 'generic unnamed subject — name a specific person/team/thing',
+  },
+  {
+    // "a surprise collab / unexpected drop" with nobody named
+    pattern: /\b(surprise|unexpected|unannounced|random|secret)\s+(collab|collaboration|drop|release|announcement|appearance|guest|reunion)\b/i,
+    label: 'vague "surprise X" with no named subject',
+  },
+  {
+    pattern: /\b(someone|somebody|anyone|anybody|some\s+\w+\s+(star|figure|name))\b/i,
+    label: 'unnamed subject (someone/anyone)',
+  },
+
   // ── Extreme Length Guards ─────────────────────────────────────────────────
   // Caught separately in checkInstantReject — see below
 ]
