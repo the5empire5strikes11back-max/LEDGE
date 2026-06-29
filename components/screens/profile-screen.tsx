@@ -7,6 +7,7 @@ import { AchievementsGrid } from "@/components/achievements-grid"
 import { Ticker } from "@/components/ui/ticker"
 import { CollapsibleSection } from "@/components/ui/collapsible-section"
 import { xpProgress } from "@/lib/game-engine"
+import { positionValue } from "@/lib/amm"
 import {
   Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2,
   CheckCircle2, XCircle, Clock, ExternalLink, Flame, ShieldCheck,
@@ -119,9 +120,17 @@ interface BetRecord {
   side: "yes" | "no"
   amount: number
   payout: number | null
+  shares: number | null
   won: boolean | null
   created_at: string
-  markets: { title: string; category: string } | null
+  markets: {
+    title: string
+    category: string
+    resolved: boolean
+    winner: string | null
+    yes_shares: number | null
+    no_shares: number | null
+  } | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -406,6 +415,18 @@ export function ProfileScreen({
     return sum + payout - b.amount
   }, 0)
 
+  // ── Unrealized P&L from open positions (mark-to-market) ──────────────────
+  const unrealizedPnl = bets.reduce((sum, b) => {
+    if (b.won !== null) return sum
+    const m = b.markets
+    if (!m || m.resolved || !b.shares || !m.yes_shares || !m.no_shares) return sum
+    const liveValue = positionValue({ y: m.yes_shares, n: m.no_shares }, b.side, b.shares)
+    return sum + liveValue - b.amount
+  }, 0)
+  const openPositions = bets.filter(b =>
+    b.won === null && b.markets && !b.markets.resolved && b.shares && b.markets.yes_shares && b.markets.no_shares
+  )
+
   // ── Calibration data (derived from bets) ──────────────────────────────────
   const TRACKED = ["Sports", "Politics", "Culture"] as const
   type TrackedCat = typeof TRACKED[number]
@@ -659,7 +680,7 @@ export function ProfileScreen({
                     { label: "Win Rate", value: `${stats.winRate}%`, color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger" },
                     { label: "Wins",     value: String(stats.correct), color: "text-foreground" },
                     { label: "Best Run", value: String(stats.bestStreak), color: "text-foreground" },
-                    { label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${Math.abs(totalPnl) >= 1000 ? `${(totalPnl / 1000).toFixed(1)}K` : totalPnl}`, color: totalPnl >= 0 ? "text-success" : "text-danger" },
+                    { label: "P&L", value: (() => { const v = totalPnl + unrealizedPnl; return `${v >= 0 ? "+" : ""}${Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}K` : v}` })(), color: (totalPnl + unrealizedPnl) >= 0 ? "text-success" : "text-danger" },
                     { label: "Calibration", value: stats.calibrationScore != null ? String(stats.calibrationScore) : "--", color: stats.calibrationScore == null ? "text-muted-foreground" : stats.calibrationScore >= 80 ? "text-success" : stats.calibrationScore >= 65 ? "text-accent" : "text-danger" },
                   ].map((stat) => (
                     <div
@@ -956,7 +977,7 @@ export function ProfileScreen({
           {bets.length > 0 && (
             <CollapsibleSection
               label="Bets Made"
-              badge={`${bets.length} bets`}
+              badge={openPositions.length > 0 ? `${openPositions.length} open · ${bets.length} total` : `${bets.length} bets`}
               defaultOpen={false}
               storageKey="profile_bets"
               noPadding
@@ -964,10 +985,14 @@ export function ProfileScreen({
               <div className="divide-y divide-border">
                 {bets.map((bet) => {
                   // Voided market = resolved with no winner → stake was refunded.
-                  const m = bet.markets as { resolved?: boolean; winner?: string | null } | null
+                  const m = bet.markets
                   const isVoided  = bet.won === null && m?.resolved === true && (m?.winner == null)
                   const isPending = bet.won === null && !isVoided
                   const profit    = bet.won && bet.payout ? bet.payout - bet.amount : null
+                  const liveValue = isPending && bet.shares && m?.yes_shares && m?.no_shares
+                    ? positionValue({ y: m.yes_shares, n: m.no_shares }, bet.side, bet.shares)
+                    : null
+                  const unrealized = liveValue !== null ? liveValue - bet.amount : null
                   return (
                     <div key={bet.id} className="px-4 py-3 flex items-start gap-3">
                       <div className="mt-0.5 shrink-0">
@@ -1003,14 +1028,19 @@ export function ProfileScreen({
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-xs font-mono font-semibold text-foreground tabular-nums">
-                          {bet.amount.toLocaleString()} CR
+                          {liveValue !== null ? liveValue.toLocaleString() : bet.amount.toLocaleString()} CR
                         </span>
                         {profit !== null && (
                           <p className={cn("text-[10px] font-mono font-semibold tabular-nums", profit >= 0 ? "text-success" : "text-danger")}>
                             {profit >= 0 ? "+" : ""}{profit.toLocaleString()}
                           </p>
                         )}
-                        {isPending && <p className="text-[10px] text-muted-foreground/50">pending</p>}
+                        {unrealized !== null && (
+                          <p className={cn("text-[10px] font-mono font-semibold tabular-nums", unrealized >= 0 ? "text-success" : "text-danger")}>
+                            {unrealized >= 0 ? "+" : ""}{unrealized.toLocaleString()}
+                          </p>
+                        )}
+                        {isPending && liveValue === null && <p className="text-[10px] text-muted-foreground/50">pending</p>}
                         {isVoided && <p className="text-[10px] text-muted-foreground/60">refunded</p>}
                       </div>
                     </div>
