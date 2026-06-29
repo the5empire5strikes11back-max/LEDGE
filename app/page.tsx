@@ -22,6 +22,7 @@ import { Ticker } from "@/components/ui/ticker"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { FirstBetAchievement } from "@/components/onboarding/achievement-toast"
 import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
+import { NotificationPrompt } from "@/components/onboarding/notification-prompt"
 import { useOnboarding } from "@/lib/onboarding"
 import { applyAccentTheme, getSavedAccent } from "@/lib/accent-theme"
 import {
@@ -111,6 +112,7 @@ export default function App() {
   const [winReceipt, setWinReceipt] = useState<WinReceiptData | null>(null)
   const [rankUpFrom, setRankUpFrom] = useState<RankKey | null>(null)
   const [chestOpen, setChestOpen] = useState(false)
+  const [notifPromptOpen, setNotifPromptOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
   const [publicProfileUsername, setPublicProfileUsername] = useState<string | null>(null)
   const [xpFloat, setXpFloat] = useState<{ amount: number; key: number }>({ amount: 0, key: 0 })
@@ -299,6 +301,9 @@ export default function App() {
   const handleDailyDropClose = async () => {
     setDailyDropOpen(false)
     if (!ob.dailyDropClaimed) completeOb("dailyDropClaimed")
+    if (!ob.notifPromptSeen && typeof Notification !== "undefined" && Notification.permission === "default") {
+      setTimeout(() => setNotifPromptOpen(true), 800)
+    }
     // Send the user's LOCAL calendar date so the streak day flips at their midnight.
     const localDate = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
     const res = await fetch('/api/daily-drop', {
@@ -382,8 +387,10 @@ export default function App() {
     if (pendingDailyDropRef.current) {
       setPendingDailyDrop(false)
       setTimeout(() => setDailyDropOpen(true), 600)
+    } else if (!ob.notifPromptSeen && typeof Notification !== "undefined" && Notification.permission === "default") {
+      setTimeout(() => setNotifPromptOpen(true), 2000)
     }
-  }, [])
+  }, [ob.notifPromptSeen])
 
   const handleWin = (
     marketTitle: string,
@@ -794,6 +801,10 @@ export default function App() {
         onClose={() => setChestOpen(false)}
         tier={dailyDropData?.chestTier ?? "common"}
         amount={dailyDropData?.chestCredits ?? 0}
+      />
+      <NotificationPrompt
+        open={notifPromptOpen}
+        onDone={() => { setNotifPromptOpen(false); completeOb("notifPromptSeen") }}
       />
       <CreditShopModal
         open={shopOpen}

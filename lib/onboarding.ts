@@ -14,6 +14,7 @@ export interface OnboardingState {
   circleTipDone: boolean
   dailyDropClaimed: boolean
   firstMarketCreated: boolean
+  notifPromptSeen: boolean
 }
 
 const DEFAULTS: OnboardingState = {
@@ -26,6 +27,7 @@ const DEFAULTS: OnboardingState = {
   circleTipDone: false,
   dailyDropClaimed: false,
   firstMarketCreated: false,
+  notifPromptSeen: false,
 }
 
 function read(): OnboardingState {
