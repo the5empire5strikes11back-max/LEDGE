@@ -120,7 +120,7 @@
 /* ── Tailwind theme mapping ─────────────────────────────────────────────── */
 @theme inline {
   /* Typography */
-  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-sans: 'Space Grotesk', 'Space Grotesk Fallback', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
 
   /* Color aliases */
