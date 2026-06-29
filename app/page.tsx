@@ -345,15 +345,12 @@ export default function App() {
     })
 
     if (serverCredits === undefined) {
-      // First-bet achievement
+      // First-bet achievement — delayed to fire after the bet overlay clears (~2.5s)
       if (!ob.firstBetAchievementDone) {
         completeOb("firstBetAchievementDone")
         completeOb("firstBetHintDone")
-        setShowFirstBetAchievement(true)
-        // The deferred daily drop now waits for the post-bet panel to be
-        // dismissed (handleFirstBetFlowDone) instead of racing it on a timer.
-        // Fallback: if the panel never shows (e.g. bet placed from Circles),
-        // release the drop after the panel's max lifetime.
+        setTimeout(() => setShowFirstBetAchievement(true), 2700)
+        // Deferred daily drop waits until the achievement and post-bet panel are done.
         if (pendingDailyDrop) {
           setTimeout(() => {
             if (pendingDailyDropRef.current) {
@@ -362,21 +359,8 @@ export default function App() {
             }
           }, 12_000)
         }
-      } else {
-        const resolveHint = marketEndTime ? formatResolveTime(marketEndTime) : null
-        const sideColor = side === "yes" ? "#22C55E" : "#EF4444"
-        toast(`⚡ +10 XP · ${side.toUpperCase()} locked in`, {
-          description: resolveHint ?? "Check back when it resolves",
-          duration: 2500,
-          style: {
-            background: "var(--card)",
-            border: `1px solid ${sideColor}33`,
-            borderLeft: `3px solid ${sideColor}`,
-            fontSize: "13px",
-            fontWeight: "700",
-          },
-        })
       }
+      // Non-first bets: overlay already confirms the bet, no extra toast needed.
 
       const newRecord: BetRecord = { category: marketCategory as BetRecord["category"], side, majorityWas, won: false }
       setBetHistory((prev) => [...prev, newRecord])

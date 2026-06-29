@@ -215,7 +215,6 @@ export function FeedScreen({
     potentialPayout: number
     marketTitle: string
     xpGain: number
-    isFirstBet: boolean
   } | null>(null)
   const { state: ob, complete: completeOb } = useOnboarding()
 
@@ -511,10 +510,9 @@ export function FeedScreen({
     setBetConfirm({
       side,
       amount: placed,
-      potentialPayout: data?.doubleDownApplied ? potentialPayout : potentialPayout,
+      potentialPayout,
       marketTitle: market.title,
       xpGain,
-      isFirstBet: wasFirstBet,
     })
 
     // Streak milestone celebration fires after the overlay clears
@@ -1205,7 +1203,6 @@ export function FeedScreen({
           potentialPayout={betConfirm.potentialPayout}
           marketTitle={betConfirm.marketTitle}
           xpGain={betConfirm.xpGain}
-          isFirstBet={betConfirm.isFirstBet}
           onDone={() => setBetConfirm(null)}
         />
       )}

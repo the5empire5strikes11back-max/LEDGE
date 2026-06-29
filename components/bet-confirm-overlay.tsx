@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface BetConfirmOverlayProps {
@@ -9,11 +9,8 @@ interface BetConfirmOverlayProps {
   potentialPayout: number
   marketTitle: string
   xpGain: number
-  isFirstBet?: boolean
   onDone: () => void
 }
-
-const CONFETTI_COLORS = ["#10b981", "#f59e0b", "#3b82f6", "#ec4899", "#8b5cf6", "#f97316"]
 
 export function BetConfirmOverlay({
   side,
@@ -21,7 +18,6 @@ export function BetConfirmOverlay({
   potentialPayout,
   marketTitle,
   xpGain,
-  isFirstBet = false,
   onDone,
 }: BetConfirmOverlayProps) {
   const [exiting, setExiting] = useState(false)
@@ -32,24 +28,9 @@ export function BetConfirmOverlay({
     return () => { clearTimeout(exit); clearTimeout(done) }
   }, [onDone])
 
-  const isYes = side === "yes"
+  const isYes     = side === "yes"
   const accentHex = isYes ? "#10b981" : "#ef4444"
   const sideLabel = isYes ? "YES" : "NO"
-
-  const particles = useMemo(() =>
-    isFirstBet
-      ? Array.from({ length: 30 }, (_, i) => ({
-          id: i,
-          left: `${(i / 30) * 100 + (Math.random() * 3 - 1.5)}%`,
-          color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-          delay: `${(Math.random() * 0.4).toFixed(2)}s`,
-          duration: `${(0.9 + Math.random() * 0.7).toFixed(2)}s`,
-          rotate: `${Math.floor(Math.random() * 360)}deg`,
-          size: `${6 + Math.floor(Math.random() * 7)}px`,
-        }))
-      : [],
-  [isFirstBet])
-
   const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K` : n.toLocaleString()
 
   return (
@@ -63,22 +44,7 @@ export function BetConfirmOverlay({
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/80" />
 
-      {/* Confetti — first bet only */}
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="absolute top-0 pointer-events-none"
-          style={{
-            left: p.left,
-            width: p.size,
-            height: p.size,
-            backgroundColor: p.color,
-            borderRadius: "2px",
-            animation: `confetti-fall ${p.duration} ${p.delay} ease-in forwards`,
-            "--r": p.rotate,
-          } as React.CSSProperties}
-        />
-      ))}
+{/* first-bet confetti handled by FirstBetAchievement which fires after this overlay */}
 
       {/* Card */}
       <div
