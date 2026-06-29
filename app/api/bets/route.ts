@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
-import { buyShares, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
+import { buyShares, addLiquidity, LIQUIDITY_REINVEST_RATE, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
 import { isXpBoostActive, DOUBLE_DOWN_MULTIPLIER } from '@/lib/shop'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
           Math.max(6000, (market.virtual_yes_pool ?? 0) + (market.virtual_no_pool ?? 0) + (market.total_credits ?? 0))
         )
   const buy = buyShares(reservesBefore, side, cappedAmount)
-  const reservesAfter = buy.reserves
+  const reservesAfter = addLiquidity(buy.reserves, cappedAmount * LIQUIDITY_REINVEST_RATE)
 
   // Check user has enough credits + read shop inventory (Double Down / XP boost).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

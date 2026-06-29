@@ -128,3 +128,27 @@ export function seedReserves(probYes: number, depth: number): Reserves {
   const d = Math.max(1, depth)
   return { y: Math.round(d * (1 - p)), n: Math.round(d * p) }
 }
+
+/**
+ * Fraction of each bet reinvested as pool depth after the trade.
+ * Implements the Othman et al. (2013) liquidity-sensitive AMM property:
+ * as volume accumulates the pool deepens, so later bets move the odds
+ * less than early ones — just like a real market.
+ */
+export const LIQUIDITY_REINVEST_RATE = 0.10
+
+/**
+ * Add `amount` credits of depth to the pool without moving the price.
+ * Injects proportionally to the current reserve ratio so the YES/NO price
+ * is unchanged — only the pool depth (and therefore price impact) increases.
+ */
+export function addLiquidity(reserves: Reserves, amount: number): Reserves {
+  if (amount <= 0) return reserves
+  const { y, n } = reserves
+  const total = y + n
+  if (total <= 0) return reserves
+  return {
+    y: y + (amount * y / total),
+    n: n + (amount * n / total),
+  }
+}
