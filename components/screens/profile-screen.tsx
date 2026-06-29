@@ -47,7 +47,7 @@ function AccuracyRing({ pct, size = 40 }: { pct: number; size?: number }) {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type LbSort   = "credits" | "winrate" | "streak"
+type LbSort   = "credits" | "winrate" | "streak" | "calibration"
 type LbView   = "global"  | "near-me"
 type LbPeriod = "all"     | "week"    | "month"
 
@@ -61,14 +61,16 @@ interface LbEntry {
   streak: number
   winRate: number
   pnl: number
+  calibrationScore?: number | null
   totalBets: number
   isCurrentUser: boolean
 }
 
 const LB_SORT_TABS: { id: LbSort; label: string }[] = [
-  { id: "credits",  label: "Credits"  },
-  { id: "winrate",  label: "Win Rate" },
-  { id: "streak",   label: "Streak"   },
+  { id: "credits",     label: "Credits"     },
+  { id: "winrate",     label: "Win Rate"    },
+  { id: "calibration", label: "Calibration" },
+  { id: "streak",      label: "Streak"      },
 ]
 
 const LB_MEDAL = ["🥇", "🥈", "🥉"]
@@ -271,8 +273,9 @@ function LbRow({
   onUsernameClick?: (u: string) => void
 }) {
   const statValue =
-    sort === "winrate" ? `${entry.winRate}%` :
-    sort === "streak"  ? `🔥 ${entry.streak}` :
+    sort === "winrate"     ? `${entry.winRate}%` :
+    sort === "streak"      ? `🔥 ${entry.streak}` :
+    sort === "calibration" ? (entry.calibrationScore != null ? String(entry.calibrationScore) : "—") :
     formatCredits(entry.credits)
 
   return (
@@ -306,9 +309,12 @@ function LbRow({
       </button>
       <p className={cn(
         "font-mono text-xs font-bold tabular-nums shrink-0",
-        sort === "winrate" && entry.winRate >= 60 ? "text-success" :
-        sort === "winrate" && entry.winRate <= 40 ? "text-danger"  :
-        sort === "streak"  ? "text-orange-400" :
+        sort === "winrate"     && entry.winRate >= 60  ? "text-success" :
+        sort === "winrate"     && entry.winRate <= 40  ? "text-danger"  :
+        sort === "streak"      ? "text-orange-400" :
+        sort === "calibration" && (entry.calibrationScore ?? 0) >= 80 ? "text-success" :
+        sort === "calibration" && (entry.calibrationScore ?? 0) >= 65 ? "text-accent"  :
+        sort === "calibration" && entry.calibrationScore != null       ? "text-danger"  :
         "text-foreground"
       )}>
         {statValue}
@@ -357,7 +363,7 @@ export function ProfileScreen({
   const loadLeaderboard = useCallback((sort: LbSort, view: LbView, period: LbPeriod) => {
     setLbLoading(true)
     const params = new URLSearchParams({ sort, limit: "25", view })
-    if (sort === "winrate" && period !== "all") params.set("period", period)
+    if ((sort === "winrate" || sort === "calibration") && period !== "all") params.set("period", period)
     fetch(`/api/leaderboard?${params}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
@@ -766,7 +772,7 @@ export function ProfileScreen({
                     {v === "global" ? "Global" : "Near Me"}
                   </button>
                 ))}
-                {lbSort === "winrate" && (
+                {(lbSort === "winrate" || lbSort === "calibration") && (
                   <div className="flex gap-1 ml-auto">
                     {(["all", "week", "month"] as LbPeriod[]).map((p) => (
                       <button

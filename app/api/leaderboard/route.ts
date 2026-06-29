@@ -59,11 +59,11 @@ export async function GET(request: Request) {
     const d = new Date(); d.setDate(d.getDate() - 30); periodCutoff = d.toISOString()
   }
 
-  // Bet stats for all profiles
+  // Bet stats for all profiles — include bet_price for calibration computation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let betQuery = (admin as any)
     .from('bets')
-    .select('user_id, amount, payout, won')
+    .select('user_id, amount, payout, won, bet_price')
     .in('user_id', profileIds)
     .in('market_id', globalMarketIds.length > 0 ? globalMarketIds : ['__none__'])
     .not('won', 'is', null)
@@ -74,13 +74,23 @@ export async function GET(request: Request) {
 
   const statsMap = new Map<string, {
     totalBets: number; wonBets: number; totalWagered: number; totalPayout: number
+    brierNumerator: number; brierCount: number
   }>()
 
   for (const bet of betStats ?? []) {
-    const s = statsMap.get(bet.user_id) ?? { totalBets: 0, wonBets: 0, totalWagered: 0, totalPayout: 0 }
+    const s = statsMap.get(bet.user_id) ?? {
+      totalBets: 0, wonBets: 0, totalWagered: 0, totalPayout: 0,
+      brierNumerator: 0, brierCount: 0,
+    }
     s.totalBets++
     s.totalWagered += bet.amount
     if (bet.won) { s.wonBets++; s.totalPayout += bet.payout ?? 0 }
+    if (bet.bet_price != null) {
+      const outcome = bet.won ? 1 : 0
+      const diff = outcome - bet.bet_price
+      s.brierNumerator += diff * diff
+      s.brierCount++
+    }
     statsMap.set(bet.user_id, s)
   }
 
@@ -89,6 +99,9 @@ export async function GET(request: Request) {
     const winRate = s && s.totalBets >= 3 ? Math.round((s.wonBets / s.totalBets) * 100) : 0
     const netProfit = s ? s.totalPayout - s.totalWagered : 0
     const pnl = s && s.totalWagered > 0 ? Math.round((netProfit / s.totalWagered) * 100 * 10) / 10 : 0
+    const calibrationScore = s && s.brierCount >= 5
+      ? Math.round((1 - s.brierNumerator / s.brierCount) * 100)
+      : null
     return {
       id: p.id,
       username: p.username,
@@ -99,14 +112,23 @@ export async function GET(request: Request) {
       xp: p.xp,
       winRate,
       pnl,
+      calibrationScore,
       totalBets: s?.totalBets ?? 0,
       isCurrentUser: p.id === user.id,
     }
   })
 
-  // Re-sort for winrate mode (filter min 3 bets, sort desc)
+  // Re-sort based on requested mode
   if (sort === 'winrate') {
     enriched.sort((a, b) => b.winRate - a.winRate || b.totalBets - a.totalBets)
+  } else if (sort === 'calibration') {
+    // Users with no calibration data go to the bottom
+    enriched.sort((a, b) => {
+      if (a.calibrationScore == null && b.calibrationScore == null) return 0
+      if (a.calibrationScore == null) return 1
+      if (b.calibrationScore == null) return -1
+      return b.calibrationScore - a.calibrationScore
+    })
   }
 
   const totalUsers = enriched.length
