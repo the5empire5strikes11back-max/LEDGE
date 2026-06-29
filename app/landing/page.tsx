@@ -1,6 +1,30 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { TrendingUp, TrendingDown, Flame, Zap, Shield, Trophy, ChevronRight, BarChart2, Users, Target, Check, ChevronDown, Quote } from "lucide-react"
 import { PredictionQuiz } from "@/components/landing/prediction-quiz"
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://ledge-phi.vercel.app'
+
+export const metadata: Metadata = {
+  title: 'Ledge — Prove You Were Right',
+  description: 'Stop arguing on social media with no record to back it up. Ledge is the free prediction market for sports, politics, and culture. 1,000 credits on signup. No real money, ever.',
+  alternates: {
+    canonical: `${BASE_URL}/landing`,
+  },
+  openGraph: {
+    title: "Ledge — You're Always Right. Now You Have Proof.",
+    description: 'Free prediction market for sports, politics & culture. Track your accuracy, build your streak, beat your friends. 1,000 credits free — no real money, ever.',
+    url: `${BASE_URL}/landing`,
+    siteName: 'Ledge',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Ledge — You're Always Right. Now You Have Proof.",
+    description: 'Free prediction market for sports, politics & culture. Track your accuracy, build your streak, beat your friends.',
+  },
+  keywords: ['prediction market', 'sports betting game', 'free prediction app', 'social prediction market', 'predict sports', 'predict politics', 'fantasy predictions', 'ledge app'],
+}
 
 // ── Mock market card ─────────────────────────────────────────────────────────
 
