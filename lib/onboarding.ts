@@ -12,6 +12,8 @@ export interface OnboardingState {
   rankTipDone: boolean
   whaleTipDone: boolean
   circleTipDone: boolean
+  dailyDropClaimed: boolean
+  firstMarketCreated: boolean
 }
 
 const DEFAULTS: OnboardingState = {
@@ -22,6 +24,8 @@ const DEFAULTS: OnboardingState = {
   rankTipDone: false,
   whaleTipDone: false,
   circleTipDone: false,
+  dailyDropClaimed: false,
+  firstMarketCreated: false,
 }
 
 function read(): OnboardingState {

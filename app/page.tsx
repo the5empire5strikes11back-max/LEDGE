@@ -298,6 +298,7 @@ export default function App() {
 
   const handleDailyDropClose = async () => {
     setDailyDropOpen(false)
+    if (!ob.dailyDropClaimed) completeOb("dailyDropClaimed")
     // Send the user's LOCAL calendar date so the streak day flips at their midnight.
     const localDate = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
     const res = await fetch('/api/daily-drop', {
@@ -447,6 +448,7 @@ export default function App() {
           onBet={handleBet}
           onWin={handleWin}
           onOpenShop={() => setShopOpen(true)}
+          onOpenDailyDrop={() => setDailyDropOpen(true)}
           onFirstBetFlowDone={handleFirstBetFlowDone}
           onCashout={(newCredits) => setProfile((prev) => prev ? { ...prev, credits: newCredits } : prev)}
           onUsernameClick={(username) => setPublicProfileUsername(username)}

@@ -10,6 +10,7 @@ import { BetModal } from "@/components/bet-modal"
 import { BetConfirmOverlay } from "@/components/bet-confirm-overlay"
 import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
+import { GettingStartedChecklist } from "@/components/onboarding/getting-started-checklist"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
 import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
@@ -160,6 +161,8 @@ interface FeedScreenProps {
   ) => void
   /** Open the credit shop modal */
   onOpenShop?: () => void
+  /** Open the daily drop modal — used by the getting-started checklist */
+  onOpenDailyDrop?: () => void
   /** Fired when the first-bet post-bet panel is dismissed — releases the next queued celebration */
   onFirstBetFlowDone?: () => void
   /** Update the app-level credit balance after a cash-out */
@@ -197,6 +200,7 @@ export function FeedScreen({
   onBet,
   onWin,
   onOpenShop,
+  onOpenDailyDrop,
   onFirstBetFlowDone,
   onCashout,
   onUsernameClick,
@@ -936,6 +940,19 @@ export function FeedScreen({
           />
         )}
 
+        {/* Onboarding: getting started checklist — 3-step strip, persists until all done */}
+        {!loading && (
+          <GettingStartedChecklist
+            ob={ob}
+            onOpenBet={() => {
+              const spotlight = filtered.find((m) => !m.resolved && !m.userBet)
+              if (spotlight) openTrade(spotlight, "yes")
+            }}
+            onOpenDailyDrop={() => onOpenDailyDrop?.()}
+            onOpenCreate={() => setCreateSheetOpen(true)}
+          />
+        )}
+
         {/* Markets */}
         <div className="w-full px-4 py-4 space-y-4">
           {loading ? (
@@ -1231,6 +1248,7 @@ export function FeedScreen({
         open={createSheetOpen}
         onClose={() => setCreateSheetOpen(false)}
         onCreated={(isReview) => {
+          if (!ob.firstMarketCreated) completeOb("firstMarketCreated")
           if (isReview) {
             toast.info("Prediction submitted for review — it'll go live shortly if approved.")
           } else {
