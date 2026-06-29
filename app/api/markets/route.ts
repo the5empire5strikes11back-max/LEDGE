@@ -266,7 +266,7 @@ export async function GET(request: Request) {
       /** Username of the person who created this market (null for AI-generated) */
       creatorUsername: market.created_by ? (creatorMap.get(market.created_by) ?? null) : null,
       /** Creator trust score [0.1, 0.95] — null for AI-generated markets */
-      creator_trust: market.created_by ? (creatorTrustMap.get(market.created_by)?.score ?? null) : null,
+      creatorTrust: market.created_by ? (creatorTrustMap.get(market.created_by)?.score ?? null) : null,
     }
   })
 

@@ -53,6 +53,8 @@ interface MarketDetailProps {
     creatorProposedWinner?: "yes" | "no" | null
     creatorResolvedAt?: string | null
     isCreator?: boolean
+    creatorUsername?: string | null
+    creatorTrust?: number | null
   }
   onClose: () => void
   onBuyYes: () => void
@@ -440,6 +442,23 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
         <div className={cn("px-4 pt-4 flex flex-col gap-5", isPanel ? "pb-4" : "pb-40")}>
 
           <h1 className="text-base font-semibold text-foreground leading-snug">{market.title}</h1>
+
+          {market.creatorUsername && (
+            <div className="flex items-center gap-1.5 -mt-2">
+              <span className="text-xs text-muted-foreground">@{market.creatorUsername}</span>
+              {market.creatorTrust != null && market.creatorTrust >= 0.70 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-1.5 py-0.5 rounded-full">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  Trusted
+                </span>
+              )}
+              {market.creatorTrust != null && market.creatorTrust < 0.35 && (
+                <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                  New creator
+                </span>
+              )}
+            </div>
+          )}
 
           {/* How this resolves — front-and-center trust block. Ledge's edge over
               creator-resolved markets: it settles on official data, or refunds. */}

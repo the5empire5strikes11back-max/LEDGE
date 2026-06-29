@@ -110,6 +110,7 @@ interface Market {
   }
   resolutionCriteria?: string | null
   creatorUsername?: string | null
+  creatorTrust?: number | null
   friendBets?: FriendBet[]
   /** Multi-option grouping — null for standalone Yes/No markets */
   groupId?: string | null
