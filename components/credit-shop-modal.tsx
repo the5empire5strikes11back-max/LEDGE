@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useId } from "react"
-import { X, Zap, Minus, Plus } from "lucide-react"
+import { X, Zap, Minus, Plus, Tag, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CREDIT_PACKS, PLUS_YEARLY_PRICE } from "@/lib/stripe"
 import type { CreditPackId } from "@/lib/stripe"
@@ -26,9 +26,14 @@ function calcCustomPrice(credits: number) {
   return Math.max(0.5, credits * CUSTOM_RATE)
 }
 
+type PromoStatus = 'idle' | 'loading' | 'success' | 'error'
+
 export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps) {
   const [loading, setLoading]           = useState<CreditPackId | 'plus' | 'custom' | null>(null)
   const [customCredits, setCustomCredits] = useState<number>(1_000)
+  const [promoCode, setPromoCode]       = useState("")
+  const [promoStatus, setPromoStatus]   = useState<PromoStatus>('idle')
+  const [promoMessage, setPromoMessage] = useState("")
   const inputId = useId()
 
   if (!open) return null
@@ -74,6 +79,30 @@ export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps)
       if (data.url) window.location.href = data.url
     } finally {
       setLoading(null)
+    }
+  }
+
+  const handleRedeemPromo = async () => {
+    if (!promoCode.trim() || promoStatus === 'loading') return
+    setPromoStatus('loading')
+    try {
+      const res = await fetch('/api/promo/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPromoStatus('success')
+        setPromoMessage(`+${data.creditsAwarded.toLocaleString()} CR added to your account!`)
+        setPromoCode("")
+      } else {
+        setPromoStatus('error')
+        setPromoMessage(data.error ?? 'Something went wrong.')
+      }
+    } catch {
+      setPromoStatus('error')
+      setPromoMessage('Network error. Try again.')
     }
   }
 
@@ -279,6 +308,60 @@ export function CreditShopModal({ open, onClose, isPlus }: CreditShopModalProps)
             <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
               $0.001 / CR · presets above are better value
             </p>
+          </div>
+        </div>
+
+        {/* Promo code */}
+        <div className="px-5 pb-3">
+          <div
+            className="border border-border bg-card px-4 py-3.5"
+            style={{ borderRadius: "var(--radius-card)" }}
+          >
+            <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium block mb-3">
+              Promo code
+            </label>
+            {promoStatus === 'success' ? (
+              <div className="flex items-center gap-2 py-2">
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                <span className="text-sm font-semibold text-success">{promoMessage}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex-1 flex items-center gap-2 border border-border bg-background px-3 py-2" style={{ borderRadius: "var(--radius-button)" }}>
+                    <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Enter code"
+                      value={promoCode}
+                      onChange={(e) => {
+                        setPromoCode(e.target.value.toUpperCase())
+                        if (promoStatus !== 'idle') setPromoStatus('idle')
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRedeemPromo()}
+                      className="flex-1 bg-transparent text-sm font-mono font-bold text-foreground placeholder:text-muted-foreground/40 placeholder:font-sans placeholder:font-normal outline-none min-w-0 uppercase"
+                    />
+                  </div>
+                  <button
+                    onClick={handleRedeemPromo}
+                    disabled={!promoCode.trim() || promoStatus === 'loading'}
+                    className={cn(
+                      "px-4 py-2 text-sm font-bold transition-all duration-[80ms]",
+                      "bg-accent text-accent-foreground hover:bg-accent/90",
+                      "active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none"
+                    )}
+                    style={{ borderRadius: "var(--radius-button)" }}
+                  >
+                    {promoStatus === 'loading' ? (
+                      <span className="inline-block w-3.5 h-3.5 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin" />
+                    ) : 'Apply'}
+                  </button>
+                </div>
+                {promoStatus === 'error' && (
+                  <p className="text-[11px] text-destructive mt-2">{promoMessage}</p>
+                )}
+              </>
+            )}
           </div>
         </div>
 
