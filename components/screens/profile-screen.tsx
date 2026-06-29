@@ -24,6 +24,26 @@ import { AdvanceCard } from "@/components/advance-card"
 import { StreakFreezeCard } from "@/components/streak-freeze-card"
 import type { CreatorMarket } from "@/app/api/creator/markets/route"
 
+// ── Accuracy Ring ─────────────────────────────────────────────────────────────
+function AccuracyRing({ pct, size = 40 }: { pct: number; size?: number }) {
+  const r = size * 0.38
+  const circ = 2 * Math.PI * r
+  const offset = circ * (1 - pct / 100)
+  const color = pct >= 60 ? "#22c55e" : pct >= 50 ? "#F5A623" : "#ef4444"
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={size * 0.09} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={size * 0.09}
+        strokeDasharray={circ} strokeDashoffset={offset}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dashoffset 0.8s ease-out, stroke 0.3s" }}
+      />
+    </svg>
+  )
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type LbSort   = "credits" | "winrate" | "streak"
@@ -378,6 +398,13 @@ export function ProfileScreen({
     }
   }
 
+  // ── P&L from resolved bets ────────────────────────────────────────────────
+  const totalPnl = bets.reduce((sum, b) => {
+    if (b.won === null) return sum
+    const payout = b.won ? ((b as { payout?: number }).payout ?? 0) : 0
+    return sum + payout - b.amount
+  }, 0)
+
   // ── Calibration data (derived from bets) ──────────────────────────────────
   const TRACKED = ["Sports", "Politics", "Culture"] as const
   type TrackedCat = typeof TRACKED[number]
@@ -537,9 +564,44 @@ export function ProfileScreen({
               </div>
             </div>
 
+            {/* Quick stats row — always visible below the fold of the identity card */}
+            {stats !== null && stats.marketsPlayed > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/50">
+                <div className="grid grid-cols-3 gap-0 divide-x divide-border/40">
+                  {/* Accuracy */}
+                  <div className="flex flex-col items-center gap-1 py-1">
+                    <div className="relative">
+                      <AccuracyRing pct={stats.marketsPlayed >= 3 ? stats.winRate : 0} size={44} />
+                      <span
+                        className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums"
+                        style={{ color: stats.winRate >= 60 ? "#22c55e" : stats.winRate >= 50 ? "#F5A623" : "#ef4444" }}
+                      >
+                        {stats.marketsPlayed >= 3 ? `${stats.winRate}%` : "--"}
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Accuracy</span>
+                  </div>
+                  {/* Played */}
+                  <div className="flex flex-col items-center justify-center gap-0.5 py-1">
+                    <span className="text-base font-black font-mono tabular-nums text-foreground">{stats.marketsPlayed}</span>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Played</span>
+                  </div>
+                  {/* P&L */}
+                  <div className="flex flex-col items-center justify-center gap-0.5 py-1">
+                    <span className={cn("text-base font-black font-mono tabular-nums", totalPnl >= 0 ? "text-success" : "text-danger")}>
+                      {totalPnl >= 0 ? "+" : ""}{totalPnl >= 1000 || totalPnl <= -1000
+                        ? `${(totalPnl / 1000).toFixed(1)}K`
+                        : totalPnl.toLocaleString()}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">P&amp;L</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Streak */}
             {streak > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+              <div className={cn("flex items-center justify-between", stats !== null && stats.marketsPlayed > 0 ? "mt-2 pt-2 border-t border-border/50" : "mt-3 pt-3 border-t border-border/50")}>
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent">
                   <Flame className="w-3.5 h-3.5 shrink-0 streak-flame" />{streak}-day streak
                 </span>
@@ -593,10 +655,10 @@ export function ProfileScreen({
                   ))
                 ) : (
                   [
-                    { label: "Win Rate", value: `${stats.winRate}%`,         color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger" },
-                    { label: "Played",   value: String(stats.marketsPlayed), color: "text-foreground" },
-                    { label: "Wins",     value: String(stats.correct),       color: "text-foreground" },
-                    { label: "Best Run", value: String(stats.bestStreak),    color: "text-foreground" },
+                    { label: "Win Rate", value: `${stats.winRate}%`, color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger" },
+                    { label: "Wins",     value: String(stats.correct), color: "text-foreground" },
+                    { label: "Best Run", value: String(stats.bestStreak), color: "text-foreground" },
+                    { label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${Math.abs(totalPnl) >= 1000 ? `${(totalPnl / 1000).toFixed(1)}K` : totalPnl}`, color: totalPnl >= 0 ? "text-success" : "text-danger" },
                   ].map((stat) => (
                     <div
                       key={stat.label}
