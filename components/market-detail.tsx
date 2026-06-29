@@ -331,14 +331,26 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
     }
   }, [loading, signals.hasWhale, ob.whaleTipDone, completeOb])
 
-  // History already ends at the live value (last reconstructed point uses the
-  // current pools), so it's used as-is — no duplicate "now" point appended.
   const chartData = history.length > 0
-    ? history.map((h, i) => ({ t: i, y: h.yesPercent }))
-    : [{ t: 0, y: yesPercent }]
+    ? history.map((h) => ({ ts: new Date(h.timestamp).getTime(), y: h.yesPercent }))
+    : [{ ts: Date.now(), y: yesPercent }]
 
-  const chartMin = Math.max(0, Math.min(...chartData.map((d) => d.y)) - 5)
+  const chartMin = Math.max(0,   Math.min(...chartData.map((d) => d.y)) - 5)
   const chartMax = Math.min(100, Math.max(...chartData.map((d) => d.y)) + 5)
+  const chartOpenPct  = chartData[0]?.y ?? yesPercent
+  const chartNowPct   = chartData[chartData.length - 1]?.y ?? yesPercent
+  const chartDelta    = Math.round((chartNowPct - chartOpenPct) * 10) / 10
+  const chartColor    = chartNowPct >= 50 ? "#22c55e" : "#ef4444"
+  const chartGradId   = chartNowPct >= 50 ? "yesGradGreen" : "yesGradRed"
+
+  function fmtChartTime(ts: number): string {
+    const d = new Date(ts)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - ts) / 86_400_000)
+    if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    if (diffDays < 7)  return d.toLocaleDateString([], { weekday: "short" })
+    return d.toLocaleDateString([], { month: "short", day: "numeric" })
+  }
 
   return (
     <div className={cn(
@@ -772,29 +784,57 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
 
           {/* Probability chart */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Probability History</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Probability History</span>
+              </div>
+              {chartData.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold font-mono tabular-nums" style={{ color: chartColor }}>
+                    {chartNowPct.toFixed(1)}%
+                  </span>
+                  {chartDelta !== 0 && (
+                    <span className={cn("text-[10px] font-mono font-semibold tabular-nums", chartDelta > 0 ? "text-success" : "text-danger")}>
+                      {chartDelta > 0 ? "+" : ""}{chartDelta.toFixed(1)}pp
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             {chartData.length > 1 ? (
               <div className="bg-surface border border-border overflow-hidden px-1 pt-3 pb-1" style={{ borderRadius: "var(--radius-card)" }}>
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={chartData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                     <defs>
-                      <linearGradient id="yesGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}   />
+                      <linearGradient id="yesGradGreen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}    />
+                      </linearGradient>
+                      <linearGradient id="yesGradRed" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}    />
                       </linearGradient>
                     </defs>
                     <ReferenceLine y={50} stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-                    <XAxis dataKey="t" hide />
+                    <XAxis dataKey="ts" hide />
                     <YAxis domain={[chartMin, chartMax]} hide />
                     <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="y" stroke="#22c55e" strokeWidth={2} fill="url(#yesGrad)" dot={false} activeDot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="y"
+                      stroke={chartColor}
+                      strokeWidth={2}
+                      fill={`url(#${chartGradId})`}
+                      dot={false}
+                      activeDot={{ r: 3, fill: chartColor, strokeWidth: 0 }}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
                 <div className="flex justify-between px-2 pb-1">
-                  <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+                  <span className="text-[9px] text-muted-foreground font-mono">
+                    {fmtChartTime(chartData[0].ts)}
+                  </span>
                   <span className="text-[9px] text-muted-foreground font-mono">Now</span>
                 </div>
               </div>
