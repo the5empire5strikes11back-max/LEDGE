@@ -65,5 +65,13 @@ export function useOnboarding() {
     })
   }, [])
 
-  return { state, complete }
+  const completeAll = useCallback(() => {
+    const all = Object.fromEntries(
+      Object.keys(DEFAULTS).map((k) => [k, true])
+    ) as OnboardingState
+    persist(all)
+    setState(all)
+  }, [])
+
+  return { state, complete, completeAll }
 }

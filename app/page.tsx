@@ -104,7 +104,7 @@ export default function App() {
   // Ref mirror so delayed callbacks read the current value, not a stale closure
   const pendingDailyDropRef = useRef(false)
   useEffect(() => { pendingDailyDropRef.current = pendingDailyDrop }, [pendingDailyDrop])
-  const { state: ob, complete: completeOb } = useOnboarding()
+  const { state: ob, complete: completeOb, completeAll: completeAllOb } = useOnboarding()
   const [showFirstBetAchievement, setShowFirstBetAchievement] = useState(false)
   const [dailyDropData, setDailyDropData] = useState<{
     dropAmount: number; streakBonus: number; multiplier: number
@@ -208,6 +208,18 @@ export default function App() {
       navigator.serviceWorker.register("/sw.js").catch(() => {})
     }
   }, [])
+
+  // Skip all onboarding for existing users who predated the feature.
+  // If localStorage has never been written (null) and the user already has
+  // activity, they are not new — mark everything done immediately.
+  useEffect(() => {
+    if (!profile) return
+    if (typeof window === "undefined") return
+    const alreadyInitialized = localStorage.getItem("ledge:ob:v1") !== null
+    if (alreadyInitialized) return
+    const isExistingUser = profile.xp > 0 || profile.streak > 0 || profile.credits !== 1000
+    if (isExistingUser) completeAllOb()
+  }, [profile, completeAllOb])
 
   useEffect(() => {
     applyAccentTheme(getSavedAccent())
