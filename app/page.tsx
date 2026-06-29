@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle, ShoppingBag } from "lucide-react"
 import { ShopModal } from "@/components/shop-modal"
+import { XpProgressBar } from "@/components/xp-progress-bar"
+import { XpFloatBadge } from "@/components/xp-float-badge"
 import { toast, Toaster } from "sonner"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -110,6 +112,7 @@ export default function App() {
   const [chestOpen, setChestOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
   const [publicProfileUsername, setPublicProfileUsername] = useState<string | null>(null)
+  const [xpFloat, setXpFloat] = useState<{ amount: number; key: number }>({ amount: 0, key: 0 })
   const supabase = createClient()
 
   const credits  = profile?.credits ?? 0
@@ -120,6 +123,16 @@ export default function App() {
   const persona  = calculatePersona(betHistory)
   const vetoes   = vetoesFromStreak(streak, isPlus)
   const rankConfig = RANKS[rank]
+
+  // Fire a floating "+N XP" badge whenever XP increases
+  const prevXpRef = useRef(0)
+  useEffect(() => {
+    if (xp > prevXpRef.current && prevXpRef.current > 0) {
+      const gained = xp - prevXpRef.current
+      setXpFloat((prev) => ({ amount: gained, key: prev.key + 1 }))
+    }
+    prevXpRef.current = xp
+  }, [xp])
 
   // Consecutive win streak — walk betHistory in reverse, count leading wins
   const winStreak = (() => {
@@ -579,6 +592,15 @@ export default function App() {
             </div>
           </button>
 
+          {/* XP progress bar */}
+          <div className="px-1">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-widest">XP</span>
+              <span className="text-[9px] text-muted-foreground font-mono">{xp.toLocaleString()}</span>
+            </div>
+            <XpProgressBar xp={xp} />
+          </div>
+
           {/* Credits */}
           <button
             onClick={() => setShopOpen(true)}
@@ -603,46 +625,50 @@ export default function App() {
       </aside>
 
       {/* ── MOBILE: Top Header ───────────────────────────────────────────── */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-20 bg-background border-b border-border px-4 h-[57px] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <LedgeLogo size={28} />
-          <span className="font-semibold text-base tracking-tight">Ledge</span>
-        </div>
-
-        {decay !== "none" && (
-          <div className="flex items-center gap-1.5">
-            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", decay === "critical" ? "bg-danger" : "bg-accent")} />
-            <span className={cn("text-[10px] font-medium uppercase tracking-wider", decay === "critical" ? "text-danger" : "text-accent")}>
-              {decay === "critical" ? "Rank Decaying" : "Streak at risk"}
-            </span>
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-20 bg-background border-b border-border flex flex-col shrink-0">
+        <div className="px-4 h-[57px] flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <LedgeLogo size={28} />
+            <span className="font-semibold text-base tracking-tight">Ledge</span>
           </div>
-        )}
 
-        <div className="flex items-center gap-2">
-          <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
-          <button
-            onClick={() => setShopOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-              <Ticker value={credits} decimals={0} />
-            </span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
-            <span
-              className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-              style={{ borderRadius: "var(--radius-badge)" }}
+          {decay !== "none" && (
+            <div className="flex items-center gap-1.5">
+              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", decay === "critical" ? "bg-danger" : "bg-accent")} />
+              <span className={cn("text-[10px] font-medium uppercase tracking-wider", decay === "critical" ? "text-danger" : "text-accent")}>
+                {decay === "critical" ? "Rank Decaying" : "Streak at risk"}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
+            <button
+              onClick={() => setShopOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
+              style={{ borderRadius: "var(--radius-button)" }}
             >
-              +
-            </span>
-          </button>
+              <span className="font-mono text-sm font-semibold tabular-nums text-accent">
+                <Ticker value={credits} decimals={0} />
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                style={{ borderRadius: "var(--radius-badge)" }}
+              >
+                +
+              </span>
+            </button>
+          </div>
         </div>
+        {/* XP progress bar — fills to current rank progress, pulses gold on XP gain */}
+        <XpProgressBar xp={xp} />
       </header>
 
       {/* ── Main content area ─────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 lg:ml-[220px] flex flex-col overflow-hidden">
-        {/* Mobile top padding */}
-        <div className="lg:hidden h-[57px] shrink-0" />
+        {/* Mobile top padding — extra 2px for XP bar */}
+        <div className="lg:hidden h-[59px] shrink-0" />
 
         {/* Screen */}
         <main
@@ -737,6 +763,9 @@ export default function App() {
       />
 
       <Toaster position="top-center" toastOptions={{ style: { borderRadius: "var(--radius-button)" } }} />
+
+      {/* Floating +XP badge — fires on any XP gain, sits above the bottom nav */}
+      <XpFloatBadge amount={xpFloat.amount} triggerKey={xpFloat.key} />
 
       {/* ── Onboarding overlays ──────────────────────────────────────────── */}
       <FirstBetAchievement
