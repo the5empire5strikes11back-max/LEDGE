@@ -289,7 +289,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { bet, profile: updated, cappedAmount, doubleDownApplied: applyDoubleDown },
+    { bet, profile: updated, cappedAmount, doubleDownApplied: applyDoubleDown, xpGain },
     { status: 201 }
   )
   } catch (err) {

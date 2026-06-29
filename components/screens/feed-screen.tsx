@@ -6,6 +6,7 @@ import { MarketGroupCard } from "@/components/market-group-card"
 import { PollCard } from "@/components/poll-card"
 import type { GroupType } from "@/lib/market-groups"
 import { BetModal } from "@/components/bet-modal"
+import { BetConfirmOverlay } from "@/components/bet-confirm-overlay"
 import { MarketDetail } from "@/components/market-detail"
 import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
@@ -208,6 +209,14 @@ export function FeedScreen({
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
   const [postBetInfo, setPostBetInfo] = useState<PostBetInfo | null>(null)
   const [createSheetOpen, setCreateSheetOpen] = useState(false)
+  const [betConfirm, setBetConfirm] = useState<{
+    side: "yes" | "no"
+    amount: number
+    potentialPayout: number
+    marketTitle: string
+    xpGain: number
+    isFirstBet: boolean
+  } | null>(null)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   // First-session: user hasn't placed a bet yet
@@ -484,9 +493,8 @@ export function FeedScreen({
 
     const data = await res.json()
     const placed = data?.cappedAmount ?? amount
-    if (data?.doubleDownApplied) {
-      toast(`🎯 Double Down active — this bet pays 2×`, { duration: 3500 })
-    }
+    const potentialPayout = data?.bet?.shares ?? data?.bet?.payout ?? placed
+    const xpGain = data?.xpGain ?? 10
 
     const patch = { userBet: { side, amount: placed } }
     setMarkets((prev) => prev.map((m) => m.id === market.id ? { ...m, ...patch } : m))
@@ -499,30 +507,43 @@ export function FeedScreen({
     // Record bet in session arc — drives peaked phase + arc strip copy
     arcRecordBet(market.title, market.endTime, side)
 
-    // Streak milestone celebration — when hitting 7 / 14 / 30-day streaks
+    // Show the confirmation overlay — replaces individual toasts for the primary action
+    setBetConfirm({
+      side,
+      amount: placed,
+      potentialPayout: data?.doubleDownApplied ? potentialPayout : potentialPayout,
+      marketTitle: market.title,
+      xpGain,
+      isFirstBet: wasFirstBet,
+    })
+
+    // Streak milestone celebration fires after the overlay clears
     const STREAK_MILESTONES = [7, 14, 30, 60, 100]
     if (STREAK_MILESTONES.includes(streak + 1)) {
-      toast(`🔥 ${streak + 1}-day streak!`, {
+      setTimeout(() => toast(`🔥 ${streak + 1}-day streak!`, {
         description: `You've predicted ${streak + 1} days in a row. Keep it going.`,
         duration: 4000,
-      })
+      }), 2600)
     } else if (streak === 0 && decay !== "none") {
-      // First bet after a streak break — gentle encouragement
-      toast("Streak restarted 🔥", {
+      setTimeout(() => toast("Streak restarted 🔥", {
         description: "Day 1. Get to 7 days for a bonus reward.",
         duration: 3000,
-      })
+      }), 2600)
     }
 
-    // Show anticipation panel on first bet
+    if (data?.doubleDownApplied) {
+      setTimeout(() => toast(`🎯 Double Down — this bet pays 2×`, { duration: 3500 }), 2600)
+    }
+
+    // Show anticipation panel on first bet (after overlay)
     if (wasFirstBet) {
-      setPostBetInfo({
+      setTimeout(() => setPostBetInfo({
         marketTitle: market.title,
         endTime: new Date(market.endTime),
         side,
         amount: placed,
         currentOdds: market.yesPercent,
-      })
+      }), 2600)
     }
   }
 
@@ -1173,6 +1194,19 @@ export function FeedScreen({
           onClose={() => setTradeModal(null)}
           onSubmit={handleBetSubmit}
           onArmAutoBet={handleArmAutoBet}
+        />
+      )}
+
+      {/* Bet confirmation overlay */}
+      {betConfirm && (
+        <BetConfirmOverlay
+          side={betConfirm.side}
+          amount={betConfirm.amount}
+          potentialPayout={betConfirm.potentialPayout}
+          marketTitle={betConfirm.marketTitle}
+          xpGain={betConfirm.xpGain}
+          isFirstBet={betConfirm.isFirstBet}
+          onDone={() => setBetConfirm(null)}
         />
       )}
 

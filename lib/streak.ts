@@ -67,7 +67,7 @@ export function advanceStreak(state: StreakState, today: string): StreakResult {
 
   if (gap <= 0) {
     // Already counted today (gap 0), or a stale/duplicate request (negative).
-    return { ...state, freezes, outcome: 'already', freezesConsumed: 0, freezeGranted: false, hitMilestone: false }
+    return { ...state, freezes, outcome: 'already', freezesConsumed: 0, freezeGranted: false, hitMilestone: false, preResetStreak: 0 }
   }
 
   if (gap === 1) {

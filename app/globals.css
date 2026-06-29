@@ -437,6 +437,36 @@
 
 /* ══ Market Ticker ════════════════════════════════════════════════════════════ */
 /* Continuous left-scroll marquee for the live odds ticker strip */
+/* ═══════════════════════════════════════════════════════════════════════════
+   BET CONFIRMATION OVERLAY ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes badge-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  65%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes xp-float-in {
+  0%   { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shrink-bar {
+  from { transform: scaleX(1); transform-origin: left; }
+  to   { transform: scaleX(0); transform-origin: left; }
+}
+
+@keyframes confetti-fall {
+  0%   { transform: translateY(-20px) rotate(var(--r, 0deg)); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(100vh) rotate(calc(var(--r, 0deg) + 360deg)); opacity: 0; }
+}
+
 @keyframes ticker-marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
