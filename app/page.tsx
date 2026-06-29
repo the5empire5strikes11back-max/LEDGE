@@ -94,6 +94,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(screenFromUrl)
   const [circlesBadge, setCirclesBadge] = useState(false)
   const [boostShopOpen, setBoostShopOpen] = useState(false)
+  const [isGuest, setIsGuest] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [betHistory, setBetHistory] = useState<BetRecord[]>([])
   const [dailyDropOpen, setDailyDropOpen] = useState(false)
@@ -152,7 +153,7 @@ export default function App() {
   const loadProfile = useCallback(async () => {
     try {
       const res = await fetch('/api/user')
-      if (res.status === 401) { window.location.href = '/auth/login'; return }
+      if (res.status === 401) { setIsGuest(true); return }
       if (res.ok) {
         const data = await res.json()
         setProfile(data)
@@ -160,7 +161,7 @@ export default function App() {
         const newRank  = rankFromXP(data.xp)
         if (prevRank !== newRank) setRankUpFrom(prevRank)
       } else {
-        window.location.href = '/auth/login'
+        setIsGuest(true)
       }
     } catch {
       setTimeout(loadProfile, 3000)
@@ -422,7 +423,7 @@ export default function App() {
     })
   }
 
-  if (!profile) {
+  if (!profile && !isGuest) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -449,8 +450,9 @@ export default function App() {
           onFirstBetFlowDone={handleFirstBetFlowDone}
           onCashout={(newCredits) => setProfile((prev) => prev ? { ...prev, credits: newCredits } : prev)}
           onUsernameClick={(username) => setPublicProfileUsername(username)}
-          currentUsername={profile.username}
-          currentAvatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
+          currentUsername={profile?.username ?? null}
+          currentAvatarUrl={(profile as { avatar_url?: string } | null)?.avatar_url ?? null}
+          isGuest={isGuest}
         />
       )}
       {screen === "circles" && (
@@ -460,8 +462,8 @@ export default function App() {
         <ProfileScreen
           xp={xp} rank={rank} credits={credits} streak={streak}
           vetoes={vetoes} persona={persona} decay={decay}
-          username={profile.username}
-          avatarUrl={(profile as { avatar_url?: string }).avatar_url ?? null}
+          username={profile?.username ?? ""}
+          avatarUrl={(profile as { avatar_url?: string } | null)?.avatar_url ?? null}
           isPlus={isPlus}
           onOpenShop={() => setShopOpen(true)}
           onUsernameClick={(u) => setPublicProfileUsername(u)}
@@ -494,7 +496,7 @@ export default function App() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          {(isGuest ? NAV_ITEMS.filter((n) => n.id === "feed") : NAV_ITEMS).map(({ id, label, icon: Icon }) => {
             const circlesBadgeShow = id === 'circles' && circlesBadge
             return (
             <button
@@ -536,75 +538,99 @@ export default function App() {
 
         {/* Bottom user section */}
         <div className="shrink-0 border-t border-border px-3 py-4 flex flex-col gap-3">
-          {/* Decay warning */}
-          {decay !== "none" && (
-            <div className={cn(
-              "px-3 py-2 text-[11px] font-medium",
-              decay === "critical"
-                ? "bg-danger/8 border border-danger/25 text-danger"
-                : "bg-accent/8 border border-accent/20 text-accent"
-            )} style={{ borderRadius: "var(--radius-button)" }}>
-              <span className="flex items-center gap-1.5">
-                {decay === "critical"
-                  ? <><AlertTriangle className="w-3 h-3 shrink-0" />Rank decaying</>
-                  : <><Flame className="w-3 h-3 shrink-0 streak-flame" />Streak at risk</>}
-              </span>
-            </div>
-          )}
-
-          {/* User card */}
-          <button
-            onClick={() => handleScreenChange("profile")}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 transition-all duration-150 text-left w-full border",
-              screen === "profile"
-                ? "bg-accent/10 border-accent/20"
-                : "bg-secondary border-transparent hover:border-border"
-            )}
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <UserAvatar
-              username={profile.username}
-              avatarUrl={(profile as { avatar_url?: string }).avatar_url}
-              size={28}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground truncate">@{profile.username}</p>
-              <p className={cn("text-[10px] font-semibold", rankConfig.color)}>
-                {rankConfig.icon} {rankConfig.label}
+          {isGuest ? (
+            <>
+              <p className="text-[11px] text-muted-foreground px-1">
+                Predict outcomes and earn credits.
               </p>
-            </div>
-          </button>
-
-          {/* XP progress bar */}
-          <div className="px-1">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[9px] text-muted-foreground uppercase tracking-widest">XP</span>
-              <span className="text-[9px] text-muted-foreground font-mono">{xp.toLocaleString()}</span>
-            </div>
-            <XpProgressBar xp={xp} />
-          </div>
-
-          {/* Credits */}
-          <button
-            onClick={() => setShopOpen(true)}
-            className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-sm font-bold text-accent tabular-nums">
-                <Ticker value={credits} decimals={0} />
-              </span>
-              <span className="text-[10px] text-muted-foreground">CR</span>
-              <span
-                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-                style={{ borderRadius: "var(--radius-badge)" }}
+              <a
+                href="/auth/signup"
+                className="w-full py-2.5 text-xs font-black uppercase tracking-widest text-accent-foreground text-center"
+                style={{ backgroundColor: "var(--accent)", borderRadius: "var(--radius-button)" }}
               >
-                + Buy
-              </span>
-            </div>
-          </button>
+                Join Free
+              </a>
+              <a
+                href="/auth/login"
+                className="w-full py-2 text-xs font-semibold text-muted-foreground text-center border border-border hover:border-accent/30 transition-colors"
+                style={{ borderRadius: "var(--radius-button)" }}
+              >
+                Sign in
+              </a>
+            </>
+          ) : (
+            <>
+              {/* Decay warning */}
+              {decay !== "none" && (
+                <div className={cn(
+                  "px-3 py-2 text-[11px] font-medium",
+                  decay === "critical"
+                    ? "bg-danger/8 border border-danger/25 text-danger"
+                    : "bg-accent/8 border border-accent/20 text-accent"
+                )} style={{ borderRadius: "var(--radius-button)" }}>
+                  <span className="flex items-center gap-1.5">
+                    {decay === "critical"
+                      ? <><AlertTriangle className="w-3 h-3 shrink-0" />Rank decaying</>
+                      : <><Flame className="w-3 h-3 shrink-0 streak-flame" />Streak at risk</>}
+                  </span>
+                </div>
+              )}
+
+              {/* User card */}
+              <button
+                onClick={() => handleScreenChange("profile")}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 transition-all duration-150 text-left w-full border",
+                  screen === "profile"
+                    ? "bg-accent/10 border-accent/20"
+                    : "bg-secondary border-transparent hover:border-border"
+                )}
+                style={{ borderRadius: "var(--radius-button)" }}
+              >
+                <UserAvatar
+                  username={profile!.username}
+                  avatarUrl={(profile as { avatar_url?: string } | null)?.avatar_url}
+                  size={28}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">@{profile!.username}</p>
+                  <p className={cn("text-[10px] font-semibold", rankConfig.color)}>
+                    {rankConfig.icon} {rankConfig.label}
+                  </p>
+                </div>
+              </button>
+
+              {/* XP progress bar */}
+              <div className="px-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-widest">XP</span>
+                  <span className="text-[9px] text-muted-foreground font-mono">{xp.toLocaleString()}</span>
+                </div>
+                <XpProgressBar xp={xp} />
+              </div>
+
+              {/* Credits */}
+              <button
+                onClick={() => setShopOpen(true)}
+                className="flex items-center justify-between px-3 py-2 bg-surface border border-border hover:border-accent/40 hover:bg-accent/5 active:scale-[0.97] transition-all duration-[80ms] w-full"
+                style={{ borderRadius: "var(--radius-button)" }}
+              >
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Credits</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-sm font-bold text-accent tabular-nums">
+                    <Ticker value={credits} decimals={0} />
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">CR</span>
+                  <span
+                    className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                    style={{ borderRadius: "var(--radius-badge)" }}
+                  >
+                    + Buy
+                  </span>
+                </div>
+              </button>
+            </>
+          )}
         </div>
       </aside>
 
@@ -616,43 +642,62 @@ export default function App() {
             <span className="font-semibold text-base tracking-tight">Ledge</span>
           </div>
 
-          {decay !== "none" && (
-            <div className="flex items-center gap-1.5">
-              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", decay === "critical" ? "bg-danger" : "bg-accent")} />
-              <span className={cn("text-[10px] font-medium uppercase tracking-wider", decay === "critical" ? "text-danger" : "text-accent")}>
-                {decay === "critical" ? "Rank Decaying" : "Streak at risk"}
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
-            <button
-              onClick={() => setShopOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
-              style={{ borderRadius: "var(--radius-button)" }}
-            >
-              <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-                <Ticker value={credits} decimals={0} />
-              </span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
-              <span
-                className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
-                style={{ borderRadius: "var(--radius-badge)" }}
+          {isGuest ? (
+            <div className="flex items-center gap-2">
+              <a
+                href="/auth/login"
+                className="text-xs font-semibold text-muted-foreground px-3 py-1.5"
               >
-                +
-              </span>
-            </button>
-          </div>
+                Sign in
+              </a>
+              <a
+                href="/auth/signup"
+                className="text-xs font-black uppercase tracking-widest text-accent-foreground px-3 py-1.5"
+                style={{ backgroundColor: "var(--accent)", borderRadius: "var(--radius-button)" }}
+              >
+                Join Free
+              </a>
+            </div>
+          ) : (
+            <>
+              {decay !== "none" && (
+                <div className="flex items-center gap-1.5">
+                  <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", decay === "critical" ? "bg-danger" : "bg-accent")} />
+                  <span className={cn("text-[10px] font-medium uppercase tracking-wider", decay === "critical" ? "text-danger" : "text-accent")}>
+                    {decay === "critical" ? "Rank Decaying" : "Streak at risk"}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
+                <button
+                  onClick={() => setShopOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-accent/40 active:scale-[0.96] transition-all duration-[80ms]"
+                  style={{ borderRadius: "var(--radius-button)" }}
+                >
+                  <span className="font-mono text-sm font-semibold tabular-nums text-accent">
+                    <Ticker value={credits} decimals={0} />
+                  </span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CR</span>
+                  <span
+                    className="text-[9px] font-bold px-1 py-0.5 bg-accent/15 text-accent"
+                    style={{ borderRadius: "var(--radius-badge)" }}
+                  >
+                    +
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
-        {/* XP progress bar — fills to current rank progress, pulses gold on XP gain */}
-        <XpProgressBar xp={xp} />
+        {/* XP progress bar — only shown for authenticated users */}
+        {!isGuest && <XpProgressBar xp={xp} />}
       </header>
 
       {/* ── Main content area ─────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 lg:ml-[220px] flex flex-col overflow-hidden">
-        {/* Mobile top padding — extra 2px for XP bar */}
-        <div className="lg:hidden h-[59px] shrink-0" />
+        {/* Mobile top padding — extra 2px for XP bar (omitted for guests) */}
+        <div className={cn("lg:hidden shrink-0", isGuest ? "h-[57px]" : "h-[59px]")} />
 
         {/* Screen */}
         <main
@@ -668,29 +713,48 @@ export default function App() {
         className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-background border-t border-border"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="flex">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-            const circBadge  = id === 'circles' && circlesBadge
-            return (
-            <button
-              key={id}
-              onClick={() => { if (id === "shop") setBoostShopOpen(true); else handleScreenChange(id) }}
-              className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors duration-200 relative",
-                screen === id ? "text-accent" : "text-muted-foreground hover:text-foreground"
-              )}
+        {isGuest ? (
+          <div className="flex items-center gap-2 px-4 py-3">
+            <a
+              href="/auth/login"
+              className="flex-1 py-2.5 text-xs font-semibold text-muted-foreground text-center border border-border"
+              style={{ borderRadius: "var(--radius-button)" }}
             >
-              <div className="relative">
-                <Icon className={cn("w-5 h-5 transition-all duration-200", screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.6)]")} />
-                {circBadge && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-background" />
+              Sign in
+            </a>
+            <a
+              href="/auth/signup"
+              className="flex-[2] py-2.5 text-xs font-black uppercase tracking-widest text-accent-foreground text-center"
+              style={{ backgroundColor: "var(--accent)", borderRadius: "var(--radius-button)" }}
+            >
+              Join Free to Predict
+            </a>
+          </div>
+        ) : (
+          <div className="flex">
+            {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+              const circBadge  = id === 'circles' && circlesBadge
+              return (
+              <button
+                key={id}
+                onClick={() => { if (id === "shop") setBoostShopOpen(true); else handleScreenChange(id) }}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors duration-200 relative",
+                  screen === id ? "text-accent" : "text-muted-foreground hover:text-foreground"
                 )}
-              </div>
-              <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
-            </button>
-            )
-          })}
-        </div>
+              >
+                <div className="relative">
+                  <Icon className={cn("w-5 h-5 transition-all duration-200", screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.6)]")} />
+                  {circBadge && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-background" />
+                  )}
+                </div>
+                <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
+              </button>
+              )
+            })}
+          </div>
+        )}
       </nav>
 
       {/* ── Modals (shared across both layouts) ───────────────────────────── */}
@@ -713,7 +777,7 @@ export default function App() {
         profit={winReceipt?.profit ?? 0}
         newXP={xp}
         xpGained={winReceipt?.xpGained ?? 0}
-        username={profile.username}
+        username={profile?.username ?? ""}
         rank={rank}
         persona={persona}
       />

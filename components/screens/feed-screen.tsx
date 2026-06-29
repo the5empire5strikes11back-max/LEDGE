@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useTransition } from "react"
+import { GuestJoinPrompt } from "@/components/guest-join-prompt"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { MarketGroupCard } from "@/components/market-group-card"
 import { PollCard } from "@/components/poll-card"
@@ -165,6 +166,7 @@ interface FeedScreenProps {
   onUsernameClick?: (username: string) => void
   currentUsername?: string | null
   currentAvatarUrl?: string | null
+  isGuest?: boolean
 }
 
 function formatCredits(value: number): string {
@@ -199,6 +201,7 @@ export function FeedScreen({
   onUsernameClick,
   currentUsername,
   currentAvatarUrl,
+  isGuest = false,
 }: FeedScreenProps) {
   const [activeTab, setActiveTab] = useState<Category>("All")
   const [activeSubcat, setActiveSubcat] = useState<string | null>(null)
@@ -216,6 +219,7 @@ export function FeedScreen({
     marketTitle: string
     xpGain: number
   } | null>(null)
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false)
   const { state: ob, complete: completeOb } = useOnboarding()
 
   // First-session: user hasn't placed a bet yet
@@ -443,6 +447,7 @@ export function FeedScreen({
 
   const openTrade = (market: Market, side: "yes" | "no") => {
     if (market.userBet || market.resolved) return
+    if (isGuest) { setGuestPromptOpen(true); return }
     // If user has no credits, open the shop instead
     if (availableCredits < 50) {
       onOpenShop?.()
@@ -1110,7 +1115,7 @@ export function FeedScreen({
 
       {/* "+" FAB — create a market */}
       <button
-        onClick={() => setCreateSheetOpen(true)}
+        onClick={() => isGuest ? setGuestPromptOpen(true) : setCreateSheetOpen(true)}
         aria-label="Create a prediction market"
         className={cn(
           "fixed z-30 w-11 h-11 rounded-full bg-accent text-accent-foreground",
@@ -1233,6 +1238,8 @@ export function FeedScreen({
           }
         }}
       />
+
+      <GuestJoinPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
     </>
   )
 }

@@ -58,45 +58,46 @@ export async function GET(request: Request) {
   const category = searchParams.get('category')
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // No auth guard — guests can view the public feed
+
+  const noData = Promise.resolve({ data: null })
 
   // Cached queries (shared across all users) + user-specific queries run in parallel
   const [allMarkets, recentBetsData, userBetsResult, circleMembershipsResult, profileResult, autoBetsResult] = await Promise.all([
     getCachedMarkets(category),
     getCachedRecentBets(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
-      .from('bets')
-      .select('market_id, side, amount, payout, shares, won, markets(title, category)')
-      .eq('user_id', user.id) as Promise<{ data: Array<{
-        market_id: string
-        side: string
-        amount: number
-        payout: number | null
-        shares: number | null
-        won: boolean | null
-        markets: { title: string; category: string } | null
-      }> | null }>,
-    supabase
-      .from('circle_members')
-      .select('circle_id')
-      .eq('user_id', user.id),
-    supabase
-      .from('profiles')
-      .select('interests')
-      .eq('id', user.id)
-      .single(),
-    // Pending auto-bets so the feed can show an armed trigger on a market.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
-      .from('auto_bets')
-      .select('id, market_id, side, target_percent, amount')
-      .eq('user_id', user.id)
-      .eq('status', 'pending') as Promise<{ data: Array<{
-        id: string; market_id: string; side: string; target_percent: number; amount: number
-      }> | null }>,
+    user
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase as any)
+          .from('bets')
+          .select('market_id, side, amount, payout, shares, won, markets(title, category)')
+          .eq('user_id', user.id) as Promise<{ data: Array<{
+            market_id: string
+            side: string
+            amount: number
+            payout: number | null
+            shares: number | null
+            won: boolean | null
+            markets: { title: string; category: string } | null
+          }> | null }>
+      : noData,
+    user
+      ? supabase.from('circle_members').select('circle_id').eq('user_id', user.id)
+      : noData,
+    user
+      ? supabase.from('profiles').select('interests').eq('id', user.id).single()
+      : noData,
+    user
+      // Pending auto-bets so the feed can show an armed trigger on a market.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase as any)
+          .from('auto_bets')
+          .select('id, market_id, side, target_percent, amount')
+          .eq('user_id', user.id)
+          .eq('status', 'pending') as Promise<{ data: Array<{
+            id: string; market_id: string; side: string; target_percent: number; amount: number
+          }> | null }>
+      : noData,
   ])
 
   const recentBetsResult = { data: recentBetsData }
@@ -221,7 +222,7 @@ export async function GET(request: Request) {
       resolutionMode: (market as { resolution_mode?: string }).resolution_mode ?? 'auto',
       creatorProposedWinner: (market as { creator_proposed_winner?: string | null }).creator_proposed_winner ?? null,
       creatorResolvedAt: (market as { creator_resolved_at?: string | null }).creator_resolved_at ?? null,
-      isCreator: !!market.created_by && market.created_by === user.id,
+      isCreator: !!user && !!market.created_by && market.created_by === user.id,
       /** User-coined category label shown in place of the system category */
       subcategory: market.subcategory ?? null,
       /** Pre-resolution source URL — used for "Resolves via …" chip on cards */
