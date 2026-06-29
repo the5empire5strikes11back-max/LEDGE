@@ -6,7 +6,14 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 interface ShopItem { key: string; name: string; emoji: string; description: string; price: number }
-interface Inventory { double_down_tokens: number; xp_boost_until: string | null; streak_freezes: number }
+interface Inventory {
+  double_down_tokens: number
+  xp_boost_until: string | null
+  streak_freezes: number
+  safety_net_tokens: number
+  streak: number
+  pre_reset_streak: number
+}
 
 interface ShopModalProps {
   open: boolean
@@ -20,11 +27,28 @@ function fmt(n: number) { return n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 
 function ownedLabel(key: string, inv: Inventory | null): string | null {
   if (!inv) return null
   if (key === "double_down") return inv.double_down_tokens > 0 ? `${inv.double_down_tokens} owned` : null
+  if (key === "safety_net") return inv.safety_net_tokens > 0 ? `${inv.safety_net_tokens} owned` : null
   if (key === "streak_freeze") return inv.streak_freezes > 0 ? `${inv.streak_freezes} owned` : null
+  if (key === "streak_repair") {
+    if (inv.streak === 1 && inv.pre_reset_streak > 1) return `Restore ${inv.pre_reset_streak}-day streak`
+    return null
+  }
   if (key === "xp_boost") {
     if (inv.xp_boost_until && new Date(inv.xp_boost_until).getTime() > Date.now()) return "Active"
     return null
   }
+  return null
+}
+
+function isDisabled(key: string, inv: Inventory | null, credits: number, price: number): boolean {
+  if (credits < price) return true
+  if (key === "streak_repair") return !inv || inv.streak !== 1 || inv.pre_reset_streak <= 1
+  return false
+}
+
+function disabledReason(key: string, inv: Inventory | null, credits: number, price: number): string | null {
+  if (credits < price) return null
+  if (key === "streak_repair" && (!inv || inv.streak !== 1 || inv.pre_reset_streak <= 1)) return "Only usable right after a streak reset"
   return null
 }
 
@@ -85,7 +109,8 @@ export function ShopModal({ open, onClose, onCreditsChange, onOpenBuyCredits }: 
         <div className="p-4 flex flex-col gap-2.5">
           {items.map((it) => {
             const owned = ownedLabel(it.key, inv)
-            const afford = credits >= it.price
+            const disabled = isDisabled(it.key, inv, credits, it.price)
+            const tooltip = disabledReason(it.key, inv, credits, it.price)
             return (
               <div key={it.key} className="flex items-center gap-3 px-3.5 py-3 bg-surface border border-border" style={{ borderRadius: "var(--radius-card)" }}>
                 <span className="text-2xl shrink-0" aria-hidden>{it.emoji}</span>
@@ -95,13 +120,14 @@ export function ShopModal({ open, onClose, onCreditsChange, onOpenBuyCredits }: 
                     {owned && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-accent/15 text-accent" style={{ borderRadius: "var(--radius-badge)" }}>{owned}</span>}
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{it.description}</p>
+                  {tooltip && <p className="text-[10px] text-amber-500 mt-0.5">{tooltip}</p>}
                 </div>
                 <button
                   onClick={() => buy(it.key)}
-                  disabled={!afford || buying === it.key}
+                  disabled={disabled || buying === it.key}
                   className={cn(
                     "shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.97]",
-                    afford ? "bg-accent text-accent-foreground hover:bg-accent/90" : "bg-muted text-muted-foreground cursor-not-allowed"
+                    !disabled ? "bg-accent text-accent-foreground hover:bg-accent/90" : "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
                   style={{ borderRadius: "var(--radius-button)" }}
                 >

@@ -14,7 +14,7 @@ export async function GET() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: p } = await (supabase as any)
     .from('profiles')
-    .select('credits, double_down_tokens, xp_boost_until, streak_freezes')
+    .select('credits, double_down_tokens, xp_boost_until, streak_freezes, safety_net_tokens, streak, pre_reset_streak')
     .eq('id', user.id)
     .single()
 
@@ -25,6 +25,9 @@ export async function GET() {
       double_down_tokens: p?.double_down_tokens ?? 0,
       xp_boost_until: p?.xp_boost_until ?? null,
       streak_freezes: p?.streak_freezes ?? 0,
+      safety_net_tokens: p?.safety_net_tokens ?? 0,
+      streak: p?.streak ?? 0,
+      pre_reset_streak: p?.pre_reset_streak ?? 0,
     },
   })
 }
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: p } = await (admin as any)
       .from('profiles')
-      .select('credits, double_down_tokens, xp_boost_until, streak_freezes')
+      .select('credits, double_down_tokens, xp_boost_until, streak_freezes, safety_net_tokens, streak, pre_reset_streak')
       .eq('id', user.id)
       .single()
     if (!p) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -64,6 +67,8 @@ export async function POST(request: Request) {
     const update: Record<string, any> = { credits: p.credits - item.price }
     if (item.key === 'double_down') {
       update.double_down_tokens = (p.double_down_tokens ?? 0) + 1
+    } else if (item.key === 'safety_net') {
+      update.safety_net_tokens = (p.safety_net_tokens ?? 0) + 1
     } else if (item.key === 'xp_boost') {
       update.xp_boost_until = extendXpBoost(p.xp_boost_until)
     } else if (item.key === 'streak_freeze') {
@@ -71,6 +76,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `You can hold at most ${FREEZE_CAP} freezes` }, { status: 400 })
       }
       update.streak_freezes = (p.streak_freezes ?? 0) + 1
+    } else if (item.key === 'streak_repair') {
+      const preReset = p.pre_reset_streak ?? 0
+      if (preReset <= 1 || (p.streak ?? 0) !== 1) {
+        return NextResponse.json({ error: 'No lost streak to repair' }, { status: 400 })
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      update.streak = preReset
+      update.last_streak_date = today
+      update.pre_reset_streak = 0
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,6 +98,8 @@ export async function POST(request: Request) {
         double_down_tokens: update.double_down_tokens ?? p.double_down_tokens ?? 0,
         xp_boost_until: update.xp_boost_until ?? p.xp_boost_until ?? null,
         streak_freezes: update.streak_freezes ?? p.streak_freezes ?? 0,
+        safety_net_tokens: update.safety_net_tokens ?? p.safety_net_tokens ?? 0,
+        streak: update.streak ?? p.streak ?? 0,
       },
     }, { status: 201 })
   } catch (err) {

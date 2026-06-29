@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: profile } = await (supabase as any)
     .from('profiles')
-    .select('credits, xp, streak, last_active_at, is_plus, last_streak_date, streak_freezes')
+    .select('credits, xp, streak, last_active_at, is_plus, last_streak_date, streak_freezes, pre_reset_streak')
     .eq('id', user.id)
     .single()
 
@@ -133,6 +133,8 @@ export async function POST(request: Request) {
       last_streak_date: streakResult.lastStreakDate,
       streak_freezes: streakResult.freezes,
       last_active_at: new Date().toISOString(),
+      // Track streak before reset so Streak Repair can restore it.
+      pre_reset_streak: streakResult.preResetStreak > 0 ? streakResult.preResetStreak : (profile.pre_reset_streak ?? 0),
     })
     .eq('id', user.id)
     .select()

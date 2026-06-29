@@ -5,7 +5,7 @@
  * config + helpers; no I/O. The purchase endpoint and the shop UI both read this.
  */
 
-export type ShopItemKind = 'token' | 'timed' | 'freeze'
+export type ShopItemKind = 'token' | 'timed' | 'freeze' | 'action'
 
 export interface ShopItem {
   key: string
@@ -21,6 +21,8 @@ export interface ShopItem {
 export const XP_BOOST_HOURS = 24
 /** Double Down multiplies a single bet's payout by this. */
 export const DOUBLE_DOWN_MULTIPLIER = 2
+/** Safety Net refunds this fraction of stake on a losing bet. */
+export const SAFETY_NET_REFUND_RATE = 0.5
 
 export const SHOP_ITEMS: ShopItem[] = [
   {
@@ -29,6 +31,14 @@ export const SHOP_ITEMS: ShopItem[] = [
     emoji: '🎯',
     description: 'Your next bet pays 2× if you win — same stake, double the winnings.',
     price: 1500,
+    kind: 'token',
+  },
+  {
+    key: 'safety_net',
+    name: 'Safety Net',
+    emoji: '🛟',
+    description: 'Auto-applies to your next loss — get 50% of your stake back.',
+    price: 1200,
     kind: 'token',
   },
   {
@@ -46,6 +56,14 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: 'Automatically saves your streak on a missed day.',
     price: 1000,
     kind: 'freeze',
+  },
+  {
+    key: 'streak_repair',
+    name: 'Streak Repair',
+    emoji: '🩹',
+    description: 'Restore the streak you just lost. Only works right after a reset.',
+    price: 2000,
+    kind: 'action',
   },
 ]
 

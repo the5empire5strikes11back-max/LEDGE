@@ -172,28 +172,48 @@ async function settleBets(
 
     await supabase.from('bets').update({ won, payout }).eq('id', bet.id)
 
-    // Track loss streak for comeback mechanics + send loss notification
+    // Track loss streak for comeback mechanics + apply Safety Net + send loss notification
     if (!won) {
-      const { data: losingProfile } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: losingProfile } = await (supabase as any)
         .from('profiles')
-        .select('loss_streak')
+        .select('loss_streak, credits, safety_net_tokens')
         .eq('id', bet.user_id)
         .single()
 
       if (losingProfile) {
         const newLossStreak = (losingProfile.loss_streak ?? 0) + 1
-        await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const lossUpdate: Record<string, any> = {
+          loss_streak: newLossStreak,
+          comeback_eligible: newLossStreak >= COMEBACK_LOSS_TRIGGER,
+        }
+
+        // Auto-apply one Safety Net token on loss: refund 50% of stake.
+        const safetyTokens = losingProfile.safety_net_tokens ?? 0
+        let safetyRefund = 0
+        if (safetyTokens > 0) {
+          safetyRefund = Math.floor((bet.amount ?? 0) * 0.5)
+          lossUpdate.credits = (losingProfile.credits ?? 0) + safetyRefund
+          lossUpdate.safety_net_tokens = safetyTokens - 1
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
           .from('profiles')
-          .update({
-            loss_streak: newLossStreak,
-            comeback_eligible: newLossStreak >= COMEBACK_LOSS_TRIGGER,
-          })
+          .update(lossUpdate)
           .eq('id', bet.user_id)
 
         if (newLossStreak === COMEBACK_LOSS_TRIGGER) {
           void pushToUser(bet.user_id, {
             title: '🔥 Comeback Mode Activated',
             body: 'Win your next bet for BONUS XP. You\'ve got this.',
+            url: '/',
+          })
+        } else if (safetyRefund > 0) {
+          void pushToUser(bet.user_id, {
+            title: '🛟 Safety Net Caught You',
+            body: `You lost, but got ${safetyRefund.toLocaleString()} CR back on "${market.title}".`,
             url: '/',
           })
         } else {

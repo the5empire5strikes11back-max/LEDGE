@@ -35,6 +35,8 @@ export interface StreakResult extends StreakState {
   freezesConsumed: number
   freezeGranted: boolean   // a milestone awarded a freeze this advance
   hitMilestone: boolean    // streak landed on a FREEZE_MILESTONE multiple
+  /** Streak value before a reset; 0 when no reset occurred. Used by Streak Repair. */
+  preResetStreak: number
 }
 
 /** Parse 'YYYY-MM-DD' to a UTC-midnight epoch (calendar-date math, tz-free). */
@@ -81,11 +83,11 @@ export function advanceStreak(state: StreakState, today: string): StreakResult {
     )
   }
   // Not enough freezes — the streak broke. Start fresh at 1.
-  return finalize({ streak: 1, lastStreakDate: today, freezes }, 'reset', 0, state.streak)
+  return finalize({ streak: 1, lastStreakDate: today, freezes }, 'reset', 0, state.streak, state.streak)
 }
 
 /** Apply the milestone freeze grant + flags to a computed new state. */
-function finalize(next: StreakState, outcome: StreakOutcome, freezesConsumed: number, prevStreak: number): StreakResult {
+function finalize(next: StreakState, outcome: StreakOutcome, freezesConsumed: number, prevStreak: number, preResetStreak = 0): StreakResult {
   const hitMilestone =
     next.streak > 0 &&
     next.streak % FREEZE_MILESTONE === 0 &&
@@ -96,5 +98,5 @@ function finalize(next: StreakState, outcome: StreakOutcome, freezesConsumed: nu
     freezes += 1
     freezeGranted = true
   }
-  return { ...next, freezes, outcome, freezesConsumed, freezeGranted, hitMilestone }
+  return { ...next, freezes, outcome, freezesConsumed, freezeGranted, hitMilestone, preResetStreak }
 }
