@@ -255,13 +255,12 @@ export function FeedScreen({
   const supabase = useRef(createClient())
 
   const loadMarkets = useCallback(async () => {
-    // Fire both pipeline steps in parallel — resolve expired AND drip-release
-    // queued markets. release-markets is rate-limited server-side (2h) so it's
-    // safe to call on every feed load without spamming the DB.
-    await Promise.allSettled([
-      fetch('/api/markets/resolve-expired', { method: 'POST' }),
-      fetch('/api/cron/release-markets', { method: 'POST' }),
-    ])
+    // Fire maintenance tasks in background — do NOT await them.
+    // resolve-expired calls Claude AI and can take up to 30s; release-markets
+    // has maxDuration=30. Both are rate-limited server-side so it's safe to
+    // fire on every feed load. Markets come from cache so they don't need to wait.
+    fetch('/api/markets/resolve-expired', { method: 'POST' }).catch(() => {})
+    fetch('/api/cron/release-markets', { method: 'POST' }).catch(() => {})
     const res = await fetch('/api/markets')
     if (res.ok) {
       const data: Market[] = await res.json()

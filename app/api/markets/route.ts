@@ -14,6 +14,24 @@ import { computeCreatorTrust, batchCreatorTrust } from '@/lib/creator-trust'
 import { canAccessCircleMarket } from '@/lib/circle-access'
 import { logMessage } from '@/lib/logger'
 
+// Cache creator trust + usernames for 2 minutes — trust scores change rarely
+const getCachedCreatorData = unstable_cache(
+  async (creatorIds: string[]) => {
+    if (creatorIds.length === 0) return { profiles: [], trustEntries: [] }
+    const admin = createAdminClient()
+    const [profilesResult, trustMap] = await Promise.all([
+      admin.from('profiles').select('id, username').in('id', creatorIds),
+      batchCreatorTrust(creatorIds, admin),
+    ])
+    return {
+      profiles: (profilesResult.data ?? []) as Array<{ id: string; username: string }>,
+      trustEntries: creatorIds.map((id) => ({ id, trust: trustMap.get(id) ?? null })),
+    }
+  },
+  ['creator-data-v1'],
+  { revalidate: 120, tags: ['creator-data'] }
+)
+
 // Cache the full markets list for 30 seconds — same for all users
 const getCachedMarkets = unstable_cache(
   async (category: string | null) => {
@@ -131,18 +149,17 @@ export async function GET(request: Request) {
     (autoBetsResult?.data ?? []).map((a) => [a.market_id, a])
   )
 
-  // Batch-fetch creator usernames + trust scores for user-created markets
+  // Batch-fetch creator usernames + trust scores (cached 2 min — trust changes rarely)
   const creatorIds = [...new Set(
     markets.filter((m) => m.created_by).map((m) => m.created_by as string)
   )]
-  const adminForCreators = createAdminClient()
-  const [creatorProfilesResult, creatorTrustMap] = await Promise.all([
-    creatorIds.length > 0
-      ? adminForCreators.from('profiles').select('id, username').in('id', creatorIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; username: string }> }),
-    batchCreatorTrust(creatorIds, adminForCreators),
-  ])
-  const creatorMap = new Map((creatorProfilesResult.data ?? []).map((p: { id: string; username: string }) => [p.id, p.username]))
+  const creatorData = await getCachedCreatorData(creatorIds)
+  const creatorMap = new Map(creatorData.profiles.map((p) => [p.id, p.username]))
+  const creatorTrustMap = new Map(
+    creatorData.trustEntries
+      .filter((e) => e.trust !== null)
+      .map((e) => [e.id, e.trust!])
+  )
 
   // Aggregate recent bets into per-market social data (in-memory grouping, O(n) on bets)
   const socialMap = aggregateRecentBets(recentBetsResult.data ?? [])
