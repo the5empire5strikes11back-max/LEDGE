@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { XP_PER_BET, CIRCLE_BET_MAX_CR, WHALE_BET_THRESHOLD, MOMENTUM_SHIFT_THRESHOLD } from '@/lib/game-engine'
 import { pushToMarketBettors } from '@/lib/push'
-import { buyShares, addLiquidity, LIQUIDITY_REINVEST_RATE, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
+import { buyShares, addLiquidity, LIQUIDITY_REINVEST_RATE, priceOf, yesPercent as ammYesPercent, seedReserves, type Reserves } from '@/lib/amm'
 import { fireEligibleAutoBets } from '@/lib/auto-bet-trigger'
 import { isXpBoostActive, DOUBLE_DOWN_MULTIPLIER } from '@/lib/shop'
 import { rateLimit, LIMITS } from '@/lib/rate-limit'
@@ -117,6 +117,7 @@ export async function POST(request: Request) {
           (market.yes_percent ?? 50) / 100,
           Math.max(6000, (market.virtual_yes_pool ?? 0) + (market.virtual_no_pool ?? 0) + (market.total_credits ?? 0))
         )
+  const betPrice = priceOf(reservesBefore, side)
   const buy = buyShares(reservesBefore, side, cappedAmount)
   const reservesAfter = addLiquidity(buy.reserves, cappedAmount * LIQUIDITY_REINVEST_RATE)
 
@@ -145,12 +146,19 @@ export async function POST(request: Request) {
   // authenticated role, otherwise a user could insert a fake winning bet with a
   // client-chosen payout (resolution trusts the stored payout). user_id is
   // pinned to the verified session.
+  const betRow = { user_id: user.id, market_id, side, amount: cappedAmount, payout: lockedPayout, shares: lockedShares }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: bet, error: betError } = await (admin as any)
+  let { data: bet, error: betError } = await (admin as any)
     .from('bets')
-    .insert({ user_id: user.id, market_id, side, amount: cappedAmount, payout: lockedPayout, shares: lockedShares })
+    .insert({ ...betRow, bet_price: betPrice })
     .select()
     .single()
+
+  // 42703 = column does not exist — migration not yet applied; retry without bet_price
+  if (betError?.code === '42703') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;({ data: bet, error: betError } = await (admin as any).from('bets').insert(betRow).select().single())
+  }
 
   if (betError) {
     if (betError.code === '23505') {

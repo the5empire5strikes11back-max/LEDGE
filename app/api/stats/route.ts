@@ -13,17 +13,18 @@ export async function GET() {
   // Cast required — Supabase TS inference fails on nested joins
   const { data: rawBets, error } = await supabase
     .from('bets')
-    .select('won, amount, payout, created_at, markets(category)')
+    .select('won, amount, payout, created_at, bet_price, markets(category)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const bets = (rawBets ?? []) as Array<{
+  const bets = (rawBets ?? []) as unknown as Array<{
     won: boolean | null
     amount: number
     payout: number | null
     created_at: string
+    bet_price: number | null
     markets: { category: string } | null
   }>
 
@@ -74,6 +75,19 @@ export async function GET() {
   const followersCount = (followersResult as { count: number | null })?.count ?? 0
   const followingCount = (followingResult as { count: number | null })?.count ?? 0
 
+  // Brier-score calibration: measures how well-calibrated your probability
+  // predictions are, not just whether you won. Score 0-100; 75 = random baseline.
+  const calibratable = resolvedBets.filter((b) => b.bet_price != null)
+  let calibrationScore: number | null = null
+  if (calibratable.length >= 5) {
+    const avgBrier = calibratable.reduce((sum, b) => {
+      const outcome = b.won ? 1 : 0
+      const diff = outcome - (b.bet_price as number)
+      return sum + diff * diff
+    }, 0) / calibratable.length
+    calibrationScore = Math.round((1 - avgBrier) * 100)
+  }
+
   const profiles = profilesResult.data ?? []
   const myRankIndex = profiles.findIndex((p) => p.id === user.id)
   const leaderboardRank = myRankIndex >= 0 ? myRankIndex + 1 : null
@@ -88,6 +102,7 @@ export async function GET() {
     bestStreak,
     currentWinStreak,
     winRate,
+    calibrationScore,
     achievements,
     leaderboardRank,
     top10Gap,

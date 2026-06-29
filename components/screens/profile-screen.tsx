@@ -95,6 +95,7 @@ interface UserStats {
   bestStreak: number
   currentWinStreak: number
   winRate: number
+  calibrationScore: number | null
   achievements: Achievement[]
   leaderboardRank: number | null
   top10Gap: number | null
@@ -644,13 +645,13 @@ export function ProfileScreen({
             storageKey="profile_stats"
           >
             <div className="space-y-4">
-              {/* 4-stat grid */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* 5-stat grid */}
+              <div className="grid grid-cols-5 gap-1.5">
                 {stats === null ? (
-                  [0,1,2,3].map((i) => (
-                    <div key={i} className="bg-surface border border-border/50 px-2 py-3 flex flex-col items-center gap-1.5" style={{ borderRadius: "var(--radius-card)" }}>
-                      <div className="skeleton h-4 w-10" style={{ borderRadius: "var(--radius-badge)" }} />
-                      <div className="skeleton h-2.5 w-8" style={{ borderRadius: "var(--radius-badge)" }} />
+                  [0,1,2,3,4].map((i) => (
+                    <div key={i} className="bg-surface border border-border/50 px-1.5 py-3 flex flex-col items-center gap-1.5" style={{ borderRadius: "var(--radius-card)" }}>
+                      <div className="skeleton h-4 w-8" style={{ borderRadius: "var(--radius-badge)" }} />
+                      <div className="skeleton h-2.5 w-6" style={{ borderRadius: "var(--radius-badge)" }} />
                     </div>
                   ))
                 ) : (
@@ -659,16 +660,17 @@ export function ProfileScreen({
                     { label: "Wins",     value: String(stats.correct), color: "text-foreground" },
                     { label: "Best Run", value: String(stats.bestStreak), color: "text-foreground" },
                     { label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${Math.abs(totalPnl) >= 1000 ? `${(totalPnl / 1000).toFixed(1)}K` : totalPnl}`, color: totalPnl >= 0 ? "text-success" : "text-danger" },
+                    { label: "Calibration", value: stats.calibrationScore != null ? String(stats.calibrationScore) : "--", color: stats.calibrationScore == null ? "text-muted-foreground" : stats.calibrationScore >= 80 ? "text-success" : stats.calibrationScore >= 65 ? "text-accent" : "text-danger" },
                   ].map((stat) => (
                     <div
                       key={stat.label}
-                      className="bg-surface border border-border/50 px-2 py-3 text-center"
+                      className="bg-surface border border-border/50 px-1 py-3 text-center"
                       style={{ borderRadius: "var(--radius-card)" }}
                     >
-                      <span className={cn("text-base font-bold font-mono tabular-nums", stat.color)}>
+                      <span className={cn("text-sm font-bold font-mono tabular-nums", stat.color)}>
                         {stat.value}
                       </span>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
+                      <p className="text-[8px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
                         {stat.label}
                       </p>
                     </div>
