@@ -100,6 +100,14 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
 
   const quickAmounts = [100, 500, 1_000, 5_000].filter((v) => v <= availableCredits)
 
+  // Quarter Kelly with assumed 10% edge above the market price.
+  // f* = (q − p) / (1 − p), then ÷4 and clamped to 2–15% of bankroll.
+  const sideProbability = currentSidePct / 100
+  const assumedQ = Math.min(0.99, sideProbability + 0.10)
+  const kellyFull = (assumedQ - sideProbability) / (1 - sideProbability)
+  const kellyFraction = Math.max(0.02, Math.min(0.15, kellyFull * 0.25))
+  const kellyAmount = Math.max(100, Math.round(availableCredits * kellyFraction))
+
   return (
     // Backdrop
     <div
@@ -256,7 +264,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             </div>
 
             {/* Quick amounts */}
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
               {quickAmounts.map((v) => (
                 <button
                   key={v}
@@ -267,9 +275,19 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                   {v >= 1_000 ? `${v / 1_000}K` : v}
                 </button>
               ))}
+              {kellyAmount <= availableCredits && (
+                <button
+                  onClick={() => setRawAmount(String(kellyAmount))}
+                  title={`Kelly criterion: quarter-Kelly sizing assuming 10% edge. ${Math.round(kellyFraction * 100)}% of balance.`}
+                  className="px-2.5 py-1 text-[11px] font-mono font-medium text-accent bg-accent/10 hover:bg-accent/20 active:scale-[0.94] active:bg-accent/25 transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+                  style={{ borderRadius: "var(--radius-badge)" }}
+                >
+                  Kelly {kellyAmount >= 1_000 ? `${(kellyAmount / 1_000).toFixed(1)}K` : kellyAmount}
+                </button>
+              )}
               <button
                 onClick={() => setRawAmount(String(availableCredits))}
-                className="px-2.5 py-1 text-[11px] font-mono font-medium text-accent bg-accent/10 hover:bg-accent/20 active:scale-[0.94] active:bg-accent/25 transition-all duration-[80ms] ease-[var(--ease-sharp)]"
+                className="px-2.5 py-1 text-[11px] font-mono font-medium text-muted-foreground bg-secondary hover:text-foreground hover:bg-secondary/80 active:scale-[0.94] active:bg-muted transition-all duration-[80ms] ease-[var(--ease-sharp)]"
                 style={{ borderRadius: "var(--radius-badge)" }}
               >
                 MAX
