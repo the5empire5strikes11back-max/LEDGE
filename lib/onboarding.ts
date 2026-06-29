@@ -15,6 +15,8 @@ export interface OnboardingState {
   dailyDropClaimed: boolean
   firstMarketCreated: boolean
   notifPromptSeen: boolean
+  profileCoachmarkDone: boolean
+  circlesCoachmarkDone: boolean
 }
 
 const DEFAULTS: OnboardingState = {
@@ -28,6 +30,8 @@ const DEFAULTS: OnboardingState = {
   dailyDropClaimed: false,
   firstMarketCreated: false,
   notifPromptSeen: false,
+  profileCoachmarkDone: false,
+  circlesCoachmarkDone: false,
 }
 
 function read(): OnboardingState {
