@@ -525,7 +525,7 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
               {sorted.map((member, i) => {
                 const pos = i + 1
                 const medalStyle =
-                  pos === 1 ? "text-[#FFD700]" :
+                  pos === 1 ? "text-white" :
                   pos === 2 ? "text-[#C0C0C0]" :
                   pos === 3 ? "text-[#CD7F32]" :
                   "text-muted-foreground"

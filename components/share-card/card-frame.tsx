@@ -14,7 +14,7 @@ interface CardFrameProps {
   className?: string
 }
 
-export function CardFrame({ children, accentColor = "#F5A623", accentColor2, className }: CardFrameProps) {
+export function CardFrame({ children, accentColor = "#FFFFFF", accentColor2, className }: CardFrameProps) {
   const glow = accentColor2
     ? `radial-gradient(ellipse 80% 60% at 50% 0%, ${accentColor}18 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 100%, ${accentColor2}14 0%, transparent 70%)`
     : `radial-gradient(ellipse 80% 60% at 50% 0%, ${accentColor}1A 0%, transparent 70%)`
@@ -60,7 +60,7 @@ export function CardHeader({ label, badge }: { label?: string; badge?: string })
     <div className="flex items-center justify-between px-6 pt-5 pb-0">
       <span
         className="font-black tracking-[0.2em] uppercase"
-        style={{ fontSize: 11, color: "#F5A623", letterSpacing: "0.18em" }}
+        style={{ fontSize: 11, color: "#FFFFFF", letterSpacing: "0.18em" }}
       >
         LEDGE
       </span>

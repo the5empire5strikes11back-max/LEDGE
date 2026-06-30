@@ -59,7 +59,7 @@ export function RankUpModal({ open, onClose, newRank, previousRank }: RankUpModa
     }
 
     const sparks: Spark[] = []
-    const colors = ["#F5A623", "#FFD700", "#FFA500", "#FFFFFF", "#FFE4B5"]
+    const colors = ["#FFFFFF", "#E2E8F0", "#C0C0C0", "#D0D0D0", "#F0F0F0"]
 
     for (let i = 0; i < 80; i++) {
       const angle = (Math.PI * 2 * i) / 80 + Math.random() * 0.3
@@ -205,7 +205,7 @@ export function RankUpModal({ open, onClose, newRank, previousRank }: RankUpModa
               phase === "details" ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
             style={{
-              background: rankConfig.color.includes("amber") || rankConfig.color.includes("yellow") ? "#F5A623" : undefined,
+              background: "var(--accent)",
               borderRadius: "var(--radius-button)"
             }}
           >

@@ -31,7 +31,7 @@ export default function GlobalError({
           </p>
           <button
             onClick={reset}
-            style={{ padding: '0.5rem 1.5rem', background: '#F5A623', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}
+            style={{ padding: '0.5rem 1.5rem', background: '#FFFFFF', color: '#0A0A0B', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}
           >
             Try again
           </button>

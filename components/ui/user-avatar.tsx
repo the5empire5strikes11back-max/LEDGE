@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 // ── Color palette — deterministic per username ──────────────────────────────
 
 const PALETTE = [
-  { bg: "#F5A623", fg: "#0A0A0B" },
+  { bg: "#FFFFFF", fg: "#0A0A0B" },
   { bg: "#3B82F6", fg: "#ffffff" },
   { bg: "#22C55E", fg: "#0A0A0B" },
   { bg: "#8B5CF6", fg: "#ffffff" },

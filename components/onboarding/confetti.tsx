@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 
-const COLORS = ["#F5A623", "#22c55e", "#3b82f6", "#ec4899", "#f97316", "#a78bfa", "#ef4444", "#06b6d4"]
+const COLORS = ["#FFFFFF", "#22c55e", "#3b82f6", "#ec4899", "#f97316", "#a78bfa", "#ef4444", "#06b6d4"]
 
 interface Particle {
   id: number

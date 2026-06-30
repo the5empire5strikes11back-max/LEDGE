@@ -21,7 +21,7 @@ function ConfettiBurst({ active }: { active: boolean }) {
   const animRef   = useRef<number | undefined>(undefined)
 
   const spawn = useCallback(() => {
-    const colors = ["#22C55E", "#F5A623", "#FFD700", "#86EFAC", "#FFFFFF"]
+    const colors = ["#22C55E", "#FFFFFF", "#E2E8F0", "#86EFAC", "#B0B0C8"]
     return Array.from({ length: 70 }, (_, i) => {
       const angle = (Math.PI * 2 * i) / 70 + Math.random() * 0.4
       const vel   = 2.5 + Math.random() * 5.5

@@ -128,7 +128,7 @@ export function PredictionCardOverlay({ data, onClose }: PredictionCardOverlayPr
             style={{
               background: data.won
                 ? "linear-gradient(135deg, #22C55E 0%, #86EFAC 100%)"
-                : "linear-gradient(135deg, #F5A623 0%, #FFD700 100%)",
+                : "linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%)",
               borderRadius: "var(--radius-button)",
             }}
           >

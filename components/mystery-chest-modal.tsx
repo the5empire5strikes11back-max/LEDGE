@@ -22,7 +22,7 @@ const TIER_CONFIG: Record<ChestTier, { emoji: string; glow: string; bgFrom: stri
   common:    { emoji: "📦", glow: "rgba(107,107,123,0.4)",  bgFrom: "#6B6B7B", label: "Common Chest",    sound: "soft" },
   rare:      { emoji: "💎", glow: "rgba(59,130,246,0.5)",   bgFrom: "#3B82F6", label: "Rare Chest",      sound: "medium" },
   epic:      { emoji: "🔮", glow: "rgba(168,85,247,0.6)",   bgFrom: "#A855F7", label: "Epic Chest",      sound: "epic" },
-  legendary: { emoji: "👑", glow: "rgba(245,166,35,0.7)",   bgFrom: "#F5A623", label: "Legendary Chest", sound: "legendary" },
+  legendary: { emoji: "👑", glow: "rgba(255,255,255,0.5)",   bgFrom: "#FFFFFF", label: "Legendary Chest", sound: "legendary" },
 }
 
 export function MysteryChestModal({ open, onClose, tier, amount }: MysteryChestModalProps) {
@@ -57,7 +57,7 @@ export function MysteryChestModal({ open, onClose, tier, amount }: MysteryChestM
 
     const particles: Particle[] = []
     const tierColor = config.bgFrom
-    const extras = ["#FFD700", "#FFFFFF", tierColor]
+    const extras = ["#E2E8F0", "#FFFFFF", tierColor]
 
     for (let i = 0; i < 100; i++) {
       const angle = (Math.PI * 2 * i) / 100 + Math.random() * 0.4

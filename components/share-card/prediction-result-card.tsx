@@ -49,10 +49,10 @@ export function WinCard({ data }: { data: PredictionResultData }) {
   const rankInfo     = rank ? RANKS[rank] : null
 
   return (
-    <CardFrame accentColor="#22C55E" accentColor2="#F5A623">
+    <CardFrame accentColor="#22C55E">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-5 pb-0">
-        <span className="font-black tracking-[0.2em] uppercase" style={{ fontSize: 11, color: "#F5A623" }}>
+        <span className="font-black tracking-[0.2em] uppercase" style={{ fontSize: 11, color: "#FFFFFF" }}>
           LEDGE
         </span>
         <span
@@ -118,12 +118,12 @@ export function WinCard({ data }: { data: PredictionResultData }) {
             style={{
               fontSize: 80,
               background: isBigWin
-                ? "linear-gradient(135deg, #F5A623 0%, #FFD700 50%, #F5A623 100%)"
+                ? "linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #FFFFFF 100%)"
                 : "linear-gradient(135deg, #22C55E 0%, #86EFAC 60%, #22C55E 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               filter: isBigWin
-                ? "drop-shadow(0 0 20px rgba(245,166,35,0.5))"
+                ? "drop-shadow(0 0 20px rgba(255,255,255,0.35))"
                 : "drop-shadow(0 0 16px rgba(34,197,94,0.45))",
               lineHeight: 0.9,
             }}
@@ -209,10 +209,10 @@ export function LossCard({ data }: { data: PredictionResultData }) {
   const quip        = pickLossLine(marketTitle)
 
   return (
-    <CardFrame accentColor="rgba(255,255,255,0.15)" accentColor2="#F5A62318">
+    <CardFrame accentColor="rgba(255,255,255,0.15)">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-5 pb-0">
-        <span className="font-black tracking-[0.2em] uppercase" style={{ fontSize: 11, color: "#F5A623" }}>
+        <span className="font-black tracking-[0.2em] uppercase" style={{ fontSize: 11, color: "#FFFFFF" }}>
           LEDGE
         </span>
         <span

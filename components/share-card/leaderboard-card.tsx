@@ -32,8 +32,8 @@ function rankLabel(n: number): string {
 }
 
 function rankAccent(n: number): string {
-  if (n === 1) return "#FFD700"
-  if (n <= 3) return "#F5A623"
+  if (n === 1) return "#FFFFFF"
+  if (n <= 3) return "#D0D0D0"
   if (n <= 10) return "#3B82F6"
   return "#6B6B7B"
 }

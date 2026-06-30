@@ -253,7 +253,7 @@ export function ShareCardModal({
             sharing ? "opacity-60 cursor-not-allowed" : ""
           )}
           style={{
-            background: "linear-gradient(135deg, #F5A623 0%, #FFD700 50%, #F5A623 100%)",
+            background: "#FFFFFF",
             color: "#0A0A0B",
             borderRadius: "var(--radius-button)",
           }}

@@ -22,7 +22,7 @@ function ConfettiBurst({ active }: { active: boolean }) {
     canvas.width  = window.innerWidth
     canvas.height = window.innerHeight
 
-    const COLORS = ["#F5A623", "#FFD700", "#22c55e", "#3b82f6", "#ec4899", "#f97316", "#a78bfa", "#fff"]
+    const COLORS = ["#FFFFFF", "#E2E8F0", "#22c55e", "#3b82f6", "#ec4899", "#f97316", "#a78bfa", "#fff"]
     const particles = Array.from({ length: 90 }, () => {
       const angle = Math.random() * Math.PI * 2
       const speed = 6 + Math.random() * 10

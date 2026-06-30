@@ -5,7 +5,7 @@ import type { Persona } from "@/lib/game-engine"
 
 // Persona → accent color (for the glow treatment)
 const PERSONA_COLORS: Record<string, { accent: string; accent2?: string; rarity: string; rarityColor: string }> = {
-  oracle:          { accent: "#F5A623", accent2: "#FFD700", rarity: "LEGENDARY",  rarityColor: "#F5A623" },
+  oracle:          { accent: "#FFFFFF", accent2: "#E2E8F0", rarity: "LEGENDARY",  rarityColor: "#FFFFFF" },
   contrarian:      { accent: "#A855F7", accent2: "#EC4899", rarity: "EPIC",       rarityColor: "#A855F7" },
   sportsSavant:    { accent: "#3B82F6", accent2: "#06B6D4", rarity: "RARE",       rarityColor: "#3B82F6" },
   politicalAnalyst:{ accent: "#10B981", accent2: "#06B6D4", rarity: "RARE",       rarityColor: "#10B981" },

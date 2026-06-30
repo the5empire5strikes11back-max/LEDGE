@@ -26,7 +26,7 @@ export default function OgImage() {
               width: 48,
               height: 48,
               borderRadius: 12,
-              background: '#F5A623',
+              background: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -45,10 +45,10 @@ export default function OgImage() {
               marginLeft: 8,
               fontSize: 11,
               fontWeight: 700,
-              color: '#F5A623',
+              color: '#FFFFFF',
               letterSpacing: 2,
               textTransform: 'uppercase',
-              background: 'rgba(245,166,35,0.12)',
+              background: 'rgba(255,255,255,0.08)',
               padding: '4px 10px',
               borderRadius: 20,
             }}
@@ -70,7 +70,7 @@ export default function OgImage() {
           }}
         >
           You&apos;re always right.{' '}
-          <span style={{ color: '#F5A623' }}>Now you have proof.</span>
+          <span style={{ color: '#FFFFFF' }}>Now you have proof.</span>
         </div>
 
         {/* Subheadline */}
@@ -95,7 +95,7 @@ export default function OgImage() {
             { value: '$0', label: 'real money, ever' },
           ].map((s) => (
             <div key={s.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 28, fontWeight: 900, color: '#F5A623', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 28, fontWeight: 900, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>
                 {s.value}
               </span>
               <span style={{ fontSize: 14, color: '#8585A0', fontWeight: 500 }}>{s.label}</span>
@@ -111,7 +111,7 @@ export default function OgImage() {
             left: 0,
             right: 0,
             height: 4,
-            background: 'linear-gradient(90deg, #F5A623 0%, rgba(245,166,35,0.2) 100%)',
+            background: 'linear-gradient(90deg, #FFFFFF 0%, rgba(255,255,255,0.1) 100%)',
           }}
         />
       </div>

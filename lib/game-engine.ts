@@ -82,7 +82,7 @@ export const CHEST_AMOUNTS: Record<ChestTier, { min: number; max: number; label:
   common:    { min: 300,   max: 600,   label: "Common",    color: "#6B6B7B" },
   rare:      { min: 800,   max: 1500,  label: "Rare",      color: "#3B82F6" },
   epic:      { min: 2000,  max: 4000,  label: "Epic",      color: "#A855F7" },
-  legendary: { min: 8000,  max: 15000, label: "Legendary", color: "#F5A623" },
+  legendary: { min: 8000,  max: 15000, label: "Legendary", color: "#FFFFFF" },
 }
 
 export function chestAmount(tier: ChestTier): number {

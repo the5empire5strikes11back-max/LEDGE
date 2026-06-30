@@ -151,7 +151,7 @@ function PositionBadge({ position, previousPosition }: { position: number; previ
   const getMedalStyle = () => {
     switch (position) {
       case 1:
-        return "bg-gradient-to-br from-[#FFD700] via-[#FFF8DC] to-[#FFD700] text-black shadow-[0_0_8px_rgba(255,215,0,0.4)]"
+        return "bg-gradient-to-br from-white via-[#E2E8F0] to-white text-black shadow-[0_0_8px_rgba(255,255,255,0.3)]"
       case 2:
         return "bg-gradient-to-br from-[#C0C0C0] via-[#E8E8E8] to-[#C0C0C0] text-black shadow-[0_0_6px_rgba(192,192,192,0.3)]"
       case 3:
@@ -209,7 +209,7 @@ function LeaderboardMemberRow({
   const getLeftAccent = () => {
     if (member.isCurrentUser) return "border-l-accent"
     switch (position) {
-      case 1: return "border-l-[#FFD700]"
+      case 1: return "border-l-white"
       case 2: return "border-l-[#C0C0C0]"
       case 3: return "border-l-[#CD7F32]"
       default: return "border-l-transparent"

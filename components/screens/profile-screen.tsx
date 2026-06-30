@@ -30,7 +30,7 @@ function AccuracyRing({ pct, size = 40 }: { pct: number; size?: number }) {
   const r = size * 0.38
   const circ = 2 * Math.PI * r
   const offset = circ * (1 - pct / 100)
-  const color = pct >= 60 ? "#22c55e" : pct >= 50 ? "#F5A623" : "#ef4444"
+  const color = pct >= 60 ? "#22c55e" : pct >= 50 ? "#FFFFFF" : "#ef4444"
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={size * 0.09} />
@@ -465,7 +465,7 @@ export function ProfileScreen({
     return null
   }
   const masteryStyle = {
-    gold:   "bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30",
+    gold:   "bg-white/10 text-white border border-white/25",
     silver: "bg-[#94A3B8]/15 text-[#94A3B8] border border-[#94A3B8]/30",
     bronze: "bg-[#CD7F32]/15 text-[#CD7F32] border border-[#CD7F32]/30",
   } as const
@@ -602,7 +602,7 @@ export function ProfileScreen({
                       <AccuracyRing pct={stats.marketsPlayed >= 3 ? stats.winRate : 0} size={44} />
                       <span
                         className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums"
-                        style={{ color: stats.winRate >= 60 ? "#22c55e" : stats.winRate >= 50 ? "#F5A623" : "#ef4444" }}
+                        style={{ color: stats.winRate >= 60 ? "#22c55e" : stats.winRate >= 50 ? "#FFFFFF" : "#ef4444" }}
                       >
                         {stats.marketsPlayed >= 3 ? `${stats.winRate}%` : "--"}
                       </span>

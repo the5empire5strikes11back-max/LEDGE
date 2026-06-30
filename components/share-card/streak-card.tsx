@@ -23,10 +23,10 @@ function StreakDots({ current, total = 14 }: { current: number; total?: number }
             borderRadius: "50%",
             background: filled
               ? i < current - 1
-                ? "#F5A623"
-                : "#FFD700"
+                ? "#E2E8F0"
+                : "#FFFFFF"
               : "rgba(255,255,255,0.08)",
-            boxShadow: filled ? `0 0 ${i === current - 1 ? 10 : 4}px ${i === current - 1 ? "#F5A623" : "#F5A62360"}` : undefined,
+            boxShadow: filled ? `0 0 ${i === current - 1 ? 10 : 4}px ${i === current - 1 ? "#FFFFFF" : "rgba(255,255,255,0.38)"}` : undefined,
             transition: "background 0.3s ease",
           }}
         />
@@ -44,10 +44,10 @@ function streakLabel(n: number): string {
 }
 
 function streakColor(n: number): string {
-  if (n >= 30) return "#F5A623"
-  if (n >= 14) return "#F5A623"
-  if (n >= 7) return "#F59E0B"
-  return "#F59E0B"
+  if (n >= 30) return "#FFFFFF"
+  if (n >= 14) return "#FFFFFF"
+  if (n >= 7) return "#E2E8F0"
+  return "#E2E8F0"
 }
 
 export function StreakCard({ currentStreak, bestStreak, username }: StreakCardProps) {

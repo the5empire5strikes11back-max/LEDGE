@@ -26,14 +26,14 @@ const BASE = {
 
 /** Foreground colour (text on accent) per accent hex. */
 export const ACCENT_COLORS = [
-  { name: 'Amber',  value: '#F5A623', fg: '#0A0A0B' },
+  { name: 'White',  value: '#FFFFFF', fg: '#0A0A0B' },
   { name: 'Blue',   value: '#3B82F6', fg: '#ffffff' },
   { name: 'Green',  value: '#22C55E', fg: '#0A0A0B' },
   { name: 'Purple', value: '#8B5CF6', fg: '#ffffff' },
   { name: 'Red',    value: '#EF4444', fg: '#ffffff' },
   { name: 'Pink',   value: '#EC4899', fg: '#ffffff' },
   { name: 'Cyan',   value: '#06B6D4', fg: '#0A0A0B' },
-  { name: 'White',  value: '#E2E8F0', fg: '#0A0A0B' },
+  { name: 'Amber',  value: '#F5A623', fg: '#0A0A0B' },
 ] as const
 
 export type AccentColor = typeof ACCENT_COLORS[number]
@@ -104,8 +104,8 @@ export function applyAccentTheme(accent: string): void {
 
 /** Returns the saved accent from localStorage, or the default amber. */
 export function getSavedAccent(): string {
-  if (typeof window === 'undefined') return '#F5A623'
-  return localStorage.getItem('ledge_accent') ?? '#F5A623'
+  if (typeof window === 'undefined') return '#FFFFFF'
+  return localStorage.getItem('ledge_accent') ?? '#FFFFFF'
 }
 
 /** Saves and applies the chosen accent. */

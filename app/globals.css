@@ -37,13 +37,13 @@
   --border:        #2A2A36;   /* Structural: card edges, dividers (visible) */
   --border-subtle: #1C1C24;   /* Inner dividers, de-emphasis */
   --input:         #2A2A36;
-  --ring:          #F5A623;
+  --ring:          #FFFFFF;
 
-  /* ── Accent — Electric Amber ─────────────────────────────────────────── */
-  --accent:             #F5A623;   /* Primary interactive (OKLCH H=70) */
+  /* ── Accent — Clean White ────────────────────────────────────────────── */
+  --accent:             #FFFFFF;   /* Primary interactive */
   --accent-foreground:  #0A0A0B;
   --accent-hover:       color-mix(in srgb, var(--accent) 82%, black);
-  --primary:            #F5A623;
+  --primary:            #FFFFFF;
   --primary-foreground: #0A0A0B;
 
   /* ── Semantic Colors (meaning is load-bearing — never reassign) ────── */
@@ -59,9 +59,9 @@
   --featured-foreground: #FFFFFF;
 
   /* ── Chart Colors — OKLCH uniform spectrum (L≈0.72 C≈0.13 across hues) */
-  /* Brand amber kept as chart-1 anchor; others stepped +60° around the wheel */
-  /* so all five colors have equal perceived brightness on dark backgrounds.  */
-  --chart-1: #F5A623;   /* amber   H=70  — brand */
+  /* White kept as chart-1 anchor; others stepped around the wheel */
+  /* for equal perceived brightness on dark backgrounds.  */
+  --chart-1: #FFFFFF;   /* white — brand */
   --chart-2: #2CBDA8;   /* teal    H=185 — distinct from success */
   --chart-3: #5B90D4;   /* sky     H=230 — distinct from featured */
   --chart-4: #A07BD0;   /* violet  H=290 — distinct from featured/indigo */
@@ -91,19 +91,19 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* Celebratory only */
 
   /* ── Glow Effects (restrained — max 1 active per card) ───────────── */
-  --glow-amber:   0 0 20px rgba(245, 166,  35, 0.12);
+  --glow-accent:  0 0 20px rgba(255, 255, 255, 0.08);
   --glow-success: 0 0 16px rgba( 34, 197,  94, 0.14);
   --glow-danger:  0 0 16px rgba(239,  68,  68, 0.14);
 
   /* ── Sidebar ──────────────────────────────────────────────────────── */
   --sidebar:                  #0D0D10;
   --sidebar-foreground:       #EBEBEB;
-  --sidebar-primary:          #F5A623;
+  --sidebar-primary:          #FFFFFF;
   --sidebar-primary-foreground: #0A0A0B;
   --sidebar-accent:           #202028;
   --sidebar-accent-foreground: #EBEBEB;
   --sidebar-border:           #2A2A36;
-  --sidebar-ring:             #F5A623;
+  --sidebar-ring:             #FFFFFF;
 
   /* ── Layout helpers ───────────────────────────────────────────────────── */
   /* Bottom padding for the main content area — accounts for mobile tab bar
@@ -327,7 +327,7 @@
 /* ── Utilities ───────────────────────────────────────────────────────────── */
 @layer utilities {
   /* Glow */
-  .glow-amber   { box-shadow: var(--glow-amber); }
+  .glow-accent  { box-shadow: var(--glow-accent); }
   .glow-success { box-shadow: var(--glow-success); }
   .glow-danger  { box-shadow: var(--glow-danger); }
 
@@ -387,10 +387,10 @@
   100% { transform: scale(1); }
 }
 
-/* Glow pulse (amber) */
+/* Glow pulse (accent) */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: var(--glow-amber); }
-  50%       { box-shadow: 0 0 28px rgba(245, 166, 35, 0.22); }
+  0%, 100% { box-shadow: var(--glow-accent); }
+  50%       { box-shadow: 0 0 28px rgba(255, 255, 255, 0.18); }
 }
 
 /* ══ Market liveness animations ════════════════════════════════════════════ */
@@ -415,18 +415,18 @@
 }
 @keyframes card-border-breathe-neutral {
   0%, 100% { box-shadow: none; }
-  50%       { box-shadow: 0 0 12px rgba(245, 166,  35, 0.07); }
+  50%       { box-shadow: 0 0 12px rgba(255, 255, 255, 0.05); }
 }
 
 /* ══ Streak flame ════════════════════════════════════════════════════════════ */
 @keyframes flame-flicker {
-  0%,  100% { transform: scale(1)    rotate(-2deg); opacity: 1;    filter: drop-shadow(0 0 3px rgba(245,166,35,0.6)); }
-  25%        { transform: scale(1.15) rotate(2deg);  opacity: 0.9;  filter: drop-shadow(0 0 7px rgba(245,166,35,0.9)); }
-  50%        { transform: scale(0.95) rotate(-1deg); opacity: 1;    filter: drop-shadow(0 0 5px rgba(245,166,35,0.7)); }
-  75%        { transform: scale(1.1)  rotate(3deg);  opacity: 0.85; filter: drop-shadow(0 0 8px rgba(251,146,60,0.8)); }
+  0%,  100% { transform: scale(1)    rotate(-2deg); opacity: 1;    filter: drop-shadow(0 0 3px rgba(255,255,255,0.5)); }
+  25%        { transform: scale(1.15) rotate(2deg);  opacity: 0.9;  filter: drop-shadow(0 0 7px rgba(255,255,255,0.7)); }
+  50%        { transform: scale(0.95) rotate(-1deg); opacity: 1;    filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
+  75%        { transform: scale(1.1)  rotate(3deg);  opacity: 0.85; filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)); }
 }
 .streak-flame { animation: flame-flicker 1.8s ease-in-out infinite; }
-.streak-flame-glow { animation: flame-flicker 1.8s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(245,166,35,0.5)); }
+.streak-flame-glow { animation: flame-flicker 1.8s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(255,255,255,0.4)); }
 
 .market-volatile-yes     { animation: card-border-breathe-yes     3.0s ease-in-out infinite; }
 .market-volatile-no      { animation: card-border-breathe-no      3.0s ease-in-out infinite; }
@@ -499,6 +499,6 @@
    SELECTION
    ═══════════════════════════════════════════════════════════════════════════ */
 ::selection {
-  background: rgba(245, 166, 35, 0.25);
+  background: rgba(255, 255, 255, 0.15);
   color: var(--foreground);
 }

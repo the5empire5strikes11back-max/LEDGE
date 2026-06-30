@@ -25,7 +25,7 @@ interface Particle {
   color: string
 }
 
-// Amber particle burst effect
+// White particle burst effect
 function ParticleBurst({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
@@ -33,7 +33,7 @@ function ParticleBurst({ active }: { active: boolean }) {
 
   const createParticles = useCallback(() => {
     const particles: Particle[] = []
-    const colors = ["#F5A623", "#FFD700", "#FFA500", "#FFCC00", "#FFE4B5"]
+    const colors = ["#FFFFFF", "#E2E8F0", "#C0C0C0", "#D0D0D0", "#F0F0F0"]
     
     for (let i = 0; i < 60; i++) {
       const angle = (Math.PI * 2 * i) / 60 + Math.random() * 0.5

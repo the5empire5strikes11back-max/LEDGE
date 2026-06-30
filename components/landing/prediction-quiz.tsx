@@ -111,7 +111,7 @@ export function PredictionQuiz() {
   if (isIntro) {
     return (
       <div className="text-center">
-        <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold mb-3">Free predictor assessment</p>
+        <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-3">Free predictor assessment</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-4">
           Are you ready to find out your Prediction IQ?
         </h2>
@@ -127,7 +127,7 @@ export function PredictionQuiz() {
             { icon: Trophy,    label: "Starting rank",      body: "Which Ledge tier should you actually start at?" },
           ].map(({ icon: Icon, label, body }) => (
             <div key={label} className="bg-[#111116] border border-[#2A2A36] p-4" style={{ borderRadius: "12px" }}>
-              <Icon className="w-4 h-4 text-[#F5A623] mb-2.5" />
+              <Icon className="w-4 h-4 text-white mb-2.5" />
               <p className="text-sm font-bold text-[#EBEBEB] mb-1">{label}</p>
               <p className="text-xs text-[#8585A0] leading-relaxed">{body}</p>
             </div>
@@ -136,7 +136,7 @@ export function PredictionQuiz() {
 
         <button
           onClick={() => setStep(0)}
-          className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all active:scale-95"
+          className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-white/90 transition-all active:scale-95"
           style={{ borderRadius: "10px" }}
         >
           Start the free quiz
@@ -153,22 +153,22 @@ export function PredictionQuiz() {
       <div className="text-center max-w-lg mx-auto">
         {/* Big reveal */}
         <div
-          className="bg-[#F5A623]/8 border border-[#F5A623]/20 p-8 mb-6"
+          className="bg-white/8 border border-white/20 p-8 mb-6"
           style={{ borderRadius: "16px" }}
         >
-          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold mb-2">Your predictor type</p>
-          <p className="text-5xl font-black text-[#F5A623] mb-4 tracking-tight">{result.type}</p>
+          <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-2">Your predictor type</p>
+          <p className="text-5xl font-black text-white mb-4 tracking-tight">{result.type}</p>
           <h3 className="text-lg font-black text-[#EBEBEB] mb-3">{result.headline}</h3>
           <p className="text-sm text-[#8585A0] leading-relaxed">{result.body}</p>
         </div>
 
         {/* 3 insights — your game plan */}
         <div className="bg-[#111116] border border-[#2A2A36] p-5 mb-8 text-left" style={{ borderRadius: "12px" }}>
-          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold mb-4">Your personalized game plan</p>
+          <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-4">Your personalized game plan</p>
           <ul className="flex flex-col gap-3">
             {result.plan.map((item, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm text-[#B0B0C8]">
-                <Check className="w-3.5 h-3.5 text-[#F5A623] shrink-0 mt-0.5" />
+                <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
                 {item}
               </li>
             ))}
@@ -178,7 +178,7 @@ export function PredictionQuiz() {
         {/* Next step: claim credits */}
         <Link
           href="/auth/signup"
-          className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all active:scale-95 mb-3"
+          className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-white/90 transition-all active:scale-95 mb-3"
           style={{ borderRadius: "10px" }}
         >
           Claim your 1,000 CR as a {result.type}
@@ -199,7 +199,7 @@ export function PredictionQuiz() {
           <div
             key={i}
             className="h-1 flex-1 rounded-full transition-all duration-300"
-            style={{ background: i <= step ? "#F5A623" : "#2A2A36" }}
+            style={{ background: i <= step ? "#FFFFFF" : "#2A2A36" }}
           />
         ))}
       </div>
@@ -218,9 +218,9 @@ export function PredictionQuiz() {
             className="text-left px-4 py-3.5 border text-sm font-medium transition-all"
             style={{
               borderRadius: "10px",
-              background: selected === option ? "rgba(245,166,35,0.08)" : "#111116",
-              borderColor: selected === option ? "#F5A623" : "#2A2A36",
-              color: selected === option ? "#F5A623" : "#8585A0",
+              background: selected === option ? "rgba(255,255,255,0.08)" : "#111116",
+              borderColor: selected === option ? "#FFFFFF" : "#2A2A36",
+              color: selected === option ? "#FFFFFF" : "#8585A0",
             }}
           >
             {option}
@@ -234,7 +234,7 @@ export function PredictionQuiz() {
         className="w-full flex items-center justify-center gap-2 px-6 py-3.5 font-bold text-sm uppercase tracking-wider transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
         style={{
           borderRadius: "10px",
-          background: "#F5A623",
+          background: "#FFFFFF",
           color: "#0A0A0B",
         }}
       >

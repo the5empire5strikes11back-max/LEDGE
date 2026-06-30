@@ -36,14 +36,14 @@ function MockMarketCard({ title, yes, no, category, hot }: {
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-[#8585A0] uppercase tracking-wider font-medium">{category}</span>
         {hot && (
-          <span className="flex items-center gap-1 text-[9px] font-bold text-[#F5A623] uppercase tracking-wider">
+          <span className="flex items-center gap-1 text-[9px] font-bold text-white uppercase tracking-wider">
             <Flame className="w-2.5 h-2.5" />Hot
           </span>
         )}
       </div>
       <p className="text-sm font-semibold text-[#EBEBEB] leading-snug">{title}</p>
       <div className="h-1.5 bg-[#202028] overflow-hidden rounded-full">
-        <div className="h-full bg-[#F5A623] rounded-full" style={{ width: `${yes}%` }} />
+        <div className="h-full bg-white rounded-full" style={{ width: `${yes}%` }} />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="flex items-center justify-between px-3 py-2 bg-[#1A2E22] border border-[#22C55E]/20 rounded-lg">
@@ -70,7 +70,7 @@ function MockMarketCard({ title, yes, no, category, hot }: {
 function FAQItem({ q, a }: { q: string; a: string }) {
   return (
     <details className="group border-b border-[#1C1C24] last:border-0">
-      <summary className="flex items-center justify-between gap-4 py-4 cursor-pointer list-none text-sm font-semibold text-[#EBEBEB] hover:text-[#F5A623] transition-colors">
+      <summary className="flex items-center justify-between gap-4 py-4 cursor-pointer list-none text-sm font-semibold text-[#EBEBEB] hover:text-white transition-colors">
         {q}
         <ChevronDown className="w-4 h-4 shrink-0 text-[#8585A0] group-open:rotate-180 transition-transform" />
       </summary>
@@ -134,7 +134,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/auth/signup"
-              className="text-sm font-semibold px-4 py-2 bg-[#F5A623] text-[#0A0A0B] hover:bg-[#F5A623]/90 transition-colors"
+              className="text-sm font-semibold px-4 py-2 bg-white text-[#0A0A0B] hover:bg-white/90 transition-colors"
               style={{ borderRadius: "8px" }}
             >
               Get started free
@@ -148,15 +148,15 @@ export default function LandingPage() {
 
         {/* Editorial overline — replaces noisy pill badge */}
         <div className="flex items-center justify-center gap-3 mb-10">
-          <div className="h-px w-10 bg-[#F5A623]/30" />
-          <span className="text-[10px] text-[#F5A623]/60 uppercase tracking-[0.22em] font-medium">Prediction Market</span>
-          <div className="h-px w-10 bg-[#F5A623]/30" />
+          <div className="h-px w-10 bg-white/20" />
+          <span className="text-[10px] text-white/50 uppercase tracking-[0.22em] font-medium">Prediction Market</span>
+          <div className="h-px w-10 bg-white/20" />
         </div>
 
         {/* Headline */}
         <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-[1.1] mb-5">
           You&apos;re always right.<br />
-          <span className="text-[#F5A623]">Now you have proof.</span>
+          <span className="text-white">Now you have proof.</span>
         </h1>
 
         {/* Sub-headline */}
@@ -168,7 +168,7 @@ export default function LandingPage() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
           <Link
             href="/auth/signup"
-            className="flex items-center gap-2 px-7 py-3.5 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all active:scale-95 w-full sm:w-auto justify-center"
+            className="flex items-center gap-2 px-7 py-3.5 bg-white text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-white/90 transition-all active:scale-95 w-full sm:w-auto justify-center"
             style={{ borderRadius: "10px" }}
           >
             Claim your free credits
@@ -196,11 +196,11 @@ export default function LandingPage() {
           </div>
           <span className="text-[#2A2A36] text-xs select-none">·</span>
           <span className="text-xs text-[#8585A0]">
-            <span className="font-mono font-bold text-[#F5A623]">1,000 CR</span> free on signup
+            <span className="font-mono font-bold text-white">1,000 CR</span> free on signup
           </span>
           <span className="text-[#2A2A36] text-xs select-none">·</span>
           <span className="text-xs text-[#8585A0]">
-            <span className="font-mono font-bold text-[#F5A623]">500 CR</span> every day
+            <span className="font-mono font-bold text-white">500 CR</span> every day
           </span>
           <span className="text-[#2A2A36] text-xs select-none">·</span>
           <span className="text-xs text-[#8585A0]">
@@ -230,7 +230,7 @@ export default function LandingPage() {
       {/* ── Pain point section ──────────────────────────────────────────────── */}
       <section className="py-20 px-5 max-w-3xl mx-auto">
         <div className="text-center mb-12">
-          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold mb-3">Sound familiar?</p>
+          <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-3">Sound familiar?</p>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-4">
             You called it. No one kept score.
           </h2>
@@ -247,7 +247,7 @@ export default function LandingPage() {
             { icon: Users, stat: "Compete with friends", body: "Circle markets let your group settle every debate with something on the line." },
           ].map((item) => (
             <div key={item.stat} className="bg-[#111116] border border-[#2A2A36] p-5 rounded-xl">
-              <item.icon className="w-5 h-5 text-[#F5A623] mb-3" />
+              <item.icon className="w-5 h-5 text-white mb-3" />
               <p className="text-sm font-bold text-[#EBEBEB] mb-1.5">{item.stat}</p>
               <p className="text-xs text-[#8585A0] leading-relaxed">{item.body}</p>
             </div>
@@ -258,7 +258,7 @@ export default function LandingPage() {
       {/* ── Testimonials ────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 bg-[#111116] border-y border-[#1C1C24]">
         <div className="max-w-3xl mx-auto">
-          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">What players are saying</p>
+          <p className="text-[10px] text-white uppercase tracking-widest font-bold text-center mb-3">What players are saying</p>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-12">
             Real takes. Real receipts.
           </h2>
@@ -285,11 +285,11 @@ export default function LandingPage() {
                 className="bg-[#0A0A0B] border border-[#2A2A36] p-5 flex flex-col gap-4"
                 style={{ borderRadius: "12px" }}
               >
-                <Quote className="w-4 h-4 text-[#F5A623]/40 shrink-0" />
+                <Quote className="w-4 h-4 text-white/30 shrink-0" />
                 <p className="text-sm text-[#EBEBEB] leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
                 <div className="flex items-center justify-between gap-2 mt-auto">
                   <span className="text-xs font-bold text-[#8585A0]">{t.handle}</span>
-                  <span className="text-[10px] font-bold text-[#F5A623]/70 uppercase tracking-wider bg-[#F5A623]/10 px-2 py-0.5" style={{ borderRadius: "4px" }}>{t.tag}</span>
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider bg-white/8 px-2 py-0.5" style={{ borderRadius: "4px" }}>{t.tag}</span>
                 </div>
               </div>
             ))}
@@ -300,7 +300,7 @@ export default function LandingPage() {
       {/* ── How it works ────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 bg-[#0A0A0B] border-b border-[#1C1C24]">
         <div className="max-w-3xl mx-auto">
-          <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">How it works</p>
+          <p className="text-[10px] text-white uppercase tracking-widest font-bold text-center mb-3">How it works</p>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2">
             Three steps to your first win
           </h2>
@@ -308,7 +308,7 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-3 gap-8">
             {STEPS.map((s) => (
               <div key={s.n} className="flex flex-col gap-3">
-                <span className="font-mono text-3xl font-black text-[#F5A623]/25">{s.n}</span>
+                <span className="font-mono text-3xl font-black text-white/20">{s.n}</span>
                 <h3 className="text-base font-bold text-[#EBEBEB]">{s.title}</h3>
                 <p className="text-sm text-[#8585A0] leading-relaxed">{s.body}</p>
               </div>
@@ -327,7 +327,7 @@ export default function LandingPage() {
             { value: "$0", label: "To get started" },
           ].map((s) => (
             <div key={s.label}>
-              <p className="text-2xl font-black text-[#F5A623] font-mono">{s.value}</p>
+              <p className="text-2xl font-black text-white font-mono">{s.value}</p>
               <p className="text-xs text-[#8585A0] mt-1">{s.label}</p>
             </div>
           ))}
@@ -336,7 +336,7 @@ export default function LandingPage() {
 
       {/* ── Features ────────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 max-w-3xl mx-auto">
-        <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">What you get</p>
+        <p className="text-[10px] text-white uppercase tracking-widest font-bold text-center mb-3">What you get</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2">
           Every tool to prove you were right
         </h2>
@@ -347,11 +347,11 @@ export default function LandingPage() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="bg-[#111116] border border-[#2A2A36] p-5 flex flex-col gap-3 hover:border-[#F5A623]/30 transition-colors"
+              className="bg-[#111116] border border-[#2A2A36] p-5 flex flex-col gap-3 hover:border-white/20 transition-colors"
               style={{ borderRadius: "12px" }}
             >
-              <div className="w-8 h-8 bg-[#F5A623]/10 flex items-center justify-center" style={{ borderRadius: "8px" }}>
-                <f.icon className="w-4 h-4 text-[#F5A623]" />
+              <div className="w-8 h-8 bg-white/8 flex items-center justify-center" style={{ borderRadius: "8px" }}>
+                <f.icon className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-sm font-bold text-[#EBEBEB]">{f.title}</h3>
               <p className="text-xs text-[#8585A0] leading-relaxed">{f.body}</p>
@@ -369,7 +369,7 @@ export default function LandingPage() {
           </div>
           <Link
             href="/auth/signup"
-            className="flex items-center gap-2 px-6 py-3 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all shrink-0"
+            className="flex items-center gap-2 px-6 py-3 bg-white text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-white/90 transition-all shrink-0"
             style={{ borderRadius: "10px" }}
           >
             Get started free
@@ -380,7 +380,7 @@ export default function LandingPage() {
 
       {/* ── FAQ ─────────────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 max-w-2xl mx-auto">
-        <p className="text-[10px] text-[#F5A623] uppercase tracking-widest font-bold text-center mb-3">FAQ</p>
+        <p className="text-[10px] text-white uppercase tracking-widest font-bold text-center mb-3">FAQ</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-12">
           No catch. Here&apos;s the proof.
         </h2>
@@ -394,7 +394,7 @@ export default function LandingPage() {
       {/* ── Final CTA ───────────────────────────────────────────────────────── */}
       <section className="py-20 px-5 max-w-xl mx-auto text-center">
         <div className="bg-[#111116] border border-[#2A2A36] p-8 sm:p-12" style={{ borderRadius: "16px" }}>
-          <Shield className="w-8 h-8 text-[#F5A623] mx-auto mb-4" />
+          <Shield className="w-8 h-8 text-white mx-auto mb-4" />
           <h2 className="text-2xl font-black tracking-tight mb-3">
             Your first 1,000 credits are waiting.
           </h2>
@@ -406,7 +406,7 @@ export default function LandingPage() {
           <ul className="flex flex-col gap-2 mb-8 text-left max-w-xs mx-auto">
             {["Takes 60 seconds to sign up", "500 free credits every single day", "No money, no risk, ever"].map((item) => (
               <li key={item} className="flex items-center gap-2.5 text-sm text-[#B0B0C8]">
-                <Check className="w-3.5 h-3.5 text-[#F5A623] shrink-0" />
+                <Check className="w-3.5 h-3.5 text-white shrink-0" />
                 {item}
               </li>
             ))}
@@ -414,7 +414,7 @@ export default function LandingPage() {
 
           <Link
             href="/auth/signup"
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#F5A623] text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-[#F5A623]/90 transition-all active:scale-95"
+            className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-[#0A0A0B] font-bold text-sm uppercase tracking-wider hover:bg-white/90 transition-all active:scale-95"
             style={{ borderRadius: "10px" }}
           >
             Claim free credits

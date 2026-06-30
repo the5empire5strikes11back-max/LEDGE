@@ -20,7 +20,7 @@ export function FlexCard({ bet, username }: FlexCardProps) {
   const multiplierIsHigh = bet.payoutMultiplier >= 2.5
 
   return (
-    <CardFrame accentColor={sideColor} accentColor2="#F5A623">
+    <CardFrame accentColor={sideColor}>
       <CardHeader badge="✓ CALLED IT" />
 
       <div className="flex flex-col px-6 pt-6 pb-4 gap-5">
@@ -72,11 +72,11 @@ export function FlexCard({ bet, username }: FlexCardProps) {
             style={{
               fontSize: 72,
               background: multiplierIsHigh
-                ? "linear-gradient(135deg, #F5A623 0%, #FFD700 50%, #F5A623 100%)"
+                ? "linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #FFFFFF 100%)"
                 : sideColor,
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
-              filter: multiplierIsHigh ? `drop-shadow(0 0 16px #F5A62360)` : `drop-shadow(0 0 12px ${sideColor}50)`,
+              filter: multiplierIsHigh ? `drop-shadow(0 0 16px rgba(255,255,255,0.38))` : `drop-shadow(0 0 12px ${sideColor}50)`,
               lineHeight: 0.9,
             }}
           >
