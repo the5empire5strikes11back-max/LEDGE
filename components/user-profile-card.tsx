@@ -53,7 +53,7 @@ const RANKS = {
   },
   juryLead: {
     label: "Jury Lead",
-    color: "text-white",
+    color: "text-foreground",
     bg: "bg-white/15",
     border: "border-white/50",
     icon: "★",

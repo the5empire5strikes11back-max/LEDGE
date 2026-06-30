@@ -550,8 +550,8 @@ export function MarketFeedCard({
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
-              <span className="text-[12px] font-black text-white uppercase tracking-wide">NO</span>
-              <span className="font-mono text-[9px] text-white/60 leading-none">
+              <span className="text-[12px] font-black text-foreground uppercase tracking-wide">NO</span>
+              <span className="font-mono text-[9px] text-foreground/60 leading-none">
                 {payoutMultiplier(noPercent)}
               </span>
             </button>

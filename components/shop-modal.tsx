@@ -120,7 +120,7 @@ export function ShopModal({ open, onClose, onCreditsChange, onOpenBuyCredits }: 
                     {owned && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-accent/15 text-accent" style={{ borderRadius: "var(--radius-badge)" }}>{owned}</span>}
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{it.description}</p>
-                  {tooltip && <p className="text-[10px] text-white/50 mt-0.5">{tooltip}</p>}
+                  {tooltip && <p className="text-[10px] text-foreground/50 mt-0.5">{tooltip}</p>}
                 </div>
                 <button
                   onClick={() => buy(it.key)}

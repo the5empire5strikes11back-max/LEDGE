@@ -653,7 +653,7 @@ export function FeedScreen({
                 <>
                   <span className="text-border shrink-0">·</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="inline-flex items-center gap-1 text-[10px] text-white/70 uppercase tracking-wider font-semibold">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-foreground/70 uppercase tracking-wider font-semibold">
                       <Flame className="w-3 h-3 shrink-0" /><span className="font-mono">{hotCount}</span> hot
                     </span>
                   </div>
@@ -856,7 +856,7 @@ export function FeedScreen({
                   "transition-all duration-[80ms] ease-[var(--ease-sharp)] active:scale-[0.94]",
                   activeTab === tab
                     ? tab === "Live"
-                      ? "bg-red-500 text-white"
+                      ? "bg-red-500 text-foreground"
                       : "bg-accent text-accent-foreground"
                     : tab === "Live" && liveCount > 0
                     ? "text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20"
@@ -875,7 +875,7 @@ export function FeedScreen({
                       <span className={cn(
                         "text-[9px] font-black px-1 py-0 leading-4",
                         activeTab === "Live"
-                          ? "bg-white/20 text-white"
+                          ? "bg-white/20 text-foreground"
                           : "bg-red-500/15 text-red-400"
                       )} style={{ borderRadius: "3px" }}>
                         {liveCount}

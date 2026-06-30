@@ -111,7 +111,7 @@ export function PredictionQuiz() {
   if (isIntro) {
     return (
       <div className="text-center">
-        <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-3">Free predictor assessment</p>
+        <p className="text-[10px] text-foreground uppercase tracking-widest font-bold mb-3">Free predictor assessment</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-4">
           Are you ready to find out your Prediction IQ?
         </h2>
@@ -127,7 +127,7 @@ export function PredictionQuiz() {
             { icon: Trophy,    label: "Starting rank",      body: "Which Ledge tier should you actually start at?" },
           ].map(({ icon: Icon, label, body }) => (
             <div key={label} className="bg-[#111116] border border-[#2A2A36] p-4" style={{ borderRadius: "12px" }}>
-              <Icon className="w-4 h-4 text-white mb-2.5" />
+              <Icon className="w-4 h-4 text-foreground mb-2.5" />
               <p className="text-sm font-bold text-[#EBEBEB] mb-1">{label}</p>
               <p className="text-xs text-[#8585A0] leading-relaxed">{body}</p>
             </div>
@@ -156,19 +156,19 @@ export function PredictionQuiz() {
           className="bg-white/8 border border-white/20 p-8 mb-6"
           style={{ borderRadius: "16px" }}
         >
-          <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-2">Your predictor type</p>
-          <p className="text-5xl font-black text-white mb-4 tracking-tight">{result.type}</p>
+          <p className="text-[10px] text-foreground uppercase tracking-widest font-bold mb-2">Your predictor type</p>
+          <p className="text-5xl font-black text-foreground mb-4 tracking-tight">{result.type}</p>
           <h3 className="text-lg font-black text-[#EBEBEB] mb-3">{result.headline}</h3>
           <p className="text-sm text-[#8585A0] leading-relaxed">{result.body}</p>
         </div>
 
         {/* 3 insights — your game plan */}
         <div className="bg-[#111116] border border-[#2A2A36] p-5 mb-8 text-left" style={{ borderRadius: "12px" }}>
-          <p className="text-[10px] text-white uppercase tracking-widest font-bold mb-4">Your personalized game plan</p>
+          <p className="text-[10px] text-foreground uppercase tracking-widest font-bold mb-4">Your personalized game plan</p>
           <ul className="flex flex-col gap-3">
             {result.plan.map((item, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm text-[#B0B0C8]">
-                <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
+                <Check className="w-3.5 h-3.5 text-foreground shrink-0 mt-0.5" />
                 {item}
               </li>
             ))}

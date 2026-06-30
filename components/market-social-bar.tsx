@@ -17,7 +17,7 @@ const toneStyles: Record<FeedSignal['tone'], string> = {
   yes:     'text-success/75',
   no:      'text-danger/75',
   whale:   'text-accent/90',
-  alert:   'text-white/60',
+  alert:   'text-foreground/60',
 }
 
 const toneDotStyles: Record<FeedSignal['tone'], string> = {

@@ -287,7 +287,7 @@ function LbRow({
         "w-6 text-center font-mono text-xs font-bold shrink-0",
         entry.rank === 1 ? "text-yellow-400" :
         entry.rank === 2 ? "text-slate-300"  :
-        entry.rank === 3 ? "text-white/50" :
+        entry.rank === 3 ? "text-foreground/50" :
         "text-muted-foreground/50"
       )}>
         {entry.rank <= 3 ? LB_MEDAL[entry.rank - 1] : `#${entry.rank}`}
@@ -311,7 +311,7 @@ function LbRow({
         "font-mono text-xs font-bold tabular-nums shrink-0",
         sort === "winrate"     && entry.winRate >= 60  ? "text-success" :
         sort === "winrate"     && entry.winRate <= 40  ? "text-danger"  :
-        sort === "streak"      ? "text-white" :
+        sort === "streak"      ? "text-foreground" :
         sort === "calibration" && (entry.calibrationScore ?? 0) >= 80 ? "text-success" :
         sort === "calibration" && (entry.calibrationScore ?? 0) >= 65 ? "text-accent"  :
         sort === "calibration" && entry.calibrationScore != null       ? "text-danger"  :
@@ -465,7 +465,7 @@ export function ProfileScreen({
     return null
   }
   const masteryStyle = {
-    gold:   "bg-white/10 text-white border border-white/25",
+    gold:   "bg-white/10 text-foreground border border-white/25",
     silver: "bg-[#94A3B8]/15 text-[#94A3B8] border border-[#94A3B8]/30",
     bronze: "bg-[#CD7F32]/15 text-[#CD7F32] border border-[#CD7F32]/30",
   } as const
@@ -518,8 +518,8 @@ export function ProfileScreen({
                   )}
                 >
                   {avatarUploading
-                    ? <Loader2 className="w-4 h-4 text-white animate-spin" />
-                    : <Camera className="w-4 h-4 text-white" />
+                    ? <Loader2 className="w-4 h-4 text-foreground animate-spin" />
+                    : <Camera className="w-4 h-4 text-foreground" />
                   }
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleAvatarChange} />

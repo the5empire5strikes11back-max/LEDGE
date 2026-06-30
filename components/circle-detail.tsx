@@ -282,8 +282,8 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
               className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               {avatarUploading
-                ? <Loader2 className="w-3 h-3 text-white animate-spin" />
-                : <Camera className="w-3 h-3 text-white" />
+                ? <Loader2 className="w-3 h-3 text-foreground animate-spin" />
+                : <Camera className="w-3 h-3 text-foreground" />
               }
             </button>
             <input ref={avatarFileRef} type="file" accept="image/*" className="sr-only" onChange={handleCircleAvatarChange} />
@@ -525,7 +525,7 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
               {sorted.map((member, i) => {
                 const pos = i + 1
                 const medalStyle =
-                  pos === 1 ? "text-white" :
+                  pos === 1 ? "text-foreground" :
                   pos === 2 ? "text-[#C0C0C0]" :
                   pos === 3 ? "text-[#CD7F32]" :
                   "text-muted-foreground"
@@ -592,7 +592,7 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
                     <button
                       onClick={handleDelete}
                       disabled={deleteLoading}
-                      className="flex-1 py-2 bg-danger text-white text-xs font-bold uppercase tracking-wider hover:bg-danger/90 transition-all active:scale-95 disabled:opacity-50"
+                      className="flex-1 py-2 bg-danger text-foreground text-xs font-bold uppercase tracking-wider hover:bg-danger/90 transition-all active:scale-95 disabled:opacity-50"
                       style={{ borderRadius: "var(--radius-button)" }}
                     >
                       {deleteLoading ? "Deleting…" : "Yes, Delete"}

@@ -95,7 +95,7 @@ export function Coachmark({
       </div>
 
       {/* Tap-anywhere hint */}
-      <p className="absolute bottom-8 left-0 right-0 text-center text-[11px] text-white/40">
+      <p className="absolute bottom-8 left-0 right-0 text-center text-[11px] text-foreground/40">
         Tap anywhere to close
       </p>
     </div>

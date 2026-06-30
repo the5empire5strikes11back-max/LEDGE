@@ -83,7 +83,7 @@ export function BetConfirmOverlay({
 
         {/* Side badge */}
         <div
-          className="px-5 py-2 text-sm font-black uppercase tracking-widest text-white"
+          className="px-5 py-2 text-sm font-black uppercase tracking-widest text-foreground"
           style={{
             backgroundColor: accentHex,
             borderRadius: "var(--radius-button)",

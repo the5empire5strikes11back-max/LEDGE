@@ -453,7 +453,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
                 </span>
               )}
               {market.creatorTrust != null && market.creatorTrust < 0.35 && (
-                <span className="text-[10px] font-semibold text-white/50 bg-white/[0.06] px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold text-foreground/50 bg-white/[0.06] px-1.5 py-0.5 rounded-full">
                   New creator
                 </span>
               )}

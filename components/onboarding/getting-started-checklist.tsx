@@ -89,7 +89,7 @@ export function GettingStartedChecklist({
                     : "border-muted-foreground/40 group-hover:border-accent/60"
                 )}
               >
-                {step.done && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                {step.done && <Check className="w-2.5 h-2.5 text-foreground" strokeWidth={3} />}
               </div>
               <span
                 className={cn(
