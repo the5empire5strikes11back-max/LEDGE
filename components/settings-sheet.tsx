@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { X, LogOut, Palette, User, Info, ChevronRight, Check, Shield } from "lucide-react"
+import { X, LogOut, User, Info, ChevronRight, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { ACCENT_COLORS, AccentColor, saveAndApplyAccent } from "@/lib/accent-theme"
 
 interface SettingsSheetProps {
   open: boolean
@@ -15,25 +14,10 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
-  const [activeAccent, setActiveAccent] = useState<AccentColor>(ACCENT_COLORS[0])
   const [loggingOut, setLoggingOut] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-
-  // Load saved accent on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('ledge_accent')
-    if (saved) {
-      const found = ACCENT_COLORS.find((c) => c.value === saved)
-      if (found) setActiveAccent(found)
-    }
-  }, [])
-
-  const handleAccentChange = (color: AccentColor) => {
-    setActiveAccent(color)
-    saveAndApplyAccent(color.value)
-  }
 
   const handleLogout = async () => {
     if (!confirmLogout) {
@@ -88,49 +72,6 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
         </div>
 
         <div className="overflow-y-auto max-h-[75vh] pb-8">
-
-          {/* ── APPEARANCE ── */}
-          <div className="px-5 pt-5 pb-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Palette className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Appearance</span>
-            </div>
-
-            <div
-              className="bg-card border border-border p-4 space-y-3"
-              style={{ borderRadius: "var(--radius-card)" }}
-            >
-              <p className="text-xs font-medium text-foreground">Accent Color</p>
-              <div className="grid grid-cols-8 gap-2">
-                {ACCENT_COLORS.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => handleAccentChange(color)}
-                    title={color.name}
-                    className="relative w-full aspect-square flex items-center justify-center transition-transform active:scale-90 hover:scale-110"
-                    style={{
-                      backgroundColor: color.value,
-                      borderRadius: "var(--radius-badge)",
-                      boxShadow: activeAccent.value === color.value
-                        ? `0 0 0 2px #0A0A0B, 0 0 0 4px ${color.value}`
-                        : undefined,
-                    }}
-                  >
-                    {activeAccent.value === color.value && (
-                      <Check
-                        className="w-3 h-3"
-                        style={{ color: color.fg }}
-                        strokeWidth={3}
-                      />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Currently: <span className="font-medium" style={{ color: activeAccent.value }}>{activeAccent.name}</span>
-              </p>
-            </div>
-          </div>
 
           {/* ── ACCOUNT ── */}
           <div className="px-5 pt-4 pb-2">

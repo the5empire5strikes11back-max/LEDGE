@@ -296,20 +296,22 @@ export function MarketFeedCard({
 
   return (
     <div
-      style={{ borderRadius: "var(--radius-card)", borderTop: `2px solid ${categoryTopColor[category]}`, ...style }}
+      style={{
+        borderRadius: "var(--radius-card)",
+        borderTop: `3px solid ${categoryTopColor[category]}`,
+        background: "#17171F",
+        border: `1px solid rgba(255,255,255,0.1)`,
+        borderTopWidth: "3px",
+        borderTopColor: categoryTopColor[category],
+        ...style,
+      }}
       className={cn(
-        "relative bg-card border overflow-hidden w-full",
+        "relative overflow-hidden w-full",
         // Spotlight: slow-pulse ring for first-session
         isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
-        // Featured: subtle left accent
-        isFeatured && !isResolved && "border-border border-l-2 border-l-accent",
-        // Default / hot
-        !isFeatured && !isResolved && "border-border",
         // Resolved positions
         isWin  && "border-l-2 border-l-success",
         isLoss && "border-l-2 border-l-danger opacity-75",
-        // Open position (not resolved)
-        hasUserBet && !isResolved && !isWin && !isLoss && "border-l-2 border-l-accent",
         // Volatility glow (overrides default border-color on the shadow only)
         glowClass,
         className
@@ -333,7 +335,10 @@ export function MarketFeedCard({
         {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
+            <span
+              className="text-[10px] uppercase tracking-wider font-bold shrink-0"
+              style={{ color: categoryTopColor[category] }}
+            >
               {subcategory || categoryLabel[category]}
             </span>
 
@@ -472,7 +477,7 @@ export function MarketFeedCard({
 
           {/* Question + creator attribution */}
           <div className="flex-1 min-w-0 pt-0.5">
-            <h3 className="text-[15px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
+            <h3 className="text-[15px] font-bold text-white leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
             </h3>
             {creatorUsername && (
@@ -484,7 +489,7 @@ export function MarketFeedCard({
         </button>
 
         {/* Row 3: YES/NO odds bar */}
-        <div className="relative h-1.5 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
+        <div className="relative h-2 overflow-hidden" style={{ borderRadius: "9999px", background: "rgba(255,255,255,0.06)" }}>
           <div
             className="absolute inset-y-0 left-0 bg-success transition-all duration-500 ease-out"
             style={{ width: `${yesPercent}%` }}
