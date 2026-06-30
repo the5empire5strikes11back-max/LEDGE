@@ -84,16 +84,6 @@ const categoryLabel: Record<MarketCategory, string> = {
   Circle:   "Circle",
 }
 
-const categoryTopColor: Record<MarketCategory, string> = {
-  Sports:   "#3B82F6",
-  Politics: "#8B5CF6",
-  Culture:  "#EC4899",
-  Tech:     "#06B6D4",
-  Viral:    "#F97316",
-  Wild:     "#A855F7",
-  Circle:   "#FFFFFF",
-}
-
 function formatCredits(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`
@@ -296,22 +286,20 @@ export function MarketFeedCard({
 
   return (
     <div
-      style={{
-        borderRadius: "var(--radius-card)",
-        borderTop: `3px solid ${categoryTopColor[category]}`,
-        background: "#17171F",
-        border: `1px solid rgba(255,255,255,0.1)`,
-        borderTopWidth: "3px",
-        borderTopColor: categoryTopColor[category],
-        ...style,
-      }}
+      style={{ borderRadius: "var(--radius-card)", ...style }}
       className={cn(
-        "relative overflow-hidden w-full",
+        "relative bg-card border overflow-hidden w-full",
         // Spotlight: slow-pulse ring for first-session
         isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
+        // Featured: subtle left accent
+        isFeatured && !isResolved && "border-border border-l-2 border-l-accent",
+        // Default / hot
+        !isFeatured && !isResolved && "border-border",
         // Resolved positions
         isWin  && "border-l-2 border-l-success",
         isLoss && "border-l-2 border-l-danger opacity-75",
+        // Open position (not resolved)
+        hasUserBet && !isResolved && !isWin && !isLoss && "border-l-2 border-l-accent",
         // Volatility glow (overrides default border-color on the shadow only)
         glowClass,
         className
@@ -335,10 +323,7 @@ export function MarketFeedCard({
         {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-[10px] uppercase tracking-wider font-bold shrink-0"
-              style={{ color: categoryTopColor[category] }}
-            >
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
               {subcategory || categoryLabel[category]}
             </span>
 
@@ -477,7 +462,7 @@ export function MarketFeedCard({
 
           {/* Question + creator attribution */}
           <div className="flex-1 min-w-0 pt-0.5">
-            <h3 className="text-[15px] font-bold text-white leading-snug group-hover:text-accent transition-colors line-clamp-3">
+            <h3 className="text-[15px] font-semibold text-foreground leading-snug group-hover:text-accent transition-colors line-clamp-3">
               {title}
             </h3>
             {creatorUsername && (
@@ -489,7 +474,7 @@ export function MarketFeedCard({
         </button>
 
         {/* Row 3: YES/NO odds bar */}
-        <div className="relative h-2 overflow-hidden" style={{ borderRadius: "9999px", background: "rgba(255,255,255,0.06)" }}>
+        <div className="relative h-1.5 bg-muted overflow-hidden" style={{ borderRadius: "9999px" }}>
           <div
             className="absolute inset-y-0 left-0 bg-success transition-all duration-500 ease-out"
             style={{ width: `${yesPercent}%` }}
@@ -541,38 +526,48 @@ export function MarketFeedCard({
             <button
               onClick={onBuyYes}
               className={cn(
-                "flex flex-col items-center justify-center py-3 px-4 gap-0.5",
-                "bg-success hover:bg-success/90",
-                "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]",
+                "flex items-center justify-between py-3 px-4 border",
+                "bg-success/8 border-success/20 hover:bg-success/14 hover:border-success/30",
+                "active:scale-[0.96] active:bg-success/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-success/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
               <div className="flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-white" />
-                <span className="text-[13px] font-black text-white uppercase tracking-wide">Yes</span>
+                <TrendingUp className="w-3 h-3 text-success" />
+                <span className="text-[11px] font-bold text-success uppercase tracking-wide">Yes</span>
               </div>
-              <div className="font-mono text-[10px] text-white/60 leading-none">
-                pays {payoutMultiplier(yesPercent)}
+              <div className="text-right">
+                <div className="font-mono text-sm font-black text-success leading-none">
+                  <AnimatedNumber value={yesPercent} />%
+                </div>
+                <div className="font-mono text-[9px] text-success/50 leading-none mt-0.5">
+                  {payoutMultiplier(yesPercent)}
+                </div>
               </div>
             </button>
 
             <button
               onClick={onBuyNo}
               className={cn(
-                "flex flex-col items-center justify-center py-3 px-4 gap-0.5",
-                "bg-danger hover:bg-danger/90",
-                "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]",
+                "flex items-center justify-between py-3 px-4 border",
+                "bg-danger/8 border-danger/20 hover:bg-danger/14 hover:border-danger/30",
+                "active:scale-[0.96] active:bg-danger/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-danger/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
               <div className="flex items-center gap-1.5">
-                <TrendingDown className="w-3.5 h-3.5 text-white" />
-                <span className="text-[13px] font-black text-white uppercase tracking-wide">No</span>
+                <TrendingDown className="w-3 h-3 text-danger" />
+                <span className="text-[11px] font-bold text-danger uppercase tracking-wide">No</span>
               </div>
-              <div className="font-mono text-[10px] text-white/60 leading-none">
-                pays {payoutMultiplier(noPercent)}
+              <div className="text-right">
+                <div className="font-mono text-sm font-black text-danger leading-none">
+                  <AnimatedNumber value={noPercent} />%
+                </div>
+                <div className="font-mono text-[9px] text-danger/50 leading-none mt-0.5">
+                  {payoutMultiplier(noPercent)}
+                </div>
               </div>
             </button>
           </div>
