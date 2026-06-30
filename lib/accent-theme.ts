@@ -102,10 +102,15 @@ export function applyAccentTheme(accent: string): void {
   el.style.setProperty('--sidebar-border',border)
 }
 
-/** Returns the saved accent from localStorage, or the default amber. */
+/** Returns the saved accent from localStorage, migrating legacy amber to white. */
 export function getSavedAccent(): string {
   if (typeof window === 'undefined') return '#FFFFFF'
-  return localStorage.getItem('ledge_accent') ?? '#FFFFFF'
+  const saved = localStorage.getItem('ledge_accent')
+  if (!saved || saved === '#F5A623' || saved === '#FFD700') {
+    localStorage.setItem('ledge_accent', '#FFFFFF')
+    return '#FFFFFF'
+  }
+  return saved
 }
 
 /** Saves and applies the chosen accent. */
