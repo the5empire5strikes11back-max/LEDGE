@@ -16,18 +16,18 @@ import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Plus, Flame, Star, ChevronLeft, Search, X as XIcon } from "lucide-react"
+import { Plus, Flame, Star, ChevronLeft, Search, X as XIcon, Bookmark } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { pushOddsPoint, seedOddsHistory, type OddsPoint } from "@/lib/odds-history"
 import { useOnboarding } from "@/lib/onboarding"
 import { rankFeedFirstSession, buildAffinityMap } from "@/lib/feed-ranker"
 import { computeCompoundState } from "@/lib/feed-signals"
 import { useSessionArc, formatCloseTime } from "@/lib/session-arc"
-import { isLive, formatTimeLeft } from "@/lib/market-live"
+import { isLive } from "@/lib/market-live"
 import type { CompoundState, IdentitySignal } from "@/lib/feed-signals"
 import type { Persona } from "@/lib/game-engine"
 
-type Category = "All" | "Live" | "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
+type Category = "All" | "Mine" | "Live" | "Sports" | "Politics" | "Culture" | "Tech" | "Viral" | "Wild" | "Circle"
 
 const ALL_TABS: Category[] = ["All", "Live", "Sports", "Politics", "Culture", "Tech", "Viral", "Wild", "Circle"]
 // Circle and Live are hidden on first session
@@ -237,11 +237,22 @@ export function FeedScreen({
     () => markets.some((m) => m.category === "Circle"),
     [markets]
   )
+  // Open positions — drives the "Mine" tab (and removes bet markets from the
+  // browse feeds so new markets aren't buried under ones you've already played).
+  const betCount = markets.filter((m) => m.userBet).length
   const TABS = useMemo(() => {
     const base = [...(isFirstSession ? FIRST_SESSION_TABS : ALL_TABS)]
     if (hasCircleMarkets && !base.includes("Circle")) base.push("Circle")
+    // "Mine" sits right after "All", and only when you have open positions.
+    if (betCount > 0 && !base.includes("Mine")) base.splice(1, 0, "Mine")
     return base
-  }, [isFirstSession, hasCircleMarkets])
+  }, [isFirstSession, hasCircleMarkets, betCount])
+
+  // If you close your last open position while on the Mine tab, fall back to All
+  // so you're never stranded on an empty tab that's about to disappear.
+  useEffect(() => {
+    if (activeTab === "Mine" && betCount === 0) setActiveTab("All")
+  }, [activeTab, betCount])
 
   // Session arc — tracks emotional phase of this session
   const { arc, recordBet: arcRecordBet, recordInteraction } = useSessionArc()
@@ -364,14 +375,16 @@ export function FeedScreen({
 
 
 
-  // Markets the user has bet on stay in the feed as open-position cards —
-  // hiding them reads as a bug ("where did my market go?"). They also appear
-  // in Profile > Bets Made.
-  const rawFiltered = activeTab === "All"
-    ? markets
+  // Markets you've bet on move out of the browse feeds and live in their own
+  // "Mine" tab — so the home feed is always fresh markets, never buried under
+  // positions you've already played. They also remain in Profile > Bets Made.
+  const rawFiltered = activeTab === "Mine"
+    ? markets.filter((m) => m.userBet)
+    : activeTab === "All"
+    ? markets.filter((m) => !m.userBet)
     : activeTab === "Live"
-    ? markets.filter((m) => !m.resolved && isLive(m.endTime))
-    : markets.filter((m) => m.category === activeTab)
+    ? markets.filter((m) => !m.resolved && !m.userBet && isLive(m.endTime))
+    : markets.filter((m) => m.category === activeTab && !m.userBet)
 
   // Apply subcategory filter using keyword matching on market title
   const subcatFiltered = activeSubcat
@@ -766,57 +779,8 @@ export function FeedScreen({
           <DailyChallenges />
         )}
 
-        {/* ── Happening Now rail ───────────────────────────────────────────────
-            Horizontal strip of live markets shown only on the All tab.
-            Each chip is a compact tap-target that opens the market detail. */}
-        {activeTab === "All" && !searchTrimmed && liveCount > 0 && (
-          <div className="border-b border-border bg-red-500/3">
-            <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse shrink-0" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400">
-                Happening Now
-              </span>
-              <span className="text-[10px] text-muted-foreground/50 font-mono">
-                {liveCount} live
-              </span>
-            </div>
-            <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 pb-3 pt-1">
-              {liveMarkets.slice(0, 8).map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => { recordInteraction(); setDetailMarket(m) }}
-                  className={cn(
-                    "shrink-0 flex flex-col gap-1.5 w-[148px] px-3 py-2.5 text-left",
-                    "bg-background border border-red-500/20 hover:border-red-500/40",
-                    "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]"
-                  )}
-                  style={{ borderRadius: "var(--radius-card)" }}
-                >
-                  {/* Title */}
-                  <p className="text-[11px] font-semibold text-foreground leading-tight line-clamp-2 min-h-[2.4em]">
-                    {m.title}
-                  </p>
-                  {/* Stats row */}
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-mono text-sm font-black tabular-nums text-foreground">
-                      {Math.round(m.yesPercent)}<span className="text-muted-foreground/60">% YES</span>
-                    </span>
-                    <span className="text-[9px] font-mono text-red-400/80 tabular-nums">
-                      {formatTimeLeft(m.endTime)}
-                    </span>
-                  </div>
-                  {/* Slim odds bar */}
-                  <div className="h-0.5 bg-muted overflow-hidden w-full" style={{ borderRadius: "9999px" }}>
-                    <div
-                      className="h-full bg-success/60 transition-all duration-500"
-                      style={{ width: `${m.yesPercent}%` }}
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Happening Now rail removed for a lighter feed — live markets still
+            surface in the feed itself (LIVE badge) and the scrolling ticker. */}
 
         {/* Filter tabs + subcategory chips */}
         <div className="sticky top-0 z-10 bg-background border-b border-border">
@@ -881,6 +845,19 @@ export function FeedScreen({
                         {liveCount}
                       </span>
                     )}
+                  </span>
+                ) : tab === "Mine" ? (
+                  <span className="flex items-center gap-1.5">
+                    <Bookmark className="w-3 h-3 shrink-0" />
+                    Mine
+                    <span className={cn(
+                      "text-[9px] font-black px-1 py-0 leading-4",
+                      activeTab === "Mine"
+                        ? "bg-black/15 text-accent-foreground"
+                        : "bg-accent/15 text-accent"
+                    )} style={{ borderRadius: "3px" }}>
+                      {betCount}
+                    </span>
                   </span>
                 ) : tab}
               </button>

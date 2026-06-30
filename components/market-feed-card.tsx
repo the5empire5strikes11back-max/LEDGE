@@ -521,8 +521,8 @@ export function MarketFeedCard({
           </div>
         )}
 
-        {/* Row 4: Trade buttons */}
-        {!isResolved && !isAwaitingResult && !voided && (
+        {/* Row 4: Trade buttons — hidden once you've bet (then the position shows) */}
+        {!isResolved && !isAwaitingResult && !voided && !hasUserBet && (
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={onBuyYes}
@@ -558,6 +558,30 @@ export function MarketFeedCard({
           </div>
         )}
 
+        {/* Open position — once you've bet, the card tracks your position instead
+            of the buttons. These markets live on the feed's "Mine" tab. */}
+        {hasUserBet && !isResolved && (
+          <div
+            className="flex items-center justify-between px-3.5 py-2.5 bg-surface-2 border border-border"
+            style={{ borderRadius: "var(--radius-button)" }}
+          >
+            <div>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Your position</span>
+              <p className={cn(
+                "text-xs font-mono font-bold mt-0.5",
+                userBet!.side === "yes" ? "text-success" : "text-danger"
+              )}>
+                {userBet!.side.toUpperCase()} · {formatCredits(userBet!.amount)} CR
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Now</span>
+              <p className="text-xs font-mono font-bold mt-0.5 text-foreground">
+                {(userBet!.side === "yes" ? yesPercent : noPercent).toFixed(0)}%
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Resolved position */}
         {hasUserBet && isResolved && isWin && (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Target, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { DailyChallenge } from "@/app/api/challenges/route"
 
@@ -13,6 +13,9 @@ interface DailyChallengesProps {
 export function DailyChallenges({ onLoaded }: DailyChallengesProps) {
   const [challenges, setChallenges] = useState<DailyChallenge[]>([])
   const [loading, setLoading] = useState(true)
+  // Collapsed by default — the feed should land you on market cards, not a
+  // dashboard. The pill stays as a one-line entry point you can expand.
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     fetch('/api/challenges')
@@ -27,47 +30,59 @@ export function DailyChallenges({ onLoaded }: DailyChallengesProps) {
 
   if (loading) {
     return (
-      <div className="px-4 pt-3 pb-2.5">
-        <div className="flex gap-2 overflow-x-auto scrollbar-none">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="skeleton shrink-0 w-[130px] h-[64px]"
-              style={{ borderRadius: "var(--radius-card)", animationDelay: `${i * 80}ms` }}
-            />
-          ))}
-        </div>
+      <div className="px-4 pt-3 pb-1.5">
+        <div className="skeleton h-[42px] w-full" style={{ borderRadius: "var(--radius-card)" }} />
       </div>
     )
   }
 
   if (challenges.length === 0) return null
 
-  const allDone = challenges.every((c) => c.completed)
-  const totalXp = challenges.reduce((s, c) => s + (c.completed ? c.xp : 0), 0)
-  const maxXp   = challenges.reduce((s, c) => s + c.xp, 0)
+  const allDone   = challenges.every((c) => c.completed)
+  const doneCount = challenges.filter((c) => c.completed).length
+  const maxXp     = challenges.reduce((s, c) => s + c.xp, 0)
 
   return (
-    <div className="px-4 pt-3 pb-2.5">
-      {/* Section header */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
+    <div className="px-4 pt-3 pb-1.5">
+      {/* Collapsed pill — one slim line, tap to reveal the challenge chips */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className={cn(
+          "w-full flex items-center gap-2.5 px-3.5 py-2.5 border transition-colors",
+          allDone
+            ? "bg-success/8 border-success/20"
+            : "bg-card border-border hover:border-border/70"
+        )}
+        style={{ borderRadius: "var(--radius-card)" }}
+      >
+        <Target className={cn("w-3.5 h-3.5 shrink-0", allDone ? "text-success" : "text-accent")} aria-hidden="true" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
           Today's Challenges
         </span>
         <span className={cn(
-          "text-[10px] font-mono font-bold tabular-nums",
-          allDone ? "text-success" : "text-muted-foreground/60"
+          "ml-auto text-[10px] font-mono font-bold tabular-nums",
+          allDone ? "text-success" : "text-muted-foreground/70"
         )}>
-          {allDone ? `+${maxXp} XP ✓` : `${totalXp}/${maxXp} XP`}
+          {allDone ? `+${maxXp} XP ✓` : `${doneCount}/${challenges.length}`}
         </span>
-      </div>
+        <ChevronDown
+          className={cn(
+            "w-3.5 h-3.5 text-muted-foreground/50 transition-transform duration-200 shrink-0",
+            expanded && "rotate-180"
+          )}
+          aria-hidden="true"
+        />
+      </button>
 
-      {/* Horizontal strip of challenge chips */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-        {challenges.map((c) => (
-          <ChallengeChip key={c.id} challenge={c} />
-        ))}
-      </div>
+      {/* Expanded: horizontal strip of challenge chips */}
+      {expanded && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+          {challenges.map((c) => (
+            <ChallengeChip key={c.id} challenge={c} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
