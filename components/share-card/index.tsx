@@ -84,21 +84,21 @@ export function ShareCardModal({
   function buildShareText(): string {
     switch (activeTab) {
       case "persona":
-        return `I'm ${persona.label} on Ledge — ${winRate}% win rate across ${marketsPlayed} predictions. ${persona.emoji}\n\nledge.app`
+        return `I'm ${persona.label} on Ledge — ${winRate}% win rate across ${marketsPlayed} predictions. ${persona.emoji}\n\nledge-phi.vercel.app`
       case "rank":
-        return `Just hit ${rank.toUpperCase()} rank on Ledge with ${xp.toLocaleString()} XP ✦\n\nledge.app`
+        return `Just hit ${rank.toUpperCase()} rank on Ledge with ${xp.toLocaleString()} XP ✦\n\nledge-phi.vercel.app`
       case "flex":
         if (cardData?.bestBet) {
           const { marketTitle, payoutMultiplier, side, profit } = cardData.bestBet
-          return `Called it on Ledge 🎯\n\n"${marketTitle}"\n${side.toUpperCase()} · ${payoutMultiplier}x payout · +${profit.toLocaleString()} CR\n\nledge.app`
+          return `Called it on Ledge 🎯\n\n"${marketTitle}"\n${side.toUpperCase()} · ${payoutMultiplier}x payout · +${profit.toLocaleString()} CR\n\nledge-phi.vercel.app`
         }
-        return "Making predictions on Ledge. ledge.app"
+        return "Making predictions on Ledge. ledge-phi.vercel.app"
       case "streak":
-        return `${streak}-day prediction streak on Ledge 🔥\n\nledge.app`
+        return `${streak}-day prediction streak on Ledge 🔥\n\nledge-phi.vercel.app`
       case "leaderboard":
         return leaderboardRank
-          ? `#${leaderboardRank} on the Ledge global leaderboard 🏆\n\nledge.app`
-          : "On the Ledge leaderboard. ledge.app"
+          ? `#${leaderboardRank} on the Ledge global leaderboard 🏆\n\nledge-phi.vercel.app`
+          : "On the Ledge leaderboard. ledge-phi.vercel.app"
     }
   }
 
