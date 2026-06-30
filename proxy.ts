@@ -83,26 +83,22 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to login (except auth routes)
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api')
-  const isPublicRoute =
-    request.nextUrl.pathname === '/landing' ||
-    request.nextUrl.pathname === '/privacy' ||
-    request.nextUrl.pathname === '/terms' ||
-    request.nextUrl.pathname === '/onboarding' ||
-    // Search-engine verification / SEO files must be reachable while logged out
-    (request.nextUrl.pathname.startsWith('/google') && request.nextUrl.pathname.endsWith('.html')) ||
-    request.nextUrl.pathname === '/robots.txt' ||
-    request.nextUrl.pathname === '/sitemap.xml'
 
-  if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
+  // The app opens directly for everyone. Guests browse the live feed and are
+  // shown a sign-in prompt the moment they try a gated action (place a bet,
+  // create a circle, etc.). Every mutating API is auth-guarded server-side, so
+  // no redirect gate is needed here — guest access is safe by construction.
+  //
+  // The standalone landing page was removed; any old /landing link, bookmark, or
+  // shared OG URL redirects to the app root so nothing 404s.
+  if (request.nextUrl.pathname === '/landing') {
     const url = request.nextUrl.clone()
-    url.pathname = '/landing'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from auth pages
+  // Authenticated users never see the auth pages — bounce them into the app.
   if (user && isAuthRoute && !request.nextUrl.pathname.startsWith('/auth/callback')) {
     const url = request.nextUrl.clone()
     url.pathname = '/'

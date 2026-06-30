@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    url: `${BASE_URL}/landing`,
+    url: BASE_URL,
     title: OG_TITLE,
     description: OG_DESCRIPTION,
     siteName: 'Ledge',
