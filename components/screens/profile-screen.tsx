@@ -501,7 +501,7 @@ export function ProfileScreen({
 
           {/* ── Identity card — always visible, never collapsible ── */}
           <div
-            className={cn("bg-card border px-4 py-4", isPlus ? "border-accent/50" : "border-border")}
+            className={cn("bg-card border px-4 py-4 card-lift", isPlus ? "border-accent/50" : "border-border")}
             style={{ borderRadius: "var(--radius-card)" }}
           >
             <div className="flex items-center gap-3">

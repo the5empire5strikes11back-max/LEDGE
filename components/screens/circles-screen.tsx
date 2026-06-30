@@ -93,7 +93,7 @@ function CircleCard({ circle, onClick }: { circle: Circle; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-card border border-border hover:border-accent/40 transition-all duration-200 overflow-hidden group"
+      className="w-full text-left bg-card border border-border hover:border-accent/40 transition-all duration-200 overflow-hidden group card-lift"
       style={{ borderRadius: "var(--radius-card)" }}
     >
       <div className="p-4 flex flex-col gap-3">
