@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from "react"
-import { TrendingUp, TrendingDown, Clock, ShieldCheck } from "lucide-react"
+import { Clock, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Countdown } from "@/components/ui/countdown"
 import { OddsSparkline } from "@/components/ui/odds-sparkline"
@@ -82,6 +82,16 @@ const categoryLabel: Record<MarketCategory, string> = {
   Viral:    "Viral",
   Wild:     "Wild",
   Circle:   "Circle",
+}
+
+const CATEGORY_COLORS: Record<MarketCategory, string> = {
+  Sports:   "#3B82F6",
+  Politics: "#8B5CF6",
+  Culture:  "#EC4899",
+  Tech:     "#06B6D4",
+  Viral:    "#F97316",
+  Wild:     "#A855F7",
+  Circle:   "#FFFFFF",
 }
 
 function formatCredits(value: number): string {
@@ -286,9 +296,9 @@ export function MarketFeedCard({
 
   return (
     <div
-      style={{ borderRadius: "var(--radius-card)", ...style }}
+      style={{ borderRadius: "var(--radius-card)", borderTop: `2px solid ${CATEGORY_COLORS[category]}60`, ...style }}
       className={cn(
-        "relative bg-card border overflow-hidden w-full",
+        "relative bg-surface-2 border overflow-hidden w-full transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
         // Spotlight: slow-pulse ring for first-session
         isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
         // Featured: subtle left accent
@@ -323,7 +333,10 @@ export function MarketFeedCard({
         {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
+            <span
+              className="text-[10px] uppercase tracking-wider font-bold shrink-0"
+              style={{ color: CATEGORY_COLORS[category] }}
+            >
               {subcategory || categoryLabel[category]}
             </span>
 
@@ -526,49 +539,33 @@ export function MarketFeedCard({
             <button
               onClick={onBuyYes}
               className={cn(
-                "flex items-center justify-between py-3 px-4 border",
-                "bg-success/8 border-success/20 hover:bg-success/14 hover:border-success/30",
-                "active:scale-[0.96] active:bg-success/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
+                "flex flex-col items-center justify-center py-3 px-4 gap-0.5",
+                "bg-success hover:bg-success/90",
+                "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-success/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
-              <div className="flex items-center gap-1.5">
-                <TrendingUp className="w-3 h-3 text-success" />
-                <span className="text-[11px] font-bold text-success uppercase tracking-wide">Yes</span>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-sm font-black text-success leading-none">
-                  <AnimatedNumber value={yesPercent} />%
-                </div>
-                <div className="font-mono text-[9px] text-success/50 leading-none mt-0.5">
-                  {payoutMultiplier(yesPercent)}
-                </div>
-              </div>
+              <span className="text-[12px] font-black text-black uppercase tracking-wide">YES</span>
+              <span className="font-mono text-[9px] text-black/60 leading-none">
+                {payoutMultiplier(yesPercent)}
+              </span>
             </button>
 
             <button
               onClick={onBuyNo}
               className={cn(
-                "flex items-center justify-between py-3 px-4 border",
-                "bg-danger/8 border-danger/20 hover:bg-danger/14 hover:border-danger/30",
-                "active:scale-[0.96] active:bg-danger/20 transition-all duration-[80ms] ease-[var(--ease-sharp)]",
+                "flex flex-col items-center justify-center py-3 px-4 gap-0.5",
+                "bg-danger hover:bg-danger/90",
+                "active:scale-[0.96] transition-all duration-[80ms] ease-[var(--ease-sharp)]",
                 pulseCTA && "ring-2 ring-danger/50 animate-pulse"
               )}
               style={{ borderRadius: "var(--radius-button)" }}
             >
-              <div className="flex items-center gap-1.5">
-                <TrendingDown className="w-3 h-3 text-danger" />
-                <span className="text-[11px] font-bold text-danger uppercase tracking-wide">No</span>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-sm font-black text-danger leading-none">
-                  <AnimatedNumber value={noPercent} />%
-                </div>
-                <div className="font-mono text-[9px] text-danger/50 leading-none mt-0.5">
-                  {payoutMultiplier(noPercent)}
-                </div>
-              </div>
+              <span className="text-[12px] font-black text-white uppercase tracking-wide">NO</span>
+              <span className="font-mono text-[9px] text-white/60 leading-none">
+                {payoutMultiplier(noPercent)}
+              </span>
             </button>
           </div>
         )}
