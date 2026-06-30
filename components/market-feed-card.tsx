@@ -289,7 +289,7 @@ export function MarketFeedCard({
     <div
       style={{ borderRadius: "var(--radius-card)", ...style }}
       className={cn(
-        "relative bg-surface-2 border overflow-hidden w-full transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
+        "relative bg-surface-2 border overflow-hidden w-full card-lift",
         // Spotlight: slow-pulse ring for first-session
         isSpotlight && !isResolved && "ring-2 ring-accent/40 ring-offset-1 ring-offset-background",
         // Featured: subtle left accent
@@ -454,7 +454,7 @@ export function MarketFeedCard({
             {!isResolved && (
               <span className={cn(
                 "text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5",
-                isCrowdOdds ? "text-accent/50" : "text-white/30"
+                isCrowdOdds ? "text-accent/50" : "text-muted-foreground"
               )}>
                 {isCrowdOdds ? "Crowd" : "AI est."}
               </span>

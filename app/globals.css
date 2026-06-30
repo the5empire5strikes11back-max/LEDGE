@@ -68,11 +68,11 @@
   --chart-5: #D07090;   /* rose    H=355 — distinct from danger */
 
   /* ── Radius Scale ─────────────────────────────────────────────────── */
-  --radius:        8px;
-  --radius-badge:  4px;    /* Status chips, micro labels */
-  --radius-button: 6px;    /* All buttons */
-  --radius-card:   8px;    /* Cards, panels */
-  --radius-sheet:  12px;   /* Bottom sheets, modals */
+  --radius:        10px;
+  --radius-badge:  5px;    /* Status chips, micro labels */
+  --radius-button: 10px;   /* All buttons */
+  --radius-card:   12px;   /* Cards, panels */
+  --radius-sheet:  16px;   /* Bottom sheets, modals */
   --radius-pill:   9999px; /* Toggle tracks, progress bars */
 
   /* ── Motion Scale ─────────────────────────────────────────────────── */
@@ -94,6 +94,13 @@
   --glow-accent:  0 0 20px rgba(255, 255, 255, 0.08);
   --glow-success: 0 0 16px rgba( 34, 197,  94, 0.14);
   --glow-danger:  0 0 16px rgba(239,  68,  68, 0.14);
+
+  /* ── Depth (premium card elevation) ──────────────────────────────── */
+  /* Soft drop shadow lifts the card off the canvas; the inset top highlight
+     catches light along the top edge so the card reads as a physical object. */
+  --shadow-card:     0 14px 34px -14px rgba(0, 0, 0, 0.70);
+  --shadow-card-top: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  --border-elevated: rgba(255, 255, 255, 0.09);
 
   /* ── Sidebar ──────────────────────────────────────────────────────── */
   --sidebar:                  #0D0D10;
@@ -120,7 +127,7 @@
 /* ── Tailwind theme mapping ─────────────────────────────────────────────── */
 @theme inline {
   /* Typography */
-  --font-sans: 'Space Grotesk', 'Space Grotesk Fallback', system-ui, sans-serif;
+  --font-sans: 'Hanken Grotesk', 'Hanken Grotesk Fallback', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
 
   /* Color aliases */
@@ -204,6 +211,20 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* ── Premium grain ───────────────────────────────────────────────────
+     A barely-there film grain over the canvas. Sits at z-index -1 (above the
+     background fill, behind all content) so text stays perfectly crisp. Kills
+     the flat-digital feel that cheap dark UIs have. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   /* Reduce motion for users who prefer it */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -260,6 +281,43 @@
   .card-interactive:active {
     background: var(--surface-2);
     border-color: #2A2A35;
+  }
+
+  /* ── Premium elevated card ───────────────────────────────────────────
+     The lifted-off-the-page treatment: soft shadow + top highlight + a
+     slightly brighter hairline. Hover (desktop) deepens the lift and
+     brightens the edge so the feed feels alive before you tap. */
+  .card-elevated {
+    background: var(--card);
+    border: 1px solid var(--border-elevated);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card), var(--shadow-card-top);
+    transition: box-shadow   var(--dur-base) var(--ease-sharp),
+                border-color var(--dur-base) var(--ease-sharp),
+                transform    var(--dur-base) var(--ease-sharp);
+  }
+  @media (hover: hover) {
+    .card-elevated:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      box-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.80), var(--shadow-card-top);
+      transform: translateY(-2px);
+    }
+  }
+
+  /* ── Lift only ───────────────────────────────────────────────────────
+     Adds the premium shadow + hover lift WITHOUT touching background or
+     border, so cards that carry their own conditional borders (featured,
+     win, loss, open position) keep them and still feel elevated. */
+  .card-lift {
+    box-shadow: var(--shadow-card), var(--shadow-card-top);
+    transition: box-shadow var(--dur-base) var(--ease-sharp),
+                transform  var(--dur-base) var(--ease-sharp);
+  }
+  @media (hover: hover) {
+    .card-lift:hover {
+      box-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.80), var(--shadow-card-top);
+      transform: translateY(-2px);
+    }
   }
 
   /* ── Skeleton loader ────────────────────────────────────────────────── */
