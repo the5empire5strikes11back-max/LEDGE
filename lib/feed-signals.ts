@@ -140,7 +140,7 @@ export function computeIdentitySignal(
     return {
       type: "comeback-mode",
       label: "Comeback shot",
-      color: "text-orange-400",
+      color: "text-white/70",
     }
   }
 

@@ -653,7 +653,7 @@ export function FeedScreen({
                 <>
                   <span className="text-border shrink-0">·</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="inline-flex items-center gap-1 text-[10px] text-orange-400 uppercase tracking-wider font-semibold">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-white/70 uppercase tracking-wider font-semibold">
                       <Flame className="w-3 h-3 shrink-0" /><span className="font-mono">{hotCount}</span> hot
                     </span>
                   </div>

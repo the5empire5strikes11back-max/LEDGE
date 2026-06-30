@@ -17,7 +17,7 @@ const toneStyles: Record<FeedSignal['tone'], string> = {
   yes:     'text-success/75',
   no:      'text-danger/75',
   whale:   'text-accent/90',
-  alert:   'text-amber-400/80',
+  alert:   'text-white/60',
 }
 
 const toneDotStyles: Record<FeedSignal['tone'], string> = {
@@ -25,7 +25,7 @@ const toneDotStyles: Record<FeedSignal['tone'], string> = {
   yes:     'bg-success/60',
   no:      'bg-danger/60',
   whale:   'bg-accent/80',
-  alert:   'bg-amber-400/70',
+  alert:   'bg-white/50',
 }
 
 export function MarketSocialBar({

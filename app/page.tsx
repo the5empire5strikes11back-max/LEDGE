@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { TrendingUp, Users, User, Zap, Flame, Star, AlertTriangle, ShoppingBag, Target, CircleDot } from "lucide-react"
+import { TrendingUp, Users, User, Flame, Star, AlertTriangle, ShoppingBag, Target, CircleDot } from "lucide-react"
 import { ShopModal } from "@/components/shop-modal"
 import { XpProgressBar } from "@/components/xp-progress-bar"
 import { XpFloatBadge } from "@/components/xp-float-badge"
@@ -540,7 +540,7 @@ export default function App() {
             >
               <Icon className={cn(
                 "w-4 h-4 shrink-0 transition-all duration-150",
-                screen === id && "drop-shadow-[0_0_6px_rgba(245,166,35,0.7)]"
+                screen === id && "drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]"
               )} />
               {label}
               <span className="ml-auto flex items-center gap-1">
@@ -555,13 +555,6 @@ export default function App() {
             )
           })}
 
-          {/* Live indicator strip */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 px-3 py-1.5">
-              <Zap className="w-3 h-3 text-accent/60" />
-              <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">Live Markets</span>
-            </div>
-          </div>
         </nav>
 
         {/* Bottom user section */}

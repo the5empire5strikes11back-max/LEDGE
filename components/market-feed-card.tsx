@@ -453,7 +453,7 @@ export function MarketFeedCard({
             {!isResolved && (
               <span className={cn(
                 "text-[8px] font-bold uppercase tracking-widest leading-none mt-0.5",
-                isCrowdOdds ? "text-accent/50" : "text-amber-500/50"
+                isCrowdOdds ? "text-accent/50" : "text-white/30"
               )}>
                 {isCrowdOdds ? "Crowd" : "AI est."}
               </span>

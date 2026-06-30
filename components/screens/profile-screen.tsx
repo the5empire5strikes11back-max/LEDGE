@@ -287,7 +287,7 @@ function LbRow({
         "w-6 text-center font-mono text-xs font-bold shrink-0",
         entry.rank === 1 ? "text-yellow-400" :
         entry.rank === 2 ? "text-slate-300"  :
-        entry.rank === 3 ? "text-orange-400" :
+        entry.rank === 3 ? "text-white/50" :
         "text-muted-foreground/50"
       )}>
         {entry.rank <= 3 ? LB_MEDAL[entry.rank - 1] : `#${entry.rank}`}
@@ -311,7 +311,7 @@ function LbRow({
         "font-mono text-xs font-bold tabular-nums shrink-0",
         sort === "winrate"     && entry.winRate >= 60  ? "text-success" :
         sort === "winrate"     && entry.winRate <= 40  ? "text-danger"  :
-        sort === "streak"      ? "text-orange-400" :
+        sort === "streak"      ? "text-white" :
         sort === "calibration" && (entry.calibrationScore ?? 0) >= 80 ? "text-success" :
         sort === "calibration" && (entry.calibrationScore ?? 0) >= 65 ? "text-accent"  :
         sort === "calibration" && entry.calibrationScore != null       ? "text-danger"  :

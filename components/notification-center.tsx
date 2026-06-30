@@ -24,7 +24,7 @@ const HOOK_CONFIG: Record<ReturnHook["type"], {
   border: string
   chipLabel: string
 }> = {
-  resolves_soon:     { Icon: Clock,        color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/25", chipLabel: "Closes Soon" },
+  resolves_soon:     { Icon: Clock,        color: "text-white/60",    bg: "bg-white/[0.06]",   border: "border-white/15",      chipLabel: "Closes Soon" },
   winning:           { Icon: Award,        color: "text-success",     bg: "bg-success/10",     border: "border-success/25",    chipLabel: "Winning"     },
   sentiment_shifted: { Icon: TrendingDown, color: "text-accent",      bg: "bg-accent/10",      border: "border-accent/25",     chipLabel: "Crowd Shifted" },
   close_call:        { Icon: Scale,        color: "text-purple-400",  bg: "bg-purple-400/10",  border: "border-purple-400/25", chipLabel: "Close Call"  },
