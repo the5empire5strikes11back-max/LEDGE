@@ -84,15 +84,6 @@ const categoryLabel: Record<MarketCategory, string> = {
   Circle:   "Circle",
 }
 
-const CATEGORY_COLORS: Record<MarketCategory, string> = {
-  Sports:   "#3B82F6",
-  Politics: "#8B5CF6",
-  Culture:  "#EC4899",
-  Tech:     "#06B6D4",
-  Viral:    "#F97316",
-  Wild:     "#A855F7",
-  Circle:   "#FFFFFF",
-}
 
 function formatCredits(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
@@ -296,7 +287,7 @@ export function MarketFeedCard({
 
   return (
     <div
-      style={{ borderRadius: "var(--radius-card)", borderTop: `2px solid ${CATEGORY_COLORS[category]}60`, ...style }}
+      style={{ borderRadius: "var(--radius-card)", ...style }}
       className={cn(
         "relative bg-surface-2 border overflow-hidden w-full transition-shadow duration-200 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
         // Spotlight: slow-pulse ring for first-session
@@ -333,10 +324,7 @@ export function MarketFeedCard({
         {/* Row 1: Category · live signals · time */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-[10px] uppercase tracking-wider font-bold shrink-0"
-              style={{ color: CATEGORY_COLORS[category] }}
-            >
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium shrink-0">
               {subcategory || categoryLabel[category]}
             </span>
 
@@ -534,7 +522,7 @@ export function MarketFeedCard({
         )}
 
         {/* Row 4: Trade buttons */}
-        {!isResolved && !isAwaitingResult && !voided && !hasUserBet && (
+        {!isResolved && !isAwaitingResult && !voided && (
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={onBuyYes}
@@ -570,29 +558,6 @@ export function MarketFeedCard({
           </div>
         )}
 
-        {/* Open position */}
-        {hasUserBet && !isResolved && (
-          <div
-            className="flex items-center justify-between px-3 py-2 bg-surface border border-border"
-            style={{ borderRadius: "var(--radius-button)" }}
-          >
-            <div>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Open position</span>
-              <p className="text-xs font-mono font-bold text-foreground mt-0.5">
-                {userBet.side.toUpperCase()} · {formatCredits(userBet.amount)} CR
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Current</span>
-              <p className={cn(
-                "text-xs font-mono font-bold mt-0.5",
-                userBet.side === "yes" ? "text-success" : "text-danger"
-              )}>
-                {(userBet.side === "yes" ? yesPercent : noPercent).toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Resolved position */}
         {hasUserBet && isResolved && isWin && (
