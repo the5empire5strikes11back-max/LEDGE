@@ -92,7 +92,7 @@ export function CardFooter({ username }: { username: string }) {
       style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}
     >
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", letterSpacing: "0.06em" }}>
-        ledge.app
+        ledge-phi.vercel.app
       </span>
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>
         @{username}
