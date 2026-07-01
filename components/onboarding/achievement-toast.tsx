@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface FirstBetAchievementProps {
@@ -85,14 +85,29 @@ function ConfettiBurst({ active }: { active: boolean }) {
 export function FirstBetAchievement({ show, onDone }: FirstBetAchievementProps) {
   const [phase, setPhase] = useState<"idle" | "in" | "hold" | "out">("idle")
 
+  // Keep the latest onDone without making it an effect dependency. The parent
+  // passes a fresh closure every render; if we depended on it the effect would
+  // restart on every parent re-render (the credits ticker alone re-renders
+  // constantly), resetting phase to "in" and making the card flicker / take
+  // seconds to appear.
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+
+  // Animate out, then notify the parent. Stable identity so it is safe as a dep.
+  const finish = useCallback(() => {
+    setPhase("out")
+    setTimeout(() => onDoneRef.current(), 400)
+  }, [])
+
   useEffect(() => {
-    if (!show) return
+    // Fully reset when hidden. Without this, dismissing left phase on "hold" and
+    // the overlay stayed on screen — the "Keep Predicting does nothing" bug.
+    if (!show) { setPhase("idle"); return }
     setPhase("in")
     const t1 = setTimeout(() => setPhase("hold"), 100)
-    const t2 = setTimeout(() => setPhase("out"), 4500)
-    const t3 = setTimeout(() => { setPhase("idle"); onDone() }, 5000)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [show, onDone])
+    const t2 = setTimeout(finish, 4500)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [show, finish])
 
   if (phase === "idle") return null
 
@@ -105,7 +120,7 @@ export function FirstBetAchievement({ show, onDone }: FirstBetAchievementProps) 
         "fixed inset-0 z-[90] flex flex-col items-center justify-center",
         isOut  ? "animate-out fade-out duration-500" : "animate-in fade-in duration-200"
       )}
-      onClick={onDone}
+      onClick={finish}
     >
       {/* Dark gold-tinted backdrop */}
       <div className="absolute inset-0 bg-black/85" style={{ background: "radial-gradient(ellipse at center, rgba(245,166,35,0.08) 0%, rgba(0,0,0,0.88) 70%)" }} />
@@ -174,7 +189,7 @@ export function FirstBetAchievement({ show, onDone }: FirstBetAchievementProps) 
 
         {/* CTA */}
         <button
-          onClick={onDone}
+          onClick={finish}
           className="w-full py-3 text-sm font-black uppercase tracking-widest text-accent-foreground transition-all active:scale-[0.97]"
           style={{
             borderRadius: "var(--radius-button)",
