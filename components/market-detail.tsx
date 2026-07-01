@@ -857,7 +857,7 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
           {!market.userBet && market.autoBet && (
             <div className="flex items-center justify-between gap-2 px-4 py-3 bg-accent/5 border border-accent/30" style={{ borderRadius: "var(--radius-button)" }}>
               <div className="min-w-0">
-                <p className="text-[10px] text-accent uppercase tracking-widest font-semibold mb-0.5">⏱ Auto-bet armed</p>
+                <p className="text-[10px] text-accent uppercase tracking-widest font-semibold mb-0.5">⏱ Auto call armed</p>
                 <p className="text-xs font-mono text-foreground">
                   Buys <span className="font-bold">{market.autoBet.side.toUpperCase()}</span> at <span className="font-bold">{market.autoBet.targetPercent}%</span> · {formatCredits(market.autoBet.amount)} CR held
                 </p>

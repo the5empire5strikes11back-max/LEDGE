@@ -120,7 +120,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Place a bet on: ${market.title}`}
+        aria-label={`Make your call on: ${market.title}`}
         className="relative w-full max-w-[430px] bg-surface-2 border-t border-border animate-in slide-in-from-bottom-4 duration-[350ms]"
         style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0", overscrollBehavior: "contain" }}
       >
@@ -245,7 +245,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                aria-label="Bet amount in credits"
+                aria-label="Call amount in credits"
                 value={rawAmount}
                 onChange={(e) => setRawAmount(e.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="0"
@@ -303,7 +303,7 @@ export function BetModal({ market, initialSide, availableCredits, onClose, onSub
             >
               <span className="shrink-0 text-sm" aria-hidden>💡</span>
               <p className="text-[11px] text-accent/80 font-medium">
-                Free credits only — no real money. Pick an amount and lock in your call.
+                Free credits only. No real money. Pick an amount and lock in your call.
               </p>
             </div>
           )}

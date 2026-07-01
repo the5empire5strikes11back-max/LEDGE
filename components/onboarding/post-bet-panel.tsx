@@ -121,7 +121,7 @@ export function PostBetPanel({
               )}>
                 {userSide.toUpperCase()}
               </span>
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Your bet</span>
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Your call</span>
             </div>
 
             <div

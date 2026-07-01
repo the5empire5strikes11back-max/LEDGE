@@ -566,7 +566,7 @@ export function MarketFeedCard({
             style={{ borderRadius: "var(--radius-button)" }}
           >
             <div>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Your position</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Your call</span>
               <p className={cn(
                 "text-xs font-mono font-bold mt-0.5",
                 userBet!.side === "yes" ? "text-success" : "text-danger"

@@ -658,8 +658,8 @@ export function ProfileScreen({
               <AlertTriangle className={cn("w-3.5 h-3.5 shrink-0", decay === "critical" ? "text-danger" : "text-muted-foreground")} />
               <p className="text-xs text-muted-foreground">
                 {decay === "critical"
-                  ? "Rank decay active — place a bet to stop it."
-                  : "Bet tomorrow to keep your streak."}
+                  ? "Rank decay active. Make your call to stop it."
+                  : "Call one tomorrow to keep your streak."}
               </p>
             </div>
           )}
@@ -979,11 +979,11 @@ export function ProfileScreen({
             </CollapsibleSection>
           )}
 
-          {/* ── Bets Made — default collapsed ── */}
+          {/* Your Receipts — default collapsed */}
           {bets.length > 0 && (
             <CollapsibleSection
-              label="Bets Made"
-              badge={openPositions.length > 0 ? `${openPositions.length} open · ${bets.length} total` : `${bets.length} bets`}
+              label="Your Receipts"
+              badge={openPositions.length > 0 ? `${openPositions.length} in play · ${bets.length} total` : `${bets.length} calls`}
               defaultOpen={false}
               storageKey="profile_bets"
               noPadding

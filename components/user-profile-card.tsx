@@ -236,7 +236,7 @@ function DecayWarning() {
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger opacity-75" />
         <span className="relative inline-flex rounded-full h-2 w-2 bg-danger" />
       </span>
-      <span className="font-medium">Rank decay in 3 days — place a bet to stay active</span>
+      <span className="font-medium">Rank decay in 3 days. Make a call to stay active</span>
     </div>
   )
 }

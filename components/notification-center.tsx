@@ -84,7 +84,7 @@ function BetRow({ item, onUsernameClick }: { item: FeedItem; onUsernameClick?: (
           >
             @{item.username}
           </button>
-          <span className="text-[10px] text-muted-foreground">bet</span>
+          <span className="text-[10px] text-muted-foreground">called</span>
           <span
             className={cn(
               "text-[9px] font-bold uppercase px-1 py-0.5",

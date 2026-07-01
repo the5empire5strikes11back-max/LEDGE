@@ -181,7 +181,7 @@ export function WinReceiptModal({
         </div>
 
         <DialogTitle className="sr-only">Win Receipt</DialogTitle>
-        <DialogDescription className="sr-only">Your winning bet receipt</DialogDescription>
+        <DialogDescription className="sr-only">Your winning call receipt</DialogDescription>
 
         {/* Confetti burst — fires at the profit number */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
@@ -233,7 +233,7 @@ export function WinReceiptModal({
               visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             )}
           >
-            <StatBox label="Your Bet" value={`${bet.amount.toLocaleString()} CR`} />
+            <StatBox label="Your Call" value={`${bet.amount.toLocaleString()} CR`} />
             <StatBox label="Side" value={bet.side.toUpperCase()} />
             <StatBox label="Payout" value={`${payout.toLocaleString()} CR`} accent />
           </div>
