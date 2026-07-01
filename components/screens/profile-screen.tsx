@@ -5,13 +5,12 @@ import { SettingsSheet } from "@/components/settings-sheet"
 import { Sparkline } from "@/components/ui/sparkline"
 import { AchievementsGrid } from "@/components/achievements-grid"
 import { Ticker } from "@/components/ui/ticker"
-import { CollapsibleSection } from "@/components/ui/collapsible-section"
 import { xpProgress } from "@/lib/game-engine"
 import { positionValue } from "@/lib/amm"
 import {
   Settings, TrendingUp, AlertTriangle, Share2, Camera, Loader2,
   CheckCircle2, XCircle, Clock, ExternalLink, Flame, ShieldCheck,
-  Zap, Gift, Star, RefreshCw, Trophy,
+  Zap, Gift, Star, RefreshCw, Trophy, X, ChevronRight,
 } from "lucide-react"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
 import type { Persona } from "@/lib/game-engine"
@@ -339,6 +338,8 @@ export function ProfileScreen({
   const [creatorMarkets, setCreatorMarkets] = useState<CreatorMarket[]>([])
   const [settingsOpen,   setSettingsOpen]   = useState(false)
   const [shareOpen,      setShareOpen]      = useState(false)
+  const [activeTab,      setActiveTab]      = useState<"receipts" | "trophies" | "markets">("receipts")
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState<string | null>(initialAvatarUrl ?? null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError,    setAvatarError]    = useState<string | null>(null)
@@ -561,17 +562,6 @@ export function ProfileScreen({
                   )}
                 </div>
 
-                {/* Followers / Following counts */}
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    <span className="font-mono font-bold text-foreground tabular-nums">{stats?.followersCount ?? 0}</span>
-                    {" "}Followers
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    <span className="font-mono font-bold text-foreground tabular-nums">{stats?.followingCount ?? 0}</span>
-                    {" "}Following
-                  </span>
-                </div>
               </div>
 
               {/* Credits */}
@@ -622,7 +612,13 @@ export function ProfileScreen({
                         </span>
                       )}
                       {stats.leaderboardRank != null && (
-                        <span className="font-mono">rank #{stats.leaderboardRank}</span>
+                        <button
+                          onClick={() => setLeaderboardOpen(true)}
+                          className="font-mono inline-flex items-center gap-1 text-accent hover:text-foreground transition-colors active:scale-[0.96]"
+                        >
+                          rank #{stats.leaderboardRank}
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -677,73 +673,71 @@ export function ProfileScreen({
             </div>
           )}
 
-          {/* ── Stats ── */}
-          <CollapsibleSection
-            label="Stats"
-            badge={stats ? `${stats.winRate}% wr · ${stats.marketsPlayed} played` : undefined}
-            defaultOpen
-            storageKey="profile_stats"
-          >
-            <div className="space-y-4">
-              {/* 5-stat grid */}
-              <div className="grid grid-cols-5 gap-1.5">
-                {stats === null ? (
-                  [0,1,2,3,4].map((i) => (
-                    <div key={i} className="bg-surface border border-border/50 px-1.5 py-3 flex flex-col items-center gap-1.5" style={{ borderRadius: "var(--radius-card)" }}>
-                      <div className="skeleton h-4 w-8" style={{ borderRadius: "var(--radius-badge)" }} />
-                      <div className="skeleton h-2.5 w-6" style={{ borderRadius: "var(--radius-badge)" }} />
-                    </div>
-                  ))
-                ) : (
-                  [
-                    { label: "Win Rate", value: `${stats.winRate}%`, color: stats.winRate >= 60 ? "text-success" : stats.winRate >= 50 ? "text-accent" : "text-danger" },
-                    { label: "Wins",     value: String(stats.correct), color: "text-foreground" },
-                    { label: "Best Run", value: String(stats.bestStreak), color: "text-foreground" },
-                    { label: "P&L", value: (() => { const v = totalPnl + unrealizedPnl; return `${v >= 0 ? "+" : ""}${Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}K` : v}` })(), color: (totalPnl + unrealizedPnl) >= 0 ? "text-success" : "text-danger" },
-                    { label: "Calibration", value: stats.calibrationScore != null ? String(stats.calibrationScore) : "--", color: stats.calibrationScore == null ? "text-muted-foreground" : stats.calibrationScore >= 80 ? "text-success" : stats.calibrationScore >= 65 ? "text-accent" : "text-danger" },
-                  ].map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="bg-surface border border-border/50 px-1 py-3 text-center"
-                      style={{ borderRadius: "var(--radius-card)" }}
-                    >
-                      <span className={cn("text-sm font-bold font-mono tabular-nums", stat.color)}>
-                        {stat.value}
-                      </span>
-                      <p className="text-[8px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">
-                        {stat.label}
-                      </p>
-                    </div>
-                  ))
+          {/* ── Stat band — always visible, complements the track record hero ── */}
+          {stats !== null && stats.marketsPlayed > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "Best run", value: String(stats.bestStreak), color: "text-foreground" },
+                { label: "Calibration", value: stats.calibrationScore != null ? String(stats.calibrationScore) : "--", color: stats.calibrationScore == null ? "text-muted-foreground" : stats.calibrationScore >= 80 ? "text-success" : stats.calibrationScore >= 65 ? "text-accent" : "text-danger" },
+                { label: "Followers", value: String(stats.followersCount ?? 0), color: "text-foreground" },
+                { label: "Following", value: String(stats.followingCount ?? 0), color: "text-foreground" },
+              ].map((t) => (
+                <div key={t.label} className="bg-surface border border-border/60 py-2.5 text-center" style={{ borderRadius: "var(--radius-card)" }}>
+                  <span className={cn("text-base font-black font-mono tabular-nums", t.color)}>{t.value}</span>
+                  <p className="text-[8.5px] text-muted-foreground uppercase tracking-wider mt-0.5 leading-tight">{t.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Tabs — replace the old wall of accordions ── */}
+          <div className="flex gap-1 p-1 bg-surface border border-border" style={{ borderRadius: "var(--radius-card)" }}>
+            {([["receipts", "Receipts"], ["trophies", "Trophies"], ["markets", "Markets"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  "flex-1 py-2 text-xs font-bold transition-all duration-[120ms] active:scale-[0.97]",
+                  activeTab === id ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+                style={{ borderRadius: "var(--radius-button)" }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Receipts tab · wealth history */}
+          {activeTab === "receipts" && pnlHistory.length > 1 && (
+            <div className="bg-card border border-border px-4 py-3" style={{ borderRadius: "var(--radius-card)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-3 h-3 text-muted-foreground/60" />
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Wealth History</span>
+                </div>
+                {pnlDelta !== null && (
+                  <span className={cn("text-xs font-mono font-semibold", pnlDelta >= 0 ? "text-success" : "text-danger")}>
+                    {pnlDelta >= 0 ? "+" : ""}{pnlDelta.toLocaleString()} CR
+                  </span>
                 )}
               </div>
-
-              {/* Wealth sparkline */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-3 h-3 text-muted-foreground/60" />
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Wealth History</span>
-                  </div>
-                  {pnlDelta !== null && (
-                    <span className={cn("text-xs font-mono font-semibold", pnlDelta >= 0 ? "text-success" : "text-danger")}>
-                      {pnlDelta >= 0 ? "+" : ""}{pnlDelta.toLocaleString()} CR
-                    </span>
-                  )}
-                </div>
-                <Sparkline data={pnlHistory} />
-              </div>
+              <Sparkline data={pnlHistory} />
             </div>
-          </CollapsibleSection>
+          )}
 
-          {/* ── Leaderboard ── */}
-          <CollapsibleSection
-            label="Leaderboard"
-            badge={lbBadge ?? undefined}
-            defaultOpen
-            storageKey="profile_leaderboard"
-            noPadding
-          >
+          {/* ── Leaderboard modal — opened by tapping your rank in the hero ── */}
+          {leaderboardOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setLeaderboardOpen(false)}>
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+              <div
+                className="relative w-full max-w-[440px] max-h-[85vh] overflow-y-auto bg-surface-2 border-t sm:border border-border animate-in slide-in-from-bottom-4 duration-300"
+                style={{ borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="sticky top-0 bg-surface-2 z-10 flex items-center justify-between px-4 py-3 border-b border-border">
+                  <span className="text-sm font-bold flex items-center gap-2"><Trophy className="w-4 h-4" /> Leaderboard</span>
+                  <button onClick={() => setLeaderboardOpen(false)} aria-label="Close" className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                </div>
             {/* Controls */}
             <div className="px-4 pt-3 pb-2 space-y-2">
               {/* Sort tabs */}
@@ -870,15 +864,14 @@ export function ProfileScreen({
                 )}
               </div>
             )}
-          </CollapsibleSection>
+              </div>
+            </div>
+          )}
 
-          {/* ── Rank Progress ── */}
-          <CollapsibleSection
-            label="Rank Progress"
-            badge={`${progress.current.toLocaleString()} XP`}
-            defaultOpen
-            storageKey="profile_rank"
-          >
+          {/* ── Trophies tab · rank progress ── */}
+          {activeTab === "trophies" && (
+            <div className="bg-card border border-border px-4 py-4" style={{ borderRadius: "var(--radius-card)" }}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-3">Rank progress</p>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span
@@ -920,16 +913,13 @@ export function ProfileScreen({
                 )}
               </p>
             )}
-          </CollapsibleSection>
+            </div>
+          )}
 
-          {/* ── Calibration — default collapsed ── */}
-          {calibRows.length > 0 && (
-            <CollapsibleSection
-              label="Calibration"
-              badge={`${calibRows.length} ${calibRows.length === 1 ? "category" : "categories"}`}
-              defaultOpen={false}
-              storageKey="profile_calibration"
-            >
+          {/* ── Trophies tab · calibration by category ── */}
+          {activeTab === "trophies" && calibRows.length > 0 && (
+            <div className="bg-card border border-border px-4 py-4" style={{ borderRadius: "var(--radius-card)" }}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-3">Calibration by category</p>
               <div className="space-y-3">
                 {calibRows.map(({ cat, wins, total, rate }) => {
                   const pct       = rate ?? 0
@@ -965,43 +955,37 @@ export function ProfileScreen({
                   )
                 })}
               </div>
-            </CollapsibleSection>
+            </div>
           )}
 
-          {/* ── Achievements — default open ── */}
-          {(stats?.achievements?.length ?? 0) > 0 && (
-            <CollapsibleSection
-              label="Achievements"
-              badge={`${stats?.achievements.length} earned`}
-              defaultOpen
-              storageKey="profile_achievements"
-            >
+          {/* ── Trophies tab · achievements ── */}
+          {activeTab === "trophies" && (stats?.achievements?.length ?? 0) > 0 && (
+            <div className="bg-card border border-border px-4 py-4" style={{ borderRadius: "var(--radius-card)" }}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-3">Achievements</p>
               <AchievementsGrid earned={stats?.achievements ?? []} />
-            </CollapsibleSection>
+            </div>
           )}
 
-          {/* ── My Markets — default collapsed ── */}
-          {creatorMarkets.length > 0 && (
-            <CollapsibleSection
-              label="My Markets"
-              badge={`${creatorMarkets.filter((m) => (m as { status?: string }).status === "live" || (m as { resolved?: boolean }).resolved === false).length || creatorMarkets.length} markets`}
-              defaultOpen={false}
-              storageKey="profile_markets"
-            >
-              <CreatorAnalytics markets={creatorMarkets} />
-            </CollapsibleSection>
+          {/* ── Markets tab · markets you created ── */}
+          {activeTab === "markets" && (
+            creatorMarkets.length > 0 ? (
+              <div className="bg-card border border-border px-4 py-4" style={{ borderRadius: "var(--radius-card)" }}>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-3">Markets you created</p>
+                <CreatorAnalytics markets={creatorMarkets} />
+              </div>
+            ) : (
+              <div className="bg-card border border-border px-4 py-8 text-center" style={{ borderRadius: "var(--radius-card)" }}>
+                <p className="text-sm text-muted-foreground">You haven&apos;t created any markets yet.</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Tap the + on the feed to make your first one.</p>
+              </div>
+            )
           )}
 
-          {/* Your Receipts — default collapsed */}
-          {bets.length > 0 && (
-            <CollapsibleSection
-              label="Your Receipts"
-              badge={openPositions.length > 0 ? `${openPositions.length} in play · ${bets.length} total` : `${bets.length} calls`}
-              defaultOpen={false}
-              storageKey="profile_bets"
-              noPadding
-            >
-              <div className="divide-y divide-border">
+          {/* ── Receipts tab · your calls ── */}
+          {activeTab === "receipts" && (
+            bets.length > 0 ? (
+              <div className="bg-card border border-border overflow-hidden" style={{ borderRadius: "var(--radius-card)" }}>
+                <div className="divide-y divide-border">
                 {bets.map((bet) => {
                   // Voided market = resolved with no winner → stake was refunded.
                   const m = bet.markets
@@ -1066,19 +1050,19 @@ export function ProfileScreen({
                   )
                 })}
               </div>
-            </CollapsibleSection>
+              </div>
+            ) : (
+              <div className="bg-card border border-border px-4 py-8 text-center" style={{ borderRadius: "var(--radius-card)" }}>
+                <p className="text-sm text-muted-foreground">No receipts yet.</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Make your first call on the feed and it lands here.</p>
+              </div>
+            )
           )}
 
-          {/* ── Ledge Plus ── */}
-          <CollapsibleSection
-            label="Ledge Plus"
-            badge={isPlus ? "Active ✦" : "$20/yr"}
-            defaultOpen
-            storageKey="profile_plus"
-            className={isPlus ? "border-success/25" : "border-accent/25"}
-          >
+          {/* ── Ledge Plus banner ── */}
+          <div className={cn("border overflow-hidden", isPlus ? "border-success/25" : "border-accent/25")} style={{ borderRadius: "var(--radius-card)" }}>
             {!isPlus ? <PlusUpsellCard /> : <PlusManageCard />}
-          </CollapsibleSection>
+          </div>
 
           <div className="pb-4" />
         </div>
