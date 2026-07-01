@@ -635,6 +635,25 @@ export function FeedScreen({
   const feedColumn = (
     <div className="flex flex-col h-full w-full overflow-hidden relative">
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 w-full pb-24 lg:pb-20">
+        {/* Identity strip — the first thing guests and brand-new users see. Not a
+            tutorial, just what Ledge is. It sits above the sticky tabs, so it
+            scrolls away the moment they start, and disappears for good once they
+            place their first call. */}
+        {(isGuest || isFirstSession) && !searchTrimmed && (
+          <div className="px-5 pt-6 pb-5 border-b border-border bg-surface">
+            <h1 className="text-[26px] font-black leading-[1.05] tracking-tight text-foreground">
+              You&apos;re always right.<br />
+              <span className="text-muted-foreground">Now prove it.</span>
+            </h1>
+            <p className="text-[13px] text-muted-foreground mt-2.5 leading-snug max-w-[340px]">
+              Call what happens next and keep the receipt. Tap{" "}
+              <span className="text-success font-bold">YES</span> or{" "}
+              <span className="text-danger font-bold">NO</span> on any take below.{" "}
+              <span className="text-foreground/70">Free, no real money.</span>
+            </p>
+          </div>
+        )}
+
         {/* Screener stats bar */}
         <div className="bg-surface border-b border-border px-4 py-2.5 flex items-center gap-4 overflow-x-auto scrollbar-none">
           {isFirstSession ? (
