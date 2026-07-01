@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, TrendingUp, TrendingDown, Activity, Users, Flame, Fish, ExternalLink, Flag, Share2, Check, ImageIcon, ShieldCheck } from "lucide-react"
+import { X, TrendingUp, TrendingDown, Activity, Users, Flame, ExternalLink, Flag, Share2, Check, ImageIcon, ShieldCheck } from "lucide-react"
 import { getResolutionMeta, formatResolvedAt } from "@/lib/resolution-label"
 import { PredictionCardOverlay } from "@/components/share-card/prediction-card-overlay"
 import type { PredictionResultData } from "@/components/share-card/prediction-result-card"
 import { cn } from "@/lib/utils"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useOnboarding } from "@/lib/onboarding"
-import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { Countdown } from "@/components/ui/countdown"
 import { computeDetailSignals } from "@/lib/social-signals"
 import { MarketComments } from "@/components/market-comments"
@@ -184,7 +182,6 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
   const [disputeSubmitted, setDisputeSubmitted] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [showResultCard, setShowResultCard] = useState(false)
-  const { state: ob, complete: completeOb } = useOnboarding()
 
   const isResolved  = !!market.resolved
   const isHot       = (market.hotScore ?? 0) >= 8
@@ -324,14 +321,6 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
     bets.map((b) => ({ side: b.side, amount: b.amount, created_at: b.created_at })),
     yesPercent
   )
-
-  // Progressive tip: first time user sees whale activity
-  useEffect(() => {
-    if (!loading && signals.hasWhale && !ob.whaleTipDone) {
-      const t = setTimeout(() => completeOb("whaleTipDone"), 6000)
-      return () => clearTimeout(t)
-    }
-  }, [loading, signals.hasWhale, ob.whaleTipDone, completeOb])
 
   const chartData = history.length > 0
     ? history.map((h) => ({ ts: new Date(h.timestamp).getTime(), y: h.yesPercent }))
@@ -1059,16 +1048,6 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
         </div>
       )}
 
-      {/* Whale progressive tip */}
-      {!isPanel && (
-        <ProgressiveTip
-          show={!loading && signals.hasWhale && !ob.whaleTipDone}
-          icon={Fish}
-          title="Whale Alert"
-          body="A large position was placed on this market. Whales often have strong conviction — but can also be wrong. Use this as a signal, not a guarantee."
-          onDismiss={() => completeOb("whaleTipDone")}
-        />
-      )}
     </div>
   )
 }

@@ -9,8 +9,6 @@ import type { GroupType } from "@/lib/market-groups"
 import { BetModal } from "@/components/bet-modal"
 import { BetConfirmOverlay } from "@/components/bet-confirm-overlay"
 import { MarketDetail } from "@/components/market-detail"
-import { FeedTooltip } from "@/components/onboarding/feed-tooltip"
-import { GettingStartedChecklist } from "@/components/onboarding/getting-started-checklist"
 import { PostBetPanel } from "@/components/onboarding/post-bet-panel"
 import { DailyChallenges } from "@/components/daily-challenges"
 import { CreateMarketSheet } from "@/components/create-market-sheet"
@@ -908,27 +906,6 @@ export function FeedScreen({
           </div>
         )}
 
-        {/* Onboarding: feed tooltip — explains the core action to new users */}
-        {!loading && filtered.length > 0 && !ob.feedTooltipDone && (
-          <FeedTooltip
-            visible
-            onDismiss={() => completeOb("feedTooltipDone")}
-          />
-        )}
-
-        {/* Onboarding: getting started checklist — 3-step strip, persists until all done */}
-        {!loading && (
-          <GettingStartedChecklist
-            ob={ob}
-            onOpenBet={() => {
-              const spotlight = filtered.find((m) => !m.resolved && !m.userBet)
-              if (spotlight) openTrade(spotlight, "yes")
-            }}
-            onOpenDailyDrop={() => onOpenDailyDrop?.()}
-            onOpenCreate={() => setCreateSheetOpen(true)}
-          />
-        )}
-
         {/* Markets */}
         <div className="w-full px-4 py-4 space-y-4">
           {loading ? (
@@ -1056,15 +1033,8 @@ export function FeedScreen({
                 )
               }
               const isSpotlight = market.id === spotlightId
-              // Pulse CTA buttons only when tooltip is still showing (no spotlight)
-              const pulseCTA =
-                !isSpotlight &&
-                !ob.feedTooltipDone &&
-                isFirstSession &&
-                !market.userBet &&
-                !market.resolved &&
-                ((market.hotScore ?? 0) >= 8 || !!market.isFeatured) &&
-                filtered.indexOf(market) === 0
+              // Onboarding button-pulse hint removed along with the rest of the tutorial UI
+              const pulseCTA = false
 
               // Cross-system compound state: hot + momentum → surging, etc.
               const compoundState = computeCompoundState(

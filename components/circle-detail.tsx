@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Users, Plus, Clock, Camera, Loader2, Trash2, UsersRound } from "lucide-react"
+import { X, Copy, Check, Users, Plus, Clock, Camera, Loader2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RANKS, type RankKey } from "@/components/user-profile-card"
 import { MarketFeedCard } from "@/components/market-feed-card"
 import { BetModal } from "@/components/bet-modal"
 import { UserAvatar, CircleAvatar } from "@/components/ui/user-avatar"
-import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
-import { useOnboarding } from "@/lib/onboarding"
 import { compressToSquare } from "@/lib/compress-image"
 
 interface CircleMember {
@@ -108,7 +106,6 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null)
   const [markets, setMarkets] = useState<CircleMarket[]>(circle.markets)
   const [marketsLoading, setMarketsLoading] = useState(true)
-  const { state: ob, complete: completeOb } = useOnboarding()
 
   // Circle avatar upload
   const [circleAvatarUrl, setCircleAvatarUrl] = useState<string | null>(circle.circleAvatarUrl ?? null)
@@ -652,14 +649,6 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
         />
       )}
 
-      {/* Circle progressive tip — shown on first visit */}
-      <ProgressiveTip
-        show={!ob.circleTipDone}
-        icon={UsersRound}
-        title="Circle Markets"
-        body="Bet against your friends on exclusive circle-only predictions. Create markets on anything — your group picks the topics."
-        onDismiss={() => completeOb("circleTipDone")}
-      />
     </div>
   )
 }

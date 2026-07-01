@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { TrendingUp, Users, User, Flame, Star, AlertTriangle, ShoppingBag, Target, CircleDot } from "lucide-react"
+import { TrendingUp, Users, User, Flame, AlertTriangle, ShoppingBag } from "lucide-react"
 import { ShopModal } from "@/components/shop-modal"
 import { XpProgressBar } from "@/components/xp-progress-bar"
 import { XpFloatBadge } from "@/components/xp-float-badge"
@@ -21,9 +21,7 @@ import { ProfileScreen } from "@/components/screens/profile-screen"
 import { Ticker } from "@/components/ui/ticker"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { FirstBetAchievement } from "@/components/onboarding/achievement-toast"
-import { ProgressiveTip } from "@/components/onboarding/progressive-tip"
 import { NotificationPrompt } from "@/components/onboarding/notification-prompt"
-import { Coachmark } from "@/components/onboarding/coachmark"
 import { useOnboarding } from "@/lib/onboarding"
 import { applyAccentTheme, getSavedAccent } from "@/lib/accent-theme"
 import {
@@ -114,8 +112,6 @@ export default function App() {
   const [rankUpFrom, setRankUpFrom] = useState<RankKey | null>(null)
   const [chestOpen, setChestOpen] = useState(false)
   const [notifPromptOpen, setNotifPromptOpen] = useState(false)
-  const [profileCoachmark, setProfileCoachmark] = useState(false)
-  const [circlesCoachmark, setCirclesCoachmark] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
   const [publicProfileUsername, setPublicProfileUsername] = useState<string | null>(null)
   const [xpFloat, setXpFloat] = useState<{ amount: number; key: number }>({ amount: 0, key: 0 })
@@ -265,10 +261,6 @@ export default function App() {
     if (s === 'circles') {
       setCirclesBadge(false)
       localStorage.setItem(LS_LAST_CIRCLES_VISIT, String(Date.now()))
-      if (!ob.circlesCoachmarkDone) setTimeout(() => setCirclesCoachmark(true), 600)
-    }
-    if (s === 'profile' && !ob.profileCoachmarkDone) {
-      setTimeout(() => setProfileCoachmark(true), 700)
     }
   }
 
@@ -819,29 +811,6 @@ export default function App() {
         onDone={() => { setNotifPromptOpen(false); completeOb("notifPromptSeen") }}
       />
 
-      {/* Profile tab — calibration score coachmark */}
-      <Coachmark
-        show={profileCoachmark}
-        icon={Target}
-        iconColor="text-accent"
-        title="Your calibration score"
-        body="This number measures how accurate your predictions are. 75 is random guessing — anything above 75 means you're genuinely good. Sharp bettors hit 85+."
-        position="center"
-        arrowDir="down"
-        onDismiss={() => { setProfileCoachmark(false); completeOb("profileCoachmarkDone") }}
-      />
-
-      {/* Circles tab — private leagues coachmark */}
-      <Coachmark
-        show={circlesCoachmark}
-        icon={CircleDot}
-        iconColor="text-accent"
-        title="Private prediction leagues"
-        body="Circles are invite-only groups where you and your friends bet against each other on the same markets. Create one or join with a code — your reputation is on the line."
-        position="top"
-        arrowDir="up"
-        onDismiss={() => { setCirclesCoachmark(false); completeOb("circlesCoachmarkDone") }}
-      />
       <CreditShopModal
         open={shopOpen}
         onClose={() => setShopOpen(false)}
@@ -870,23 +839,6 @@ export default function App() {
         onDone={() => setShowFirstBetAchievement(false)}
       />
 
-      {/* Streak progressive tip */}
-      <ProgressiveTip
-        show={!ob.streakTipDone && (dailyDropData?.newStreak ?? streak) >= 2}
-        icon={Flame}
-        title="Daily Streak"
-        body="Log in and bet every day to build your streak. Longer streaks unlock bonus credits and exclusive chest rewards."
-        onDismiss={() => completeOb("streakTipDone")}
-      />
-
-      {/* Rank progressive tip — shown after first rank-up if not yet seen */}
-      <ProgressiveTip
-        show={!ob.rankTipDone && !rankUpFrom && xp >= 120}
-        icon={Star}
-        title="Rank System"
-        body="Earn XP by placing bets and winning. Higher ranks unlock bigger daily credits and exclusive profile badges."
-        onDismiss={() => completeOb("rankTipDone")}
-      />
     </div>
   )
 }
