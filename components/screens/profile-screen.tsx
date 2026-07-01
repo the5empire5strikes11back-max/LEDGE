@@ -592,36 +592,49 @@ export function ProfileScreen({
               </div>
             </div>
 
-            {/* Quick stats row — always visible below the fold of the identity card */}
+            {/* ── Track record — the hero of your profile. Being right is the
+                identity here, not the money, so accuracy leads and P&L stays quiet. ── */}
             {stats !== null && stats.marketsPlayed > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50">
-                <div className="grid grid-cols-3 gap-0 divide-x divide-border/40">
-                  {/* Accuracy */}
-                  <div className="flex flex-col items-center gap-1 py-1">
-                    <div className="relative">
-                      <AccuracyRing pct={stats.marketsPlayed >= 3 ? stats.winRate : 0} size={44} />
-                      <span
-                        className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums"
-                        style={{ color: stats.winRate >= 60 ? "#22c55e" : stats.winRate >= 50 ? "#FFFFFF" : "#ef4444" }}
-                      >
-                        {stats.marketsPlayed >= 3 ? `${stats.winRate}%` : "--"}
-                      </span>
+                <div className="flex items-center gap-4">
+                  {/* Accuracy ring — the hero number */}
+                  <div className="relative shrink-0">
+                    <AccuracyRing pct={stats.marketsPlayed >= 3 ? stats.winRate : 0} size={78} />
+                    <span
+                      className="absolute inset-0 flex items-center justify-center text-lg font-black tabular-nums"
+                      style={{ color: stats.marketsPlayed < 3 ? "var(--muted-foreground)" : stats.winRate >= 60 ? "#22c55e" : stats.winRate >= 50 ? "var(--foreground)" : "#ef4444" }}
+                    >
+                      {stats.marketsPlayed >= 3 ? `${stats.winRate}%` : "--"}
+                    </span>
+                  </div>
+
+                  {/* Record headline + supporting line */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Track record</p>
+                    <p className="text-lg font-black text-foreground leading-tight mt-0.5">
+                      Called <span className="text-success">{stats.correct}</span> right
+                    </p>
+                    <div className="flex items-center gap-2.5 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
+                      <span className="font-mono">{stats.marketsPlayed} calls</span>
+                      {streak > 0 && (
+                        <span className="inline-flex items-center gap-1 text-accent font-medium">
+                          <Flame className="w-3 h-3 streak-flame shrink-0" />{streak} streak
+                        </span>
+                      )}
+                      {stats.leaderboardRank != null && (
+                        <span className="font-mono">rank #{stats.leaderboardRank}</span>
+                      )}
                     </div>
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Accuracy</span>
                   </div>
-                  {/* Played */}
-                  <div className="flex flex-col items-center justify-center gap-0.5 py-1">
-                    <span className="text-base font-black font-mono tabular-nums text-foreground">{stats.marketsPlayed}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Played</span>
-                  </div>
-                  {/* P&L */}
-                  <div className="flex flex-col items-center justify-center gap-0.5 py-1">
-                    <span className={cn("text-base font-black font-mono tabular-nums", totalPnl >= 0 ? "text-success" : "text-danger")}>
+
+                  {/* P&L — de-emphasized; money is not the point */}
+                  <div className="text-right shrink-0 self-start">
+                    <span className={cn("font-mono text-sm font-bold tabular-nums", totalPnl >= 0 ? "text-success/70" : "text-danger/70")}>
                       {totalPnl >= 0 ? "+" : ""}{totalPnl >= 1000 || totalPnl <= -1000
                         ? `${(totalPnl / 1000).toFixed(1)}K`
                         : totalPnl.toLocaleString()}
                     </span>
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wider">P&amp;L</span>
+                    <span className="text-[9px] text-muted-foreground/70 uppercase tracking-wider block">P&amp;L</span>
                   </div>
                 </div>
               </div>
