@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { X, TrendingUp, TrendingDown, Activity, Users, Flame, ExternalLink, Flag, Share2, Check, ImageIcon, ShieldCheck } from "lucide-react"
 import { getResolutionMeta, formatResolvedAt } from "@/lib/resolution-label"
 import { PredictionCardOverlay } from "@/components/share-card/prediction-card-overlay"
@@ -216,7 +217,11 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
       if (res.ok) {
         const data = await res.json()
         onCashout?.(market.id, data.newCredits, data.cashoutValue)
+      } else {
+        toast.error("Cash out didn't go through", { description: "Please try again.", duration: 3000 })
       }
+    } catch {
+      toast.error("Cash out didn't go through", { description: "Check your connection and try again.", duration: 3000 })
     } finally {
       setCashingOut(false)
       setConfirmCashout(false)
@@ -224,13 +229,18 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
   }, [cashingOut, market.id, market.userBet, onCashout])
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/markets/${market.id}/bets`)
-    if (res.ok) {
-      const data = await res.json()
-      setBets((data.bets ?? []).slice().reverse())
-      setHistory(data.history ?? [])
+    try {
+      const res = await fetch(`/api/markets/${market.id}/bets`)
+      if (res.ok) {
+        const data = await res.json()
+        setBets((data.bets ?? []).slice().reverse())
+        setHistory(data.history ?? [])
+      }
+    } catch {
+      // Network failure — leave bets/history in their current (possibly empty) state
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [market.id])
 
   const submitDispute = useCallback(async () => {
@@ -246,7 +256,11 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
         setDisputeSubmitted(true)
         setDisputeOpen(false)
         setDisputeText("")
+      } else {
+        toast.error("Couldn't submit dispute", { description: "Please try again.", duration: 3000 })
       }
+    } catch {
+      toast.error("Couldn't submit dispute", { description: "Check your connection and try again.", duration: 3000 })
     } finally {
       setDisputeSubmitting(false)
     }
@@ -275,7 +289,13 @@ export function MarketDetail({ market, onClose, onBuyYes, onBuyNo, onCashout, on
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ winner }),
       })
-      if (res.ok) setSettledProposal(winner)
+      if (res.ok) {
+        setSettledProposal(winner)
+      } else {
+        toast.error("Couldn't submit result", { description: "Please try again.", duration: 3000 })
+      }
+    } catch {
+      toast.error("Couldn't submit result", { description: "Check your connection and try again.", duration: 3000 })
     } finally {
       setSettling(false)
     }

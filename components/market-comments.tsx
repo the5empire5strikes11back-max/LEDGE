@@ -115,6 +115,8 @@ export function MarketComments({
       setComments((prev) => [data, ...prev])
       setBody("")
       removeImage()
+    } catch {
+      alert("Couldn't post your comment. Check your connection and try again.")
     } finally {
       setSubmitting(false)
     }
@@ -138,30 +140,43 @@ export function MarketComments({
       }
     }))
 
-    const res = await fetch(`/api/comments/${commentId}/react`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type }),
-    })
-    if (!res.ok) fetchComments(1, true) // revert on error
+    try {
+      const res = await fetch(`/api/comments/${commentId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      })
+      if (!res.ok) fetchComments(1, true) // revert on error
+    } catch {
+      fetchComments(1, true) // revert on network failure
+    }
   }
 
   const handleDelete = async (commentId: string) => {
     setMenuOpen(null)
     if (!confirm("Delete this comment?")) return
-    await fetch(`/api/comments/${commentId}`, { method: "DELETE" })
-    setComments((prev) => prev.filter((c) => c.id !== commentId))
+    try {
+      const res = await fetch(`/api/comments/${commentId}`, { method: "DELETE" })
+      if (!res.ok) { alert("Couldn't delete comment. Please try again."); return }
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+    } catch {
+      alert("Couldn't delete comment. Check your connection and try again.")
+    }
   }
 
   const handleReport = async (commentId: string) => {
     setMenuOpen(null)
-    const res = await fetch(`/api/comments/${commentId}/report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "user_report" }),
-    })
-    if (res.status === 409) { alert("Already reported"); return }
-    alert("Comment reported. Thanks.")
+    try {
+      const res = await fetch(`/api/comments/${commentId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "user_report" }),
+      })
+      if (res.status === 409) { alert("Already reported"); return }
+      alert("Comment reported. Thanks.")
+    } catch {
+      alert("Couldn't report comment. Check your connection and try again.")
+    }
   }
 
   const loadMore = () => {

@@ -503,15 +503,17 @@ export default function App() {
         <div className="flex items-center gap-2.5 px-5 h-[57px] border-b border-border shrink-0">
           <LedgeLogo size={28} />
           <span className="font-bold text-base tracking-tight">Ledge</span>
-          <div className="ml-auto flex items-center gap-2">
-            {decay !== "none" && (
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full animate-pulse shrink-0",
-                decay === "critical" ? "bg-danger" : "bg-accent"
-              )} />
-            )}
-            <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
-          </div>
+          {!isGuest && (
+            <div className="ml-auto flex items-center gap-2">
+              {decay !== "none" && (
+                <div className={cn(
+                  "w-1.5 h-1.5 rounded-full animate-pulse shrink-0",
+                  decay === "critical" ? "bg-danger" : "bg-accent"
+                )} />
+              )}
+              <NotificationCenter username={profile?.username ?? null} onUsernameClick={(u) => setPublicProfileUsername(u)} />
+            </div>
+          )}
         </div>
 
         {/* Nav */}

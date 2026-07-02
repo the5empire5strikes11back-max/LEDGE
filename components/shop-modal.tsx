@@ -59,8 +59,12 @@ export function ShopModal({ open, onClose, onCreditsChange, onOpenBuyCredits }: 
   const [buying, setBuying] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/shop")
-    if (r.ok) { const d = await r.json(); setItems(d.items ?? []); setCredits(d.credits ?? 0); setInv(d.inventory ?? null) }
+    try {
+      const r = await fetch("/api/shop")
+      if (r.ok) { const d = await r.json(); setItems(d.items ?? []); setCredits(d.credits ?? 0); setInv(d.inventory ?? null) }
+    } catch {
+      // Network failure — leave shop state as-is
+    }
   }, [])
   useEffect(() => { if (open) load() }, [open, load])
 
@@ -80,6 +84,8 @@ export function ShopModal({ open, onClose, onCreditsChange, onOpenBuyCredits }: 
       setCredits(d.credits); setInv(d.inventory); onCreditsChange?.(d.credits)
       const it = items.find((i) => i.key === key)
       toast(`${it?.emoji ?? "🛒"} ${it?.name ?? "Item"} purchased`, { duration: 2500 })
+    } catch {
+      toast.error("Couldn't buy", { description: "Check your connection and try again.", duration: 3000 })
     } finally { setBuying(null) }
   }, [buying, items, onCreditsChange])
 

@@ -270,35 +270,40 @@ export function FeedScreen({
     // fire on every feed load. Markets come from cache so they don't need to wait.
     fetch('/api/markets/resolve-expired', { method: 'POST' }).catch(() => {})
     fetch('/api/cron/release-markets', { method: 'POST' }).catch(() => {})
-    const res = await fetch('/api/markets')
-    if (res.ok) {
-      const data: Market[] = await res.json()
-      setMarkets(data)
-      // Seed opening + current point per market so sparklines show the full arc
-      seedOddsHistory(
-        oddsHistoryRef.current,
-        data.map((m) => ({
-          id: m.id,
-          yesPercent: m.yesPercent,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          openingYesPercent: (m as any).openingYesPercent,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          published_at: (m as any).published_at,
-        }))
-      )
+    try {
+      const res = await fetch('/api/markets')
+      if (res.ok) {
+        const data: Market[] = await res.json()
+        setMarkets(data)
+        // Seed opening + current point per market so sparklines show the full arc
+        seedOddsHistory(
+          oddsHistoryRef.current,
+          data.map((m) => ({
+            id: m.id,
+            yesPercent: m.yesPercent,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            openingYesPercent: (m as any).openingYesPercent,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            published_at: (m as any).published_at,
+          }))
+        )
 
-      // Fetch friend bets in background — fire-and-forget, updates cards when ready
-      const ids = data.map((m) => m.id).join(',')
-      fetch(`/api/markets/friend-bets?ids=${ids}`)
-        .then((r) => r.ok ? r.json() : {})
-        .then((fbMap: Record<string, FriendBet[]>) => {
-          setMarkets((prev) => prev.map((m) =>
-            fbMap[m.id] ? { ...m, friendBets: fbMap[m.id] } : m
-          ))
-        })
-        .catch(() => {})
+        // Fetch friend bets in background — fire-and-forget, updates cards when ready
+        const ids = data.map((m) => m.id).join(',')
+        fetch(`/api/markets/friend-bets?ids=${ids}`)
+          .then((r) => r.ok ? r.json() : {})
+          .then((fbMap: Record<string, FriendBet[]>) => {
+            setMarkets((prev) => prev.map((m) =>
+              fbMap[m.id] ? { ...m, friendBets: fbMap[m.id] } : m
+            ))
+          })
+          .catch(() => {})
+      }
+    } catch {
+      // Network failure — leave markets in their current (possibly empty) state
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -487,11 +492,19 @@ export function FeedScreen({
 
     onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, undefined, undefined, market.endTime)
 
-    const res = await fetch('/api/bets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ market_id: market.id, side, amount, useDoubleDown }),
-    })
+    let res: Response
+    try {
+      res = await fetch('/api/bets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ market_id: market.id, side, amount, useDoubleDown }),
+      })
+    } catch {
+      // Roll back optimistic credit deduction
+      onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
+      toast.error("Bet didn't go through", { description: "Check your connection and try again.", duration: 4000 })
+      return
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -570,11 +583,17 @@ export function FeedScreen({
     if (!market) return
     setTradeModal(null)
 
-    const res = await fetch('/api/auto-bets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ market_id: market.id, side, target_percent: targetPercent, amount }),
-    })
+    let res: Response
+    try {
+      res = await fetch('/api/auto-bets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ market_id: market.id, side, target_percent: targetPercent, amount }),
+      })
+    } catch {
+      toast.error("Couldn't arm auto-bet", { description: "Check your connection and try again.", duration: 4000 })
+      return
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -601,7 +620,13 @@ export function FeedScreen({
     const m = markets.find((mk) => mk.id === marketId) ?? (detailMarket?.id === marketId ? detailMarket : undefined)
     const autoBetId = (m as { autoBet?: { id: string } } | undefined)?.autoBet?.id
     if (!autoBetId) return
-    const res = await fetch(`/api/auto-bets/${autoBetId}`, { method: 'DELETE' })
+    let res: Response
+    try {
+      res = await fetch(`/api/auto-bets/${autoBetId}`, { method: 'DELETE' })
+    } catch {
+      toast.error("Couldn't cancel", { description: "Check your connection and try again.", duration: 3000 })
+      return
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       toast.error("Couldn't cancel", { description: err?.error ?? 'Try again.', duration: 3000 })

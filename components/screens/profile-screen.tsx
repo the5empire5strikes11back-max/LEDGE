@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { toast } from "sonner"
 import { SettingsSheet } from "@/components/settings-sheet"
 import { Sparkline } from "@/components/ui/sparkline"
 import { AchievementsGrid } from "@/components/achievements-grid"
@@ -163,6 +164,9 @@ function PlusUpsellCard() {
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
+      else toast.error("Couldn't start checkout", { description: "Please try again.", duration: 3000 })
+    } catch {
+      toast.error("Couldn't start checkout", { description: "Check your connection and try again.", duration: 3000 })
     } finally {
       setLoading(false)
     }
@@ -355,10 +359,10 @@ export function ProfileScreen({
   const [lbLoading,    setLbLoading]    = useState(true)
 
   useEffect(() => {
-    fetch("/api/stats").then((r) => r.ok ? r.json() : null).then((d) => d && setStats(d))
-    fetch("/api/pnl-history").then((r) => r.ok ? r.json() : null).then((d) => d && setPnlHistory(d))
-    fetch("/api/bets").then((r) => r.ok ? r.json() : null).then((d) => Array.isArray(d) && setBets(d))
-    fetch("/api/creator/markets").then((r) => r.ok ? r.json() : []).then((d) => Array.isArray(d) && setCreatorMarkets(d))
+    fetch("/api/stats").then((r) => r.ok ? r.json() : null).then((d) => d && setStats(d)).catch(() => {})
+    fetch("/api/pnl-history").then((r) => r.ok ? r.json() : null).then((d) => d && setPnlHistory(d)).catch(() => {})
+    fetch("/api/bets").then((r) => r.ok ? r.json() : null).then((d) => Array.isArray(d) && setBets(d)).catch(() => {})
+    fetch("/api/creator/markets").then((r) => r.ok ? r.json() : []).then((d) => Array.isArray(d) && setCreatorMarkets(d)).catch(() => {})
   }, [])
 
   const loadLeaderboard = useCallback((sort: LbSort, view: LbView, period: LbPeriod) => {
