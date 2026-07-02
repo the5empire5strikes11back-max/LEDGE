@@ -66,9 +66,10 @@ export function useOnboarding() {
   }, [])
 
   const completeAll = useCallback(() => {
-    const all = Object.fromEntries(
-      Object.keys(DEFAULTS).map((k) => [k, true])
-    ) as OnboardingState
+    const all = (Object.keys(DEFAULTS) as (keyof OnboardingState)[]).reduce(
+      (acc, key) => ({ ...acc, [key]: true }),
+      {} as OnboardingState
+    )
     persist(all)
     setState(all)
   }, [])

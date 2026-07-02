@@ -257,19 +257,24 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
     if (!newCircleName.trim()) return
     setCreateLoading(true)
     setCreateError("")
-    const res = await fetch('/api/circles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newCircleName.trim() }),
-    })
-    setCreateLoading(false)
-    if (res.ok) {
-      setNewCircleName("")
-      setCreating(false)
-      loadCircles()
-    } else {
-      const data = await res.json().catch(() => ({}))
-      setCreateError(data.error ?? 'Failed to create circle')
+    try {
+      const res = await fetch('/api/circles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCircleName.trim() }),
+      })
+      if (res.ok) {
+        setNewCircleName("")
+        setCreating(false)
+        loadCircles()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setCreateError(data.error ?? 'Failed to create circle')
+      }
+    } catch {
+      setCreateError('Failed to create circle. Check your connection and try again.')
+    } finally {
+      setCreateLoading(false)
     }
   }
 
@@ -277,19 +282,24 @@ export function CirclesScreen({ availableCredits, onBet }: CirclesScreenProps) {
     if (!joinCode.trim()) return
     setJoinLoading(true)
     setJoinError("")
-    const res = await fetch('/api/circles/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invite_code: joinCode.trim() }),
-    })
-    setJoinLoading(false)
-    if (res.ok) {
-      setJoinCode("")
-      setJoining(false)
-      loadCircles()
-    } else {
-      const data = await res.json()
-      setJoinError(data.error ?? 'Something went wrong')
+    try {
+      const res = await fetch('/api/circles/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_code: joinCode.trim() }),
+      })
+      if (res.ok) {
+        setJoinCode("")
+        setJoining(false)
+        loadCircles()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setJoinError(data.error ?? 'Something went wrong')
+      }
+    } catch {
+      setJoinError('Failed to join circle. Check your connection and try again.')
+    } finally {
+      setJoinLoading(false)
     }
   }
 

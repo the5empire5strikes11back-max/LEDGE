@@ -152,14 +152,19 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
   const handleDelete = async () => {
     setDeleteLoading(true)
     setDeleteError("")
-    const res = await fetch(`/api/circles/${circle.id}`, { method: 'DELETE' })
-    setDeleteLoading(false)
-    if (res.ok) {
-      onDelete?.(circle.id)
-      onClose()
-    } else {
-      const data = await res.json().catch(() => ({}))
-      setDeleteError(data.error ?? 'Failed to delete circle')
+    try {
+      const res = await fetch(`/api/circles/${circle.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        onDelete?.(circle.id)
+        onClose()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setDeleteError(data.error ?? 'Failed to delete circle')
+      }
+    } catch {
+      setDeleteError('Failed to delete circle. Check your connection and try again.')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -187,36 +192,40 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
 
     const end_time = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString()
 
-    const res = await fetch(`/api/circles/${circle.id}/markets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle.trim(), end_time }),
-    })
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/markets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle.trim(), end_time }),
+      })
 
-    setCreateLoading(false)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setCreateError(data.error ?? 'Failed to create market')
+        return
+      }
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setCreateError(data.error ?? 'Failed to create market')
-      return
+      const market = await res.json()
+      const mapped: CircleMarket = {
+        id: market.id,
+        title: market.title,
+        category: 'Circle',
+        endTime: market.end_time,
+        yesPercent: market.yes_percent ?? 50,
+        yesPool: market.yes_pool ?? 0,
+        noPool: market.no_pool ?? 0,
+        totalCredits: 0,
+        hotScore: 0,
+        momentumShift: 0,
+      }
+      setMarkets((prev) => [mapped, ...prev])
+      setNewTitle("")
+      setCreating(false)
+    } catch {
+      setCreateError('Failed to create market. Check your connection and try again.')
+    } finally {
+      setCreateLoading(false)
     }
-
-    const market = await res.json()
-    const mapped: CircleMarket = {
-      id: market.id,
-      title: market.title,
-      category: 'Circle',
-      endTime: market.end_time,
-      yesPercent: market.yes_percent ?? 50,
-      yesPool: market.yes_pool ?? 0,
-      noPool: market.no_pool ?? 0,
-      totalCredits: 0,
-      hotScore: 0,
-      momentumShift: 0,
-    }
-    setMarkets((prev) => [mapped, ...prev])
-    setNewTitle("")
-    setCreating(false)
   }
 
   const handleBetSubmit = useCallback(async (side: "yes" | "no", amount: number) => {
@@ -229,28 +238,32 @@ export function CircleDetail({ circle, availableCredits, isCreator = false, onCl
     setTradeModal(null)
     onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas)
 
-    const res = await fetch('/api/bets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ market_id: market.id, side, amount }),
-    })
+    try {
+      const res = await fetch('/api/bets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ market_id: market.id, side, amount }),
+      })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      console.error('Bet failed:', err)
+      if (!res.ok) {
+        // Roll back the optimistic credit deduction — the server rejected the bet.
+        onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
+        return
+      }
+
+      const data = await res.json()
+      const placed = data?.cappedAmount ?? amount
+
+      setMarkets((prev) => prev.map((m) =>
+        m.id === market.id ? { ...m, userBet: { side, amount: placed } } : m
+      ))
+
+      if (data?.profile) {
+        onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp)
+      }
+    } catch {
+      // Network failure — roll back the optimistic credit deduction.
       onBet(market.title, market.category, side, 0, market.yesPercent, majorityWas, creditsBeforeBet)
-      return
-    }
-
-    const data = await res.json()
-    const placed = data?.cappedAmount ?? amount
-
-    setMarkets((prev) => prev.map((m) =>
-      m.id === market.id ? { ...m, userBet: { side, amount: placed } } : m
-    ))
-
-    if (data?.profile) {
-      onBet(market.title, market.category, side, amount, market.yesPercent, majorityWas, data.profile.credits, data.profile.xp)
     }
   }, [tradeModal, onBet, availableCredits])
 

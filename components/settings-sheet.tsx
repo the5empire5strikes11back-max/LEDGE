@@ -25,9 +25,14 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
       return
     }
     setLoggingOut(true)
-    await supabase.auth.signOut()
-    router.push("/auth/login")
-    router.refresh()
+    try {
+      await supabase.auth.signOut()
+      router.push("/auth/login")
+      router.refresh()
+    } catch {
+      setLoggingOut(false)
+      setConfirmLogout(false)
+    }
   }
 
   // Reset confirm state when sheet closes
@@ -84,13 +89,12 @@ export function SettingsSheet({ open, onClose, username }: SettingsSheetProps) {
               className="bg-card border border-border overflow-hidden"
               style={{ borderRadius: "var(--radius-card)" }}
             >
-              {/* Username row */}
+              {/* Username row — display only, not editable yet */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Username</p>
                   <p className="text-sm font-mono font-medium mt-0.5">@{username}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
 
               {/* Log out */}

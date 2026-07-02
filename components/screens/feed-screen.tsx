@@ -616,6 +616,7 @@ export function FeedScreen({
 
   const openTradeFromDetail = (side: "yes" | "no") => {
     if (!detailMarket) return
+    if (isGuest) { setGuestPromptOpen(true); return }
     setTradeModal({ market: detailMarket, side })
   }
 
